@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { useLocation } from "wouter";
 
 interface Patient {
   id: string;
@@ -28,12 +29,17 @@ const mockPatients: Patient[] = [
 export function PatientList() {
   const [searchTerm, setSearchTerm] = useState("");
   const [patients] = useState(mockPatients);
+  const [, setLocation] = useLocation();
 
   const filteredPatients = patients.filter(patient =>
     patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     patient.cpf.includes(searchTerm) ||
     patient.cns.includes(searchTerm)
   );
+
+  const handlePatientClick = (patientId: string) => {
+    setLocation(`/pacientes/${patientId}`);
+  };
 
   return (
     <div className="space-y-4">
@@ -62,7 +68,12 @@ export function PatientList() {
 
       <div className="space-y-3">
         {filteredPatients.map((patient) => (
-          <Card key={patient.id} className="p-4 hover-elevate cursor-pointer" data-testid={`card-patient-${patient.id}`}>
+          <Card 
+            key={patient.id} 
+            className="p-4 hover-elevate cursor-pointer" 
+            data-testid={`card-patient-${patient.id}`}
+            onClick={() => handlePatientClick(patient.id)}
+          >
             <div className="flex items-center gap-4">
               <Avatar className="h-12 w-12">
                 <AvatarImage src="" alt={patient.name} />

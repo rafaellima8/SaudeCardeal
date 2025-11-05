@@ -11,20 +11,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import Dashboard from "@/pages/dashboard";
+import Reception from "@/pages/reception";
 import Patients from "@/pages/patients";
 import PatientDetail from "@/pages/patient-detail";
 import Appointments from "@/pages/appointments";
 import Pharmacy from "@/pages/pharmacy";
+import TFD from "@/pages/tfd";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/recepcao" component={Reception} />
       <Route path="/pacientes" component={Patients} />
       <Route path="/pacientes/:id" component={PatientDetail} />
       <Route path="/agendamentos" component={Appointments} />
       <Route path="/farmacia" component={Pharmacy} />
+      <Route path="/tfd" component={TFD} />
       <Route component={NotFound} />
     </Switch>
   );

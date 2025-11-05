@@ -8,7 +8,8 @@ import {
   Building2, 
   UserCog, 
   BarChart3,
-  ChevronDown
+  ChevronDown,
+  ClipboardList
 } from "lucide-react";
 import {
   Sidebar,
@@ -27,6 +28,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 
 const menuItems = [
   { title: "Dashboard", icon: Home, url: "/" },
+  { title: "Recepção", icon: ClipboardList, url: "/recepcao" },
   { title: "Pacientes", icon: Users, url: "/pacientes" },
   { title: "Agendamentos", icon: Calendar, url: "/agendamentos" },
   { title: "Farmácia", icon: Pill, url: "/farmacia" },
