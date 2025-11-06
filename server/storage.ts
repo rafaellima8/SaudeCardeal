@@ -35,6 +35,7 @@ export interface IStorage {
   getCitizenByCns(cns: string): Promise<Citizen | undefined>;
   createCitizen(citizen: InsertCitizen): Promise<Citizen>;
   updateCitizen(id: string, citizen: Partial<InsertCitizen>): Promise<Citizen | undefined>;
+  deleteCitizen(id: string): Promise<boolean>;
 
   // Appointments
   getAppointments(params: { 
@@ -48,30 +49,36 @@ export interface IStorage {
   getAppointmentById(id: string): Promise<Appointment | undefined>;
   createAppointment(appointment: InsertAppointment): Promise<Appointment>;
   updateAppointment(id: string, appointment: Partial<InsertAppointment>): Promise<Appointment | undefined>;
+  deleteAppointment(id: string): Promise<boolean>;
 
   // Attendance Queue
   getAttendanceQueue(unitId: string, status?: string): Promise<AttendanceQueue[]>;
   createQueueEntry(entry: InsertAttendanceQueue): Promise<AttendanceQueue>;
   updateQueueEntry(id: string, entry: Partial<InsertAttendanceQueue>): Promise<AttendanceQueue | undefined>;
+  deleteQueueEntry(id: string): Promise<boolean>;
 
   // Consultations
   getConsultations(citizenId: string): Promise<Consultation[]>;
   getConsultationById(id: string): Promise<Consultation | undefined>;
   createConsultation(consultation: InsertConsultation): Promise<Consultation>;
+  deleteConsultation(id: string): Promise<boolean>;
 
   // Prescriptions
   getPrescriptions(params: { citizenId?: string; consultationId?: string }): Promise<Prescription[]>;
   createPrescription(prescription: InsertPrescription): Promise<Prescription>;
   updatePrescription(id: string, prescription: Partial<InsertPrescription>): Promise<Prescription | undefined>;
+  deletePrescription(id: string): Promise<boolean>;
 
   // Medications
   getMedications(params: { search?: string; unitId?: string }): Promise<Medication[]>;
   createMedication(medication: InsertMedication): Promise<Medication>;
+  deleteMedication(id: string): Promise<boolean>;
 
   // Medication Stock
   getMedicationStock(medicationId: string): Promise<MedicationStock[]>;
   createMedicationStock(stock: InsertMedicationStock): Promise<MedicationStock>;
   updateMedicationStock(id: string, stock: Partial<InsertMedicationStock>): Promise<MedicationStock | undefined>;
+  deleteMedicationStock(id: string): Promise<boolean>;
   getLowStockMedications(unitId: string): Promise<any[]>;
 
   // Dashboard Stats
@@ -89,12 +96,14 @@ export interface IStorage {
   getExams(citizenId: string): Promise<Exam[]>;
   createExam(exam: InsertExam): Promise<Exam>;
   updateExam(id: string, exam: Partial<InsertExam>): Promise<Exam | undefined>;
+  deleteExam(id: string): Promise<boolean>;
 
   // TFD
   getTfdRequests(params: { citizenId?: string; status?: string }): Promise<TfdRequest[]>;
   getTfdRequestById(id: string): Promise<TfdRequest | undefined>;
   createTfdRequest(request: InsertTfdRequest): Promise<TfdRequest>;
   updateTfdRequest(id: string, request: Partial<InsertTfdRequest>): Promise<TfdRequest | undefined>;
+  deleteTfdRequest(id: string): Promise<boolean>;
 
   // Health Units
   getHealthUnits(): Promise<HealthUnit[]>;
@@ -642,6 +651,52 @@ export class DbStorage implements IStorage {
       ageDistribution: Object.entries(ageDistribution)
         .map(([range, count]) => ({ range, count })),
     };
+  }
+
+  // Delete methods
+  async deleteCitizen(id: string): Promise<boolean> {
+    const result = await db.delete(schema.citizens).where(eq(schema.citizens.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  async deleteAppointment(id: string): Promise<boolean> {
+    const result = await db.delete(schema.appointments).where(eq(schema.appointments.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  async deleteQueueEntry(id: string): Promise<boolean> {
+    const result = await db.delete(schema.attendanceQueue).where(eq(schema.attendanceQueue.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  async deleteConsultation(id: string): Promise<boolean> {
+    const result = await db.delete(schema.consultations).where(eq(schema.consultations.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  async deletePrescription(id: string): Promise<boolean> {
+    const result = await db.delete(schema.prescriptions).where(eq(schema.prescriptions.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  async deleteMedication(id: string): Promise<boolean> {
+    const result = await db.delete(schema.medications).where(eq(schema.medications.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  async deleteMedicationStock(id: string): Promise<boolean> {
+    const result = await db.delete(schema.medicationStock).where(eq(schema.medicationStock.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  async deleteExam(id: string): Promise<boolean> {
+    const result = await db.delete(schema.exams).where(eq(schema.exams.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  async deleteTfdRequest(id: string): Promise<boolean> {
+    const result = await db.delete(schema.tfdRequests).where(eq(schema.tfdRequests.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
   }
 }
 

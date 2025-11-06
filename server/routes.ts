@@ -69,6 +69,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/citizens/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteCitizen(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Cidadão não encontrado" });
+      }
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Appointments API
   app.get("/api/appointments", async (req, res) => {
     try {
@@ -124,6 +136,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/appointments/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteAppointment(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Agendamento não encontrado" });
+      }
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Attendance Queue API
   app.get("/api/queue/:unitId", async (req, res) => {
     try {
@@ -155,6 +179,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Entrada na fila não encontrada" });
       }
       res.json(entry);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/queue/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteQueueEntry(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Entrada na fila não encontrada" });
+      }
+      res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -199,6 +235,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/consultations/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteConsultation(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Consulta não encontrada" });
+      }
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Prescriptions API
   app.get("/api/prescriptions", async (req, res) => {
     try {
@@ -233,6 +281,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Prescrição não encontrada" });
       }
       res.json(prescription);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/prescriptions/:id", async (req, res) => {
+    try {
+      const success = await storage.deletePrescription(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Prescrição não encontrada" });
+      }
+      res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -309,6 +369,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/exams/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteExam(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Exame não encontrado" });
+      }
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // TFD API
   app.get("/api/tfd", async (req, res) => {
     try {
@@ -355,6 +427,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Solicitação TFD não encontrada" });
       }
       res.json(request);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/tfd/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteTfdRequest(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Solicitação TFD não encontrada" });
+      }
+      res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
