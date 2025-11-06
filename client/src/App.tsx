@@ -17,6 +17,7 @@ import PatientDetail from "@/pages/patient-detail";
 import Appointments from "@/pages/appointments";
 import Pharmacy from "@/pages/pharmacy";
 import TFD from "@/pages/tfd";
+import Reports from "@/pages/reports"; // Import the new Reports component
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -29,6 +30,7 @@ function Router() {
       <Route path="/agendamentos" component={Appointments} />
       <Route path="/farmacia" component={Pharmacy} />
       <Route path="/tfd" component={TFD} />
+      <Route path="/reports" component={Reports} /> {/* Add the new route */}
       <Route component={NotFound} />
     </Switch>
   );

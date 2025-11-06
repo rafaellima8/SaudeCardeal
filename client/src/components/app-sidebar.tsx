@@ -1,15 +1,18 @@
-import { 
-  Home, 
-  Users, 
-  Calendar, 
-  Pill, 
-  Truck, 
-  FileText, 
-  Building2, 
-  UserCog, 
+import {
+  Home,
+  Users,
+  Calendar,
+  Pill,
+  Truck,
+  FileText,
+  Building2,
+  UserCog,
   BarChart3,
   ChevronDown,
-  ClipboardList
+  ClipboardList,
+  LayoutDashboard,
+  Clock,
+  MapPin
 } from "lucide-react";
 import {
   Sidebar,
@@ -56,7 +59,7 @@ export function AppSidebar() {
           </div>
         </div>
       </SidebarHeader>
-      
+
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Principal</SidebarGroupLabel>

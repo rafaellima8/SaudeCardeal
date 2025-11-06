@@ -416,6 +416,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Reports API
+  app.get("/api/reports", async (req, res) => {
+    try {
+      const { period, unitId } = req.query;
+      const days = period ? parseInt(period as string) : 30;
+      const reports = await storage.getReports(days, unitId as string);
+      res.json(reports);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

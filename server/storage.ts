@@ -53,7 +53,7 @@ export interface IStorage {
   getAttendanceQueue(unitId: string, status?: string): Promise<AttendanceQueue[]>;
   createQueueEntry(entry: InsertAttendanceQueue): Promise<AttendanceQueue>;
   updateQueueEntry(id: string, entry: Partial<InsertAttendanceQueue>): Promise<AttendanceQueue | undefined>;
-  
+
   // Consultations
   getConsultations(citizenId: string): Promise<Consultation[]>;
   getConsultationById(id: string): Promise<Consultation | undefined>;
@@ -67,7 +67,7 @@ export interface IStorage {
   // Medications
   getMedications(params: { search?: string; unitId?: string }): Promise<Medication[]>;
   createMedication(medication: InsertMedication): Promise<Medication>;
-  
+
   // Medication Stock
   getMedicationStock(medicationId: string): Promise<MedicationStock[]>;
   createMedicationStock(stock: InsertMedicationStock): Promise<MedicationStock>;
@@ -81,6 +81,9 @@ export interface IStorage {
     lowStockCount: number;
     totalCitizens: number;
   }>;
+
+  // Reports
+  getReports(days: number, unitId?: string): Promise<any>;
 
   // Exams
   getExams(citizenId: string): Promise<Exam[]>;
@@ -116,7 +119,7 @@ export class DbStorage implements IStorage {
   // Citizens
   async getCitizens(params: { search?: string; limit?: number; offset?: number }): Promise<Citizen[]> {
     let query = db.select().from(schema.citizens);
-    
+
     if (params.search) {
       query = query.where(
         or(
@@ -126,7 +129,7 @@ export class DbStorage implements IStorage {
         )
       ) as any;
     }
-    
+
     return query
       .orderBy(desc(schema.citizens.createdAt))
       .limit(params.limit || 50)
@@ -269,7 +272,7 @@ export class DbStorage implements IStorage {
   // Prescriptions
   async getPrescriptions(params: { citizenId?: string; consultationId?: string }): Promise<Prescription[]> {
     let query = db.select().from(schema.prescriptions);
-    
+
     if (params.citizenId) {
       query = query.where(eq(schema.prescriptions.citizenId, params.citizenId)) as any;
     } else if (params.consultationId) {
@@ -530,6 +533,114 @@ export class DbStorage implements IStorage {
       queueWaiting: Number(queueWaiting),
       lowStockCount: Number(lowStockCount),
       totalCitizens: Number(totalCitizens),
+    };
+  }
+
+  async getReports(days: number, unitId?: string): Promise<any> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    // Get all consultations in period
+    let consultationsQuery = db.select().from(schema.consultations)
+      .where(gte(schema.consultations.consultationDate, startDate));
+
+    if (unitId && unitId !== 'all') {
+      consultationsQuery = consultationsQuery.where(eq(schema.consultations.unitId, unitId)) as any;
+    }
+
+    const consultations = await consultationsQuery;
+
+    // Get new patients in period
+    let newPatientsQuery = db.select().from(schema.citizens)
+      .where(gte(schema.citizens.createdAt, startDate));
+
+    if (unitId && unitId !== 'all') {
+      newPatientsQuery = newPatientsQuery.where(eq(schema.citizens.unitId, unitId)) as any;
+    }
+
+    const newPatients = await newPatientsQuery;
+
+    // Get all patients
+    let allPatientsQuery = db.select().from(schema.citizens);
+    if (unitId && unitId !== 'all') {
+      allPatientsQuery = allPatientsQuery.where(eq(schema.citizens.unitId, unitId)) as any;
+    }
+    const allPatients = await allPatientsQuery;
+
+    // Get prescriptions
+    const prescriptions = await db.select().from(schema.prescriptions)
+      .where(gte(schema.prescriptions.createdAt, startDate));
+
+    // Get exams
+    const exams = await db.select().from(schema.exams)
+      .where(gte(schema.exams.requestDate, startDate));
+
+    // Get TFD requests
+    let tfdQuery = db.select().from(schema.tfdRequests)
+      .where(gte(schema.tfdRequests.requestDate, startDate));
+
+    if (unitId && unitId !== 'all') {
+      tfdQuery = tfdQuery.where(eq(schema.tfdRequests.unitId, unitId)) as any;
+    }
+    const tfdRequests = await tfdQuery;
+
+    // Process consultation types
+    const consultationsByType = consultations.reduce((acc: any, c) => {
+      acc[c.type] = (acc[c.type] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Process diagnoses
+    const diagnosesCount: any = {};
+    consultations.forEach(c => {
+      if (c.diagnosis) {
+        diagnosesCount[c.diagnosis] = (diagnosesCount[c.diagnosis] || 0) + 1;
+      }
+    });
+
+    // Process medication usage
+    const medicationUsage: any = {};
+    prescriptions.forEach(p => {
+      medicationUsage[p.medication] = (medicationUsage[p.medication] || 0) + p.quantity;
+    });
+
+    // Calculate age distribution
+    const ageDistribution = allPatients.reduce((acc: any, p) => {
+      const age = Math.floor((Date.now() - new Date(p.birthDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+      let range = '';
+      if (age < 5) range = '0-4 anos';
+      else if (age < 15) range = '5-14 anos';
+      else if (age < 25) range = '15-24 anos';
+      else if (age < 45) range = '25-44 anos';
+      else if (age < 65) range = '45-64 anos';
+      else range = '65+ anos';
+
+      acc[range] = (acc[range] || 0) + 1;
+      return acc;
+    }, {});
+
+    return {
+      summary: {
+        totalPatients: allPatients.length,
+        newPatients: newPatients.length,
+        totalConsultations: consultations.length,
+        totalPrescriptions: prescriptions.length,
+        totalExams: exams.length,
+        tfdRequests: tfdRequests.length,
+      },
+      consultationsByType: Object.entries(consultationsByType)
+        .map(([type, count]) => ({ type, count }))
+        .sort((a: any, b: any) => b.count - a.count),
+      topDiagnoses: Object.entries(diagnosesCount)
+        .map(([diagnosis, count]) => ({ diagnosis, count }))
+        .sort((a: any, b: any) => b.count - a.count)
+        .slice(0, 5),
+      medicationUsage: Object.entries(medicationUsage)
+        .map(([medication, quantity]) => ({ medication, quantity }))
+        .sort((a: any, b: any) => b.quantity - a.quantity)
+        .slice(0, 5),
+      ageDistribution: Object.entries(ageDistribution)
+        .map(([range, count]) => ({ range, count })),
     };
   }
 }
