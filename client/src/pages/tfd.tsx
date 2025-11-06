@@ -340,14 +340,16 @@ export default function TFD() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => setSelectedRequest(request)}
-                          data-testid={`button-view-${request.id}`}
-                        >
-                          Ver Detalhes
-                        </Button>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => setSelectedRequest(request)}
+                            data-testid={`button-view-${request.id}`}
+                          >
+                            Ver Detalhes
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
