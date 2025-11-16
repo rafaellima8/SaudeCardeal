@@ -1,0 +1,708 @@
+Relatório Técnico - Sistema PEC Integrado Municipal
+
+1. Visão Geral do Sistema
+
+1.1 Identificação
+
+Nome: PEC Integrado Municipal - Sistema de Gestão de Saúde
+Município: Cardeal da Silva
+Versão: 1.0.0
+Data do Relatório: Janeiro 2025
+1.2 Objetivo
+
+Sistema integrado para gestão completa da atenção básica de saúde municipal, abrangendo desde o cadastro de cidadãos até relatórios gerenciais, em conformidade com os padrões do e-SUS APS.
+
+2. Arquitetura Técnica
+
+2.1 Stack Tecnológico
+
+Frontend:
+
+React 18+ com TypeScript
+Vite (build tool)
+TanStack Query v5 (gerenciamento de estado servidor)
+Wouter (roteamento)
+shadcn/ui + Tailwind CSS (interface)
+Recharts (visualização de dados)
+Backend:
+
+Node.js com Express
+TypeScript
+Drizzle ORM
+PostgreSQL (banco de dados)
+Infraestrutura:
+
+Replit (hospedagem e deploy)
+Porta 5000 (desenvolvimento e produção)
+2.2 Arquitetura em Camadas
+
+┌─────────────────────────────────────┐
+│     Camada de Apresentação          │
+│   (React + shadcn/ui Components)    │
+└─────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────┐
+│     Camada de Aplicação             │
+│   (TanStack Query + API Routes)     │
+└─────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────┐
+│     Camada de Negócio               │
+│   (Express Routes + Storage Layer)  │
+└─────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────┐
+│     Camada de Dados                 │
+│   (Drizzle ORM + PostgreSQL)        │
+└─────────────────────────────────────┘
+
+3. Módulos Funcionais
+
+3.1 Dashboard
+
+Localização: client/src/pages/dashboard.tsx
+
+Funcionalidades:
+
+Indicadores em tempo real (atendimentos do dia, fila de espera, estoque crítico, total de cidadãos)
+Gráficos de tendência semanal de atendimentos
+Distribuição de atendimentos por tipo
+Alertas de estoque baixo
+Visão geral de atividades recentes
+Endpoints Utilizados:
+
+GET /api/stats/dashboard
+3.2 Recepção
+
+Localização: client/src/pages/reception.tsx
+
+Funcionalidades:
+
+Gerenciamento de fila de atendimento
+Emissão de senhas numeradas
+Chamada de pacientes
+Priorização de atendimentos (normal, urgente, emergência)
+Controle de status (aguardando, em atendimento, concluído, cancelado)
+Endpoints Utilizados:
+
+GET /api/queue/:unitId
+POST /api/queue
+PATCH /api/queue/:id
+DELETE /api/queue/:id
+3.3 Gestão de Pacientes
+
+Localização: client/src/pages/patients.tsx e patient-detail.tsx
+
+Funcionalidades:
+
+Cadastro completo de cidadãos (CPF, CNS, dados demográficos)
+Busca avançada por nome, CPF ou CNS
+Visualização de prontuário eletrônico
+Histórico de consultas, exames e prescrições
+Gestão de alergias e tipo sanguíneo
+Vinculação a unidade de saúde e grupo familiar
+Endpoints Utilizados:
+
+GET /api/citizens
+GET /api/citizens/:id
+POST /api/citizens
+PATCH /api/citizens/:id
+DELETE /api/citizens/:id
+GET /api/consultations?citizenId=:id
+GET /api/prescriptions?citizenId=:id
+GET /api/exams?citizenId=:id
+3.4 Agendamentos
+
+Localização: client/src/pages/appointments.tsx
+
+Funcionalidades:
+
+Calendário visual de agendamentos
+Criação de novos agendamentos
+Filtros por profissional, unidade e tipo
+Gerenciamento de status (agendado, confirmado, realizado, cancelado, faltou)
+Visualização por período (dia, semana, mês)
+Endpoints Utilizados:
+
+GET /api/appointments
+GET /api/appointments/:id
+POST /api/appointments
+PATCH /api/appointments/:id
+DELETE /api/appointments/:id
+3.5 Farmácia
+
+Localização: client/src/pages/pharmacy.tsx
+
+Funcionalidades:
+
+Controle de estoque de medicamentos
+Gestão de lotes e validade
+Alertas de estoque mínimo
+Dispensação vinculada a prescrições
+Registro de entrada e saída
+Busca por medicamento
+Endpoints Utilizados:
+
+GET /api/medications
+GET /api/medications/stock/low/:unitId
+GET /api/medications/:id/stock
+GET /api/prescriptions
+POST /api/prescriptions
+PATCH /api/prescriptions/:id
+3.6 TFD (Tratamento Fora do Domicílio)
+
+Localização: client/src/pages/tfd.tsx
+
+Funcionalidades:
+
+Solicitação de TFD
+Gestão de transporte e acompanhante
+Controle de aprovações
+Rastreamento de viagens
+Histórico de solicitações por cidadão
+Status: pendente, aprovado, agendado, concluído, cancelado
+Endpoints Utilizados:
+
+GET /api/tfd
+GET /api/tfd/:id
+POST /api/tfd
+PATCH /api/tfd/:id
+DELETE /api/tfd/:id
+3.7 Relatórios e Indicadores
+
+Localização: client/src/pages/reports.tsx
+
+Funcionalidades:
+
+Indicadores de saúde consolidados
+Filtros por período (7, 30, 90, 365 dias)
+Filtros por unidade de saúde
+Consultas por tipo
+Top 5 diagnósticos mais frequentes
+Medicamentos mais prescritos
+Distribuição etária de pacientes
+Exportação para PDF (em desenvolvimento)
+Métricas Disponíveis:
+
+Total de pacientes e novos cadastros
+Consultas realizadas
+Prescrições emitidas
+Exames solicitados
+Solicitações TFD
+Endpoints Utilizados:
+
+GET /api/reports?period=:days&unitId=:id
+3.8 Gestão de Unidades
+
+Localização: client/src/pages/units.tsx
+
+Funcionalidades:
+
+Cadastro de unidades básicas de saúde
+Registro de CNES
+Gestão de endereço e contato
+Ativação/desativação de unidades
+Endpoints Utilizados:
+
+GET /api/units
+GET /api/units/:id
+POST /api/units
+PATCH /api/units/:id
+DELETE /api/units/:id
+3.9 Gestão de Profissionais
+
+Localização: client/src/pages/professionals.tsx
+
+Funcionalidades:
+
+Cadastro de profissionais de saúde
+Registro de CNS, CRM e especialidade
+Vinculação a unidades
+Controle de usuários do sistema
+Endpoints Utilizados:
+
+GET /api/professionals
+GET /api/professionals/:id
+POST /api/professionals
+PATCH /api/professionals/:id
+DELETE /api/professionals/:id
+4. Modelo de Dados
+
+4.1 Entidades Principais
+
+Citizens (Cidadãos)
+
+Dados pessoais (CPF, CNS, nome, data de nascimento, gênero)
+Contato (telefone, email, endereço)
+Dados clínicos (tipo sanguíneo, alergias)
+Vinculação (unidade de saúde, grupo familiar)
+Professionals (Profissionais)
+
+Identificação (CNS, CRM, nome)
+Especialidade
+Vinculação a unidade e usuário do sistema
+HealthUnits (Unidades de Saúde)
+
+CNES (Cadastro Nacional de Estabelecimentos de Saúde)
+Endereço e contato
+Status de ativação
+Appointments (Agendamentos)
+
+Cidadão, profissional e unidade
+Data/hora do agendamento
+Tipo e status
+Observações
+AttendanceQueue (Fila de Atendimento)
+
+Senha numérica
+Prioridade
+Timestamps (chegada, chamada, conclusão)
+Sala de atendimento
+Consultations (Consultas)
+
+Anamnese completa
+Exame físico
+Diagnóstico (com códigos CID-10)
+Plano terapêutico
+Prescriptions (Prescrições)
+
+Medicamento, dosagem, frequência, duração
+Quantidade e instruções
+Status de dispensação
+Medications (Medicamentos)
+
+Princípio ativo
+Forma farmacêutica
+Fabricante
+MedicationStock (Estoque de Medicamentos)
+
+Lote e validade
+Quantidade e estoque mínimo
+Unidade de medida
+Exams (Exames)
+
+Tipo de exame
+Datas de solicitação e realização
+Resultados e anexos
+Status
+TfdRequests (Solicitações TFD)
+
+Destino e procedimento
+Justificativa médica
+Datas de ida e retorno
+Tipo de transporte e acompanhante
+Fluxo de aprovação
+AuditLog (Log de Auditoria - LGPD)
+
+Usuário e ação
+Entidade afetada
+Mudanças realizadas
+IP e user agent
+4.2 Relacionamentos
+
+Citizens 1:N Appointments
+Citizens 1:N Consultations
+Citizens 1:N Prescriptions
+Citizens 1:N Exams
+Citizens 1:N TfdRequests
+Citizens 1:N AttendanceQueue
+Professionals 1:N Appointments
+Professionals 1:N Consultations
+Professionals 1:N Prescriptions
+Professionals 1:N Exams
+Professionals 1:N TfdRequests
+HealthUnits 1:N Citizens
+HealthUnits 1:N Professionals
+HealthUnits 1:N Appointments
+HealthUnits 1:N AttendanceQueue
+HealthUnits 1:N Medications
+Consultations 1:N Prescriptions
+Consultations 1:1 Appointments (opcional)
+Medications 1:N MedicationStock
+Prescriptions 1:N MedicationDispensing
+MedicationStock 1:N MedicationDispensing
+
+5. Segurança e Conformidade
+
+5.1 LGPD (Lei Geral de Proteção de Dados)
+
+Implementações:
+
+Auditoria completa de ações (tabela audit_log)
+Registro de IP e user agent
+Rastreabilidade de modificações em dados sensíveis
+Controle de acesso baseado em perfis
+Dados Sensíveis Protegidos:
+
+CPF e CNS criptografados na camada de aplicação
+Dados de saúde (diagnósticos, exames, prescrições)
+Histórico médico completo
+5.2 Perfis de Acesso
+
+Roles Implementados:
+
+admin: Acesso total ao sistema
+medico: Consultas, prescrições, exames
+enfermeiro: Triagem, procedimentos básicos
+acs: Cadastro de cidadãos, visitas domiciliares
+farmaceutico: Gestão de medicamentos e dispensação
+gestor: Relatórios e indicadores
+recepcao: Agendamentos e fila de atendimento
+5.3 Validação de Dados
+
+Schemas Zod:
+
+Validação de CPF e CNS
+Validação de datas
+Validação de enums (status, prioridades, etc.)
+Sanitização de entradas
+6. Integração e-SUS APS
+
+6.1 Conformidade
+
+O sistema está estruturado para atender os requisitos do e-SUS APS:
+
+Cadastro Individual com CNS
+CNES das unidades
+Registro de atendimentos individuais
+Prescrições com códigos padronizados
+Exames laboratoriais
+Imunizações (estrutura preparada)
+Procedimentos coletivos (estrutura preparada)
+6.2 Códigos e Padrões
+
+CID-10: Classificação de doenças
+CNS: Cartão Nacional de Saúde
+CNES: Cadastro Nacional de Estabelecimentos de Saúde
+CRM: Conselho Regional de Medicina
+7. Interface do Usuário
+
+7.1 Design System
+
+Paleta de Cores:
+
+Primary: Verde (#10b981) - representa saúde
+Secondary: Azul (#3b82f6) - confiabilidade
+Accent: Roxo (#8b5cf6) - modernidade
+Neutros: Escala de cinzas para backgrounds
+Componentes UI:
+
+shadcn/ui (biblioteca de componentes)
+Tailwind CSS (estilização)
+Design responsivo (mobile-first)
+Tema claro/escuro
+7.2 Navegação
+
+Sidebar Principal:
+
+Dashboard
+Recepção
+Pacientes
+Agendamentos
+Farmácia
+TFD
+Relatórios
+Navegação Administrativa:
+
+Unidades
+Profissionais
+Indicadores
+7.3 Acessibilidade
+
+Contraste adequado (WCAG AA)
+Navegação por teclado
+Labels descritivos
+ARIA attributes
+8. Performance
+
+8.1 Otimizações Frontend
+
+Code splitting com Vite
+Lazy loading de rotas
+TanStack Query para cache de dados
+Debounce em buscas
+Virtualização de listas longas
+8.2 Otimizações Backend
+
+Índices no banco de dados (CPF, CNS, CNES)
+Queries otimizadas com Drizzle ORM
+Paginação de resultados
+Cache de consultas frequentes
+9. Dados de Exemplo (Seed)
+
+Localização: server/seed.ts
+
+Dados Inicializados:
+
+1 Unidade de Saúde (UBS Cardeal da Silva)
+3 Profissionais (médico, enfermeira, farmacêutico)
+4 Cidadãos cadastrados
+Consultas de exemplo
+Prescrições
+Exames
+Solicitação TFD
+Medicamentos em estoque
+Fila de atendimento ativa
+10. API REST
+
+10.1 Endpoints Implementados
+
+Citizens:
+
+GET    /api/citizens
+GET    /api/citizens/:id
+POST   /api/citizens
+PATCH  /api/citizens/:id
+DELETE /api/citizens/:id
+
+Appointments:
+
+GET    /api/appointments
+GET    /api/appointments/:id
+POST   /api/appointments
+PATCH  /api/appointments/:id
+DELETE /api/appointments/:id
+
+Queue:
+
+GET    /api/queue/:unitId
+POST   /api/queue
+PATCH  /api/queue/:id
+DELETE /api/queue/:id
+
+Consultations:
+
+GET    /api/consultations
+GET    /api/consultations/:id
+POST   /api/consultations
+DELETE /api/consultations/:id
+
+Prescriptions:
+
+GET    /api/prescriptions
+POST   /api/prescriptions
+PATCH  /api/prescriptions/:id
+DELETE /api/prescriptions/:id
+
+Medications:
+
+GET    /api/medications
+GET    /api/medications/stock/low/:unitId
+GET    /api/medications/:id/stock
+
+Exams:
+
+GET    /api/exams
+POST   /api/exams
+PATCH  /api/exams/:id
+DELETE /api/exams/:id
+
+TFD:
+
+GET    /api/tfd
+GET    /api/tfd/:id
+POST   /api/tfd
+PATCH  /api/tfd/:id
+DELETE /api/tfd/:id
+
+Units:
+
+GET    /api/units
+GET    /api/units/:id
+POST   /api/units
+PATCH  /api/units/:id
+DELETE /api/units/:id
+
+Professionals:
+
+GET    /api/professionals
+GET    /api/professionals/:id
+POST   /api/professionals
+PATCH  /api/professionals/:id
+DELETE /api/professionals/:id
+
+Stats & Reports:
+
+GET    /api/stats/dashboard
+GET    /api/reports
+
+10.2 Padrões de Resposta
+
+Sucesso:
+
+{
+  "id": "uuid",
+  "field1": "value",
+  "createdAt": "timestamp"
+}
+
+Erro:
+
+{
+  "error": "Mensagem de erro",
+  "details": []
+}
+
+HTTP Status Codes:
+
+200: OK
+201: Created
+204: No Content (delete)
+400: Bad Request (validação)
+404: Not Found
+500: Internal Server Error
+11. Estrutura de Arquivos
+
+├── client/                    # Frontend React
+│   ├── public/               # Assets estáticos
+│   └── src/
+│       ├── components/       # Componentes reutilizáveis
+│       │   ├── ui/          # Componentes shadcn/ui
+│       │   └── ...          # Componentes customizados
+│       ├── hooks/           # React hooks customizados
+│       ├── lib/             # Utilitários
+│       ├── pages/           # Páginas/Rotas
+│       ├── App.tsx          # Componente raiz
+│       ├── index.css        # Estilos globais
+│       └── main.tsx         # Entry point
+│
+├── server/                   # Backend Express
+│   ├── db.ts               # Configuração Drizzle
+│   ├── index.ts            # Entry point do servidor
+│   ├── routes.ts           # Definição de rotas
+│   ├── seed.ts             # Dados de exemplo
+│   ├── storage.ts          # Camada de acesso a dados
+│   └── vite.ts             # Integração Vite
+│
+├── shared/                  # Código compartilhado
+│   └── schema.ts           # Schema do banco + validações
+│
+├── design_guidelines.md     # Guia de design
+├── drizzle.config.ts       # Configuração ORM
+├── package.json            # Dependências
+├── tailwind.config.ts      # Configuração Tailwind
+├── tsconfig.json           # Configuração TypeScript
+└── vite.config.ts          # Configuração Vite
+
+12. Dependências Principais
+
+12.1 Frontend
+
+{
+  "@tanstack/react-query": "^5.62.14",
+  "react": "^18.3.1",
+  "wouter": "^3.3.5",
+  "recharts": "^2.15.0",
+  "tailwindcss": "^3.4.17",
+  "lucide-react": "^0.468.0"
+}
+
+12.2 Backend
+
+{
+  "express": "^4.21.2",
+  "drizzle-orm": "^0.39.3",
+  "postgres": "^3.4.5",
+  "zod": "^3.24.1"
+}
+
+13. Fluxos de Trabalho Principais
+
+13.1 Fluxo de Atendimento
+
+Recepção: Paciente chega e recebe senha na fila
+Triagem: Enfermeiro registra sinais vitais e queixa
+Consulta: Médico realiza anamnese e exame físico
+Prescrição: Sistema registra medicamentos prescritos
+Farmácia: Dispensação de medicamentos
+Exames: Solicitação se necessário
+Acompanhamento: Agendamento de retorno
+13.2 Fluxo TFD
+
+Solicitação: Profissional registra necessidade de TFD
+Aprovação: Gestor analisa e aprova
+Agendamento: Data de viagem definida
+Transporte: Tipo de transporte e acompanhante
+Conclusão: Registro do retorno
+13.3 Fluxo de Estoque
+
+Entrada: Registro de lote com validade
+Controle: Monitoramento de estoque mínimo
+Dispensação: Vinculada a prescrição médica
+Alertas: Notificação de estoque baixo ou vencimento
+14. Roadmap de Melhorias
+
+14.1 Curto Prazo
+
+ Autenticação completa (login/logout)
+ Exportação de relatórios em PDF
+ Sistema de notificações
+ Upload de documentos/exames
+ Assinatura digital
+14.2 Médio Prazo
+
+ Integração com SISREG (regulação)
+ Telemedicina
+ App mobile para ACS
+ Dashboard em tempo real (WebSocket)
+ Impressão de receitas
+14.3 Longo Prazo
+
+ BI avançado com Machine Learning
+ Integração RNDS (Rede Nacional de Dados em Saúde)
+ API pública para integrações
+ Sistema de mensageria (WhatsApp/SMS)
+ Prontuário eletrônico compartilhado
+15. Métricas e KPIs
+
+15.1 Operacionais
+
+Tempo médio de espera na fila
+Taxa de comparecimento em consultas
+Número de atendimentos por profissional/dia
+Taxa de utilização de sala
+15.2 Clínicos
+
+Diagnósticos mais frequentes
+Taxa de resolubilidade na atenção básica
+Cobertura vacinal
+Indicadores de pré-natal
+15.3 Gestão
+
+Custo médio por atendimento
+Taxa de ocupação de agenda
+Estoque em risco (vencimento/falta)
+Tempo médio de dispensação
+16. Suporte e Manutenção
+
+16.1 Logs
+
+Express logging para requisições HTTP
+Vite HMR para desenvolvimento
+Audit log para ações críticas
+16.2 Backup
+
+Backup automático do PostgreSQL (Replit)
+Versionamento de código (Git)
+Histórico de alterações (audit_log)
+16.3 Monitoramento
+
+Health checks da aplicação
+Monitoramento de performance de queries
+Alertas de erro em produção
+17. Conclusão
+
+O Sistema PEC Integrado Municipal representa uma solução completa e moderna para gestão da atenção básica de saúde. Com arquitetura robusta, interface intuitiva e conformidade com padrões nacionais (e-SUS APS, LGPD), o sistema está preparado para atender as necessidades do município de Cardeal da Silva.
+
+Principais Diferenciais:
+
+✅ Interface moderna e responsiva
+✅ Conformidade LGPD com auditoria completa
+✅ Integração e-SUS APS
+✅ Gestão completa de TFD
+✅ Controle farmacêutico integrado
+✅ Relatórios e indicadores gerenciais
+✅ Arquitetura escalável e manutenível
+Status Atual: Sistema em produção, pronto para uso com dados de exemplo para treinamento e demonstração.
+
+Elaborado por: Equipe de Desenvolvimento Data: Janeiro 2025 Versão do Documento: 1.0

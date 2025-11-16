@@ -109,11 +109,15 @@ export interface IStorage {
   getHealthUnits(): Promise<HealthUnit[]>;
   getHealthUnitById(id: string): Promise<HealthUnit | undefined>;
   createHealthUnit(unit: InsertHealthUnit): Promise<HealthUnit>;
+  updateHealthUnit(id: string, unit: Partial<InsertHealthUnit>): Promise<HealthUnit | undefined>;
+  deleteHealthUnit(id: string): Promise<boolean>;
 
   // Professionals
   getProfessionals(unitId?: string): Promise<Professional[]>;
   getProfessionalById(id: string): Promise<Professional | undefined>;
   createProfessional(professional: InsertProfessional): Promise<Professional>;
+  updateProfessional(id: string, professional: Partial<InsertProfessional>): Promise<Professional | undefined>;
+  deleteProfessional(id: string): Promise<boolean>;
 
   // Users
   getUser(id: string): Promise<User | undefined>;
@@ -440,6 +444,20 @@ export class DbStorage implements IStorage {
     return created;
   }
 
+  async updateHealthUnit(id: string, unit: Partial<InsertHealthUnit>): Promise<HealthUnit | undefined> {
+    const [updated] = await db
+      .update(schema.healthUnits)
+      .set(unit)
+      .where(eq(schema.healthUnits.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteHealthUnit(id: string): Promise<boolean> {
+    const result = await db.delete(schema.healthUnits).where(eq(schema.healthUnits.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+
   // Professionals
   async getProfessionals(unitId?: string): Promise<Professional[]> {
     if (unitId) {
@@ -468,6 +486,20 @@ export class DbStorage implements IStorage {
   async createProfessional(professional: InsertProfessional): Promise<Professional> {
     const [created] = await db.insert(schema.professionals).values(professional).returning();
     return created;
+  }
+
+  async updateProfessional(id: string, professional: Partial<InsertProfessional>): Promise<Professional | undefined> {
+    const [updated] = await db
+      .update(schema.professionals)
+      .set(professional)
+      .where(eq(schema.professionals.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteProfessional(id: string): Promise<boolean> {
+    const result = await db.delete(schema.professionals).where(eq(schema.professionals.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
   }
 
   // Users
@@ -550,24 +582,24 @@ export class DbStorage implements IStorage {
     startDate.setDate(startDate.getDate() - days);
 
     // Get all consultations in period
-    let consultationsQuery = db.select().from(schema.consultations)
-      .where(gte(schema.consultations.consultationDate, startDate));
-
-    if (unitId && unitId !== 'all') {
-      consultationsQuery = consultationsQuery.where(eq(schema.consultations.unitId, unitId)) as any;
-    }
-
-    const consultations = await consultationsQuery;
+    const consultations = unitId && unitId !== 'all'
+      ? await db.select().from(schema.consultations)
+          .where(and(
+            gte(schema.consultations.consultationDate, startDate),
+            eq(schema.consultations.unitId, unitId)
+          ))
+      : await db.select().from(schema.consultations)
+          .where(gte(schema.consultations.consultationDate, startDate));
 
     // Get new patients in period
-    let newPatientsQuery = db.select().from(schema.citizens)
-      .where(gte(schema.citizens.createdAt, startDate));
-
-    if (unitId && unitId !== 'all') {
-      newPatientsQuery = newPatientsQuery.where(eq(schema.citizens.unitId, unitId)) as any;
-    }
-
-    const newPatients = await newPatientsQuery;
+    const newPatients = unitId && unitId !== 'all'
+      ? await db.select().from(schema.citizens)
+          .where(and(
+            gte(schema.citizens.createdAt, startDate),
+            eq(schema.citizens.unitId, unitId)
+          ))
+      : await db.select().from(schema.citizens)
+          .where(gte(schema.citizens.createdAt, startDate));
 
     // Get all patients
     let allPatientsQuery = db.select().from(schema.citizens);
@@ -585,13 +617,14 @@ export class DbStorage implements IStorage {
       .where(gte(schema.exams.requestDate, startDate));
 
     // Get TFD requests
-    let tfdQuery = db.select().from(schema.tfdRequests)
-      .where(gte(schema.tfdRequests.requestDate, startDate));
-
-    if (unitId && unitId !== 'all') {
-      tfdQuery = tfdQuery.where(eq(schema.tfdRequests.unitId, unitId)) as any;
-    }
-    const tfdRequests = await tfdQuery;
+    const tfdRequests = unitId && unitId !== 'all'
+      ? await db.select().from(schema.tfdRequests)
+          .where(and(
+            gte(schema.tfdRequests.requestDate, startDate),
+            eq(schema.tfdRequests.unitId, unitId)
+          ))
+      : await db.select().from(schema.tfdRequests)
+          .where(gte(schema.tfdRequests.requestDate, startDate));
 
     // Process consultation types
     const consultationsByType = consultations.reduce((acc: any, c) => {

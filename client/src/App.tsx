@@ -17,7 +17,10 @@ import PatientDetail from "@/pages/patient-detail";
 import Appointments from "@/pages/appointments";
 import Pharmacy from "@/pages/pharmacy";
 import TFD from "@/pages/tfd";
-import Reports from "@/pages/reports"; // Import the new Reports component
+import Reports from "@/pages/reports";
+import Units from "@/pages/units";
+import Professionals from "@/pages/professionals";
+import Indicators from "@/pages/indicators";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -30,7 +33,10 @@ function Router() {
       <Route path="/agendamentos" component={Appointments} />
       <Route path="/farmacia" component={Pharmacy} />
       <Route path="/tfd" component={TFD} />
-      <Route path="/reports" component={Reports} /> {/* Add the new route */}
+      <Route path="/relatorios" component={Reports} />
+      <Route path="/unidades" component={Units} />
+      <Route path="/profissionais" component={Professionals} />
+      <Route path="/indicadores" component={Indicators} />
       <Route component={NotFound} />
     </Switch>
   );

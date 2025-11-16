@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCitizenSchema, insertAppointmentSchema, insertConsultationSchema, insertPrescriptionSchema, insertExamSchema, insertTfdRequestSchema, insertAttendanceQueueSchema } from "@shared/schema";
+import { insertCitizenSchema, insertAppointmentSchema, insertConsultationSchema, insertPrescriptionSchema, insertExamSchema, insertTfdRequestSchema, insertAttendanceQueueSchema, insertHealthUnitSchema, insertProfessionalSchema } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -466,6 +466,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/units", async (req, res) => {
+    try {
+      const data = insertHealthUnitSchema.parse(req.body);
+      const unit = await storage.createHealthUnit(data);
+      res.status(201).json(unit);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/units/:id", async (req, res) => {
+    try {
+      const data = insertHealthUnitSchema.partial().parse(req.body);
+      const filteredData = Object.fromEntries(
+        Object.entries(data).filter(([_, value]) => value !== undefined)
+      );
+      const unit = await storage.updateHealthUnit(req.params.id, filteredData);
+      if (!unit) {
+        return res.status(404).json({ error: "Unidade não encontrada" });
+      }
+      res.json(unit);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/units/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteHealthUnit(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Unidade não encontrada" });
+      }
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Professionals API
   app.get("/api/professionals", async (req, res) => {
     try {
@@ -484,6 +528,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Profissional não encontrado" });
       }
       res.json(professional);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/professionals", async (req, res) => {
+    try {
+      const data = insertProfessionalSchema.parse(req.body);
+      const professional = await storage.createProfessional(data);
+      res.status(201).json(professional);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/professionals/:id", async (req, res) => {
+    try {
+      const data = insertProfessionalSchema.partial().parse(req.body);
+      const filteredData = Object.fromEntries(
+        Object.entries(data).filter(([_, value]) => value !== undefined)
+      );
+      const professional = await storage.updateProfessional(req.params.id, filteredData);
+      if (!professional) {
+        return res.status(404).json({ error: "Profissional não encontrado" });
+      }
+      res.json(professional);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/professionals/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteProfessional(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Profissional não encontrado" });
+      }
+      res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
