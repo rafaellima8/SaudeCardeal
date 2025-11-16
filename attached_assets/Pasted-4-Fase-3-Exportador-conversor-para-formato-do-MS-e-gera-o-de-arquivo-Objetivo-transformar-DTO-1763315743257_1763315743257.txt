@@ -1,0 +1,63 @@
+4) Fase 3 — Exportador (conversor para formato do MS e geração de arquivo)
+Objetivo: transformar DTOs em arquivos no formato exigido (JSON+XML conforme necessidade) e empacotar para envio.
+Abordagem prática:
+Gerar dois artefatos:
+export_<municipio>_<period>.json — JSON com estrutura validada.
+export_<municipio>_<period>.xml — XML equivalente (usar fast-xml-parser).
+Arquivo:
+server/integrations/esus/exporter.ts
+Exemplo de função de export:
+// server/integrations/esus/exporter.ts
+import { j2xParser } from "fast-xml-parser";
+import fs from "fs/promises";
+import path from "path";
+
+export async function exportToFiles(municipioCode: string, period: {from:string,to:string}, payload: any) {
+  const dir = path.join(process.cwd(), "tmp", `esus_${municipioCode}_${period.from}_${period.to}`);
+  await fs.mkdir(dir, { recursive: true });
+  const jsonPath = path.join(dir, "export.json");
+  await fs.writeFile(jsonPath, JSON.stringify(payload, null, 2), "utf8");
+
+  const parser = new j2xParser({ ignoreAttributes:false, format:true });
+  const xml = parser.parse({ root: payload });
+  const xmlPath = path.join(dir, "export.xml");
+  await fs.writeFile(xmlPath, xml, "utf8");
+  return { jsonPath, xmlPath };
+}
+Prompt para Replit:
+Crie server/integrations/esus/exporter.ts que recebe o payload (citizens, consultations, procedures), valida via schemas e gera dois arquivos: export.json e export.xml numa pasta tmp/esus_<municipio>_<period>. Retorne os paths. Adicione um endpoint de teste GET /api/internal/esus/generate?from=YYYY-MM-DD&to=YYYY-MM-DD que aciona a extração e geração de arquivos (modo só leitura, sem enviar). Teste o endpoint localmente.
+Critério de aceitação:
+Arquivos gerados no filesystem e endpoint retorna paths.
+5) Fase 4 — Validação e testes (schema + regras de negócio)
+Objetivo: garantir que os arquivos gerados respeitem as regras e não sejam rejeitados.
+Tarefas:
+Implementar validações adicionais:
+CPF/CNS válidos (checksum para CNS se possível).
+Datas dentro do período.
+Campos obrigatórios não nulos.
+Criar testes unitários e de integração que:
+Gerem export com dados de seed.
+Validem JSON contra schemas.
+Compare XML gerado com um XML de referência (snapshot testing).
+Ferramentas:
+vitest para testes.
+ajv se quiser JSON Schema (opcional).
+Prompt para Replit:
+Implemente testes de validação em server/integrations/esus/__tests__. Teste 1: export completo com dados seed gera JSON válido segundo os schemas. Teste 2: geração XML corresponde ao snapshot. Teste 3: erro quando CPF inválido. Rode a suíte e retorne resultados.
+Critério de aceitação:
+Todos os testes passam.
+6) Fase 5 — Envio / Integração (colocar em produção / submissão)
+Objetivo: preparar mecanismo de envio: por FTP, API do MS ou upload no Portal (depende do padrão local). Em muitos municípios o envio é manual (upload), então disponibilize:
+Área administrativa para baixar os arquivos.
+(Opcional) Cliente SFTP ou integração com endpoint do SISAB (se houver API).
+Tarefas:
+Criar área Admin → Exportações com histórico de exports, status e botão Download.
+Implementar job agendado (cron) para export periódico.
+Registrar logs e gerar relatório de validação (erro/warning).
+Arquivos:
+server/jobs/esus-scheduler.ts
+Frontend: client/src/pages/admin/esus-exports.tsx
+Prompt para Replit:
+Crie UI simples client/src/pages/admin/esus-exports.tsx que lista exports existentes (path, createdAt, status) e botão download. No backend, adicione endpoint GET /api/esus/exports para listar e GET /api/esus/exports/:id/download para o arquivo. Adicione um job server/jobs/esus-scheduler.ts executável (node ./server/jobs/esus-scheduler.js) que roda geração para últimos 30 dias (modo dry-run). Crie 1 export real para teste e comente o link de download.
+Critério de aceitação:
+UI lista exports e permite download; scheduler cria um export de teste.
