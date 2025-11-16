@@ -410,7 +410,7 @@ describe('e-SUS Export Schemas - Validation', () => {
         healthUnitCNES: '1234567',
         systemName: 'PEC Integrado Municipal',
         systemVersion: '1.0.0',
-        citizens: [
+        cidadaos: [
           {
             cpf: '12345678901',
             name: 'João Silva',
@@ -418,7 +418,7 @@ describe('e-SUS Export Schemas - Validation', () => {
             sex: 'M' as const,
           },
         ],
-        consultations: [
+        atendimentos: [
           {
             citizenCPF: '12345678901',
             professionalCNS: '123456789012345',
@@ -427,12 +427,12 @@ describe('e-SUS Export Schemas - Validation', () => {
             type: 'consulta_medica',
           },
         ],
-        recordCount: {
-          citizens: 1,
-          consultations: 1,
-          procedures: 0,
-          exams: 0,
-          tfdRequests: 0,
+        totalRegistros: {
+          cidadaos: 1,
+          atendimentos: 1,
+          procedimentos: 0,
+          exames: 0,
+          solicitacoesTFD: 0,
         },
       };
 
@@ -448,12 +448,12 @@ describe('e-SUS Export Schemas - Validation', () => {
         endDate: '2024-01-31',
         municipalityCode: '2906501',
         healthUnitCNES: '1234567',
-        recordCount: {
-          citizens: 0,
-          consultations: 0,
-          procedures: 0,
-          exams: 0,
-          tfdRequests: 0,
+        totalRegistros: {
+          cidadaos: 0,
+          atendimentos: 0,
+          procedimentos: 0,
+          exames: 0,
+          solicitacoesTFD: 0,
         },
       };
 
@@ -469,12 +469,12 @@ describe('e-SUS Export Schemas - Validation', () => {
         endDate: '2024-01-31',
         municipalityCode: '2906501',
         healthUnitCNES: '1234567',
-        recordCount: {
-          citizens: 0,
-          consultations: 0,
-          procedures: 0,
-          exams: 0,
-          tfdRequests: 0,
+        totalRegistros: {
+          cidadaos: 0,
+          atendimentos: 0,
+          procedimentos: 0,
+          exames: 0,
+          solicitacoesTFD: 0,
         },
       };
 
@@ -490,17 +490,17 @@ describe('e-SUS Export Schemas - Validation', () => {
         endDate: '2024-01-31',
         municipalityCode: '2906501',
         healthUnitCNES: '1234567',
-        citizens: [],
-        consultations: [],
-        procedures: [],
-        exams: [],
-        tfdRequests: [],
-        recordCount: {
-          citizens: 0,
-          consultations: 0,
-          procedures: 0,
-          exams: 0,
-          tfdRequests: 0,
+        cidadaos: [],
+        atendimentos: [],
+        procedimentos: [],
+        exames: [],
+        solicitacoesTFD: [],
+        totalRegistros: {
+          cidadaos: 0,
+          atendimentos: 0,
+          procedimentos: 0,
+          exames: 0,
+          solicitacoesTFD: 0,
         },
       };
 
@@ -516,12 +516,12 @@ describe('e-SUS Export Schemas - Validation', () => {
         endDate: '2024-01-31',
         municipalityCode: '12345', // Deve ter 7 dígitos
         healthUnitCNES: '1234567',
-        recordCount: {
-          citizens: 0,
-          consultations: 0,
-          procedures: 0,
-          exams: 0,
-          tfdRequests: 0,
+        totalRegistros: {
+          cidadaos: 0,
+          atendimentos: 0,
+          procedimentos: 0,
+          exames: 0,
+          solicitacoesTFD: 0,
         },
       };
 

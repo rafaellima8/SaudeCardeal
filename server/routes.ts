@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertCitizenSchema, insertAppointmentSchema, insertConsultationSchema, insertPrescriptionSchema, insertExamSchema, insertTfdRequestSchema, insertAttendanceQueueSchema, insertHealthUnitSchema, insertProfessionalSchema } from "@shared/schema";
 import { z } from "zod";
+import { generateExport } from "./integrations/esus/exporter";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Citizens API
@@ -597,6 +598,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(reports);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // e-SUS APS Export API (Internal)
+  // ============================================================================
+  
+  app.get("/api/internal/esus/generate", async (req, res) => {
+    try {
+      const { from, to, cnes, limit } = req.query;
+      
+      // Validar parâmetros
+      if (!from || !to) {
+        return res.status(400).json({ 
+          error: "Parâmetros 'from' e 'to' são obrigatórios (formato: YYYY-MM-DD)" 
+        });
+      }
+      
+      // Validar formato de data
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(from as string) || !dateRegex.test(to as string)) {
+        return res.status(400).json({ 
+          error: "Formato de data inválido. Use YYYY-MM-DD" 
+        });
+      }
+      
+      // CNES padrão (pode ser obtido da primeira unidade)
+      const defaultCNES = "1234567"; // TODO: Obter da primeira unidade ativa
+      
+      console.log(`[API] e-SUS export requested: ${from} to ${to}`);
+      
+      // Gerar exportação
+      const result = await generateExport({
+        from: from as string,
+        to: to as string,
+        healthUnitCNES: (cnes as string) || defaultCNES,
+        limit: limit ? parseInt(limit as string) : undefined,
+      });
+      
+      res.json({
+        success: true,
+        message: "Exportação e-SUS gerada com sucesso",
+        batchId: result.batchId,
+        files: {
+          json: result.jsonPath,
+          xml: result.xmlPath,
+        },
+        totalRegistros: result.totalRegistros,
+        totalRecords: Object.values(result.totalRegistros).reduce((a, b) => a + b, 0),
+      });
+      
+    } catch (error: any) {
+      console.error("[API] e-SUS export error:", error);
+      res.status(500).json({ 
+        error: "Erro ao gerar exportação e-SUS", 
+        details: error.message 
+      });
     }
   });
 

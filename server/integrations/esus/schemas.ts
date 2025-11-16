@@ -229,20 +229,20 @@ export const ESUSExportBatchSchema = z.object({
   systemName: z.string().default("PEC Integrado Municipal"),
   systemVersion: z.string().optional(),
   
-  // Dados
-  citizens: z.array(ESUSCitizenSchema).optional(),
-  consultations: z.array(ESUSConsultationSchema).optional(),
-  procedures: z.array(ESUSProcedureSchema).optional(),
-  exams: z.array(ESUSExamSchema).optional(),
-  tfdRequests: z.array(ESUSTFDSchema).optional(),
+  // Dados (nomes em português conforme DATASUS)
+  cidadaos: z.array(ESUSCitizenSchema).optional(),
+  atendimentos: z.array(ESUSConsultationSchema).optional(),
+  procedimentos: z.array(ESUSProcedureSchema).optional(),
+  exames: z.array(ESUSExamSchema).optional(),
+  solicitacoesTFD: z.array(ESUSTFDSchema).optional(),
   
-  // Estatísticas
-  recordCount: z.object({
-    citizens: z.number().int().nonnegative(),
-    consultations: z.number().int().nonnegative(),
-    procedures: z.number().int().nonnegative(),
-    exams: z.number().int().nonnegative(),
-    tfdRequests: z.number().int().nonnegative(),
+  // Estatísticas (nomes em português conforme DATASUS)
+  totalRegistros: z.object({
+    cidadaos: z.number().int().nonnegative(),
+    atendimentos: z.number().int().nonnegative(),
+    procedimentos: z.number().int().nonnegative(),
+    exames: z.number().int().nonnegative(),
+    solicitacoesTFD: z.number().int().nonnegative(),
   }),
 });
 

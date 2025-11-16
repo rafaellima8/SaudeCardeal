@@ -1,0 +1,64 @@
+Fase 2 — Extrator (query/ETL) dos dados necessários
+Objetivo: escrever queries/transformadores que extraem dados da sua base e montam os DTOs validados.
+Tarefas:
+Criar um módulo que consulte PostgreSQL (ou seu DB) e normalize os registros conforme schema.
+Paginação e janela de tempo (ex.: exportar produção do mês/intervalo).
+Transformações (formatar datas ISO, limpar CPF, normalizar codes).
+Arquivos:
+server/integrations/esus/extractor.ts
+Exemplo (esqueleto):
+// server/integrations/esus/extractor.ts
+import { db } from "../../db"; // seu client
+import { CitizenSchema } from "./schemas";
+
+export async function extractCitizens(since: string, until: string) {
+  const rows = await db.query(
+    `SELECT cpf, cns, name, birth_date, sex, city_code FROM citizens WHERE updated_at BETWEEN $1 AND $2`,
+    [since, until]
+  );
+  return rows.map(r => {
+    const dto = {
+      cpf: r.cpf.replace(/\D/g,""),
+      cns: r.cns,
+      name: r.name,
+      birthDate: r.birth_date.toISOString().slice(0,10),
+      sex: r.sex,
+      address: { cityCode: r.city_code }
+    };
+    return CitizenSchema.parse(dto);
+  });
+}
+Prompt para Replit:
+Crie server/integrations/esus/extractor.ts. Implemente funções: extractCitizens(since, until), extractConsultations(since, until) que retornem arrays validados pelos schemas. Adicione logging e tratamento de erros. Crie um teste que rode extractCitizens contra dados seed e valide o JSON retornado.
+Critério de aceitação:
+Funções extratoras implementadas e testadas sobre dados de seed.
+4) Fase 3 — Exportador (conversor para formato do MS e geração de arquivo)
+Objetivo: transformar DTOs em arquivos no formato exigido (JSON+XML conforme necessidade) e empacotar para envio.
+Abordagem prática:
+Gerar dois artefatos:
+export_<municipio>_<period>.json — JSON com estrutura validada.
+export_<municipio>_<period>.xml — XML equivalente (usar fast-xml-parser).
+Arquivo:
+server/integrations/esus/exporter.ts
+Exemplo de função de export:
+// server/integrations/esus/exporter.ts
+import { j2xParser } from "fast-xml-parser";
+import fs from "fs/promises";
+import path from "path";
+
+export async function exportToFiles(municipioCode: string, period: {from:string,to:string}, payload: any) {
+  const dir = path.join(process.cwd(), "tmp", `esus_${municipioCode}_${period.from}_${period.to}`);
+  await fs.mkdir(dir, { recursive: true });
+  const jsonPath = path.join(dir, "export.json");
+  await fs.writeFile(jsonPath, JSON.stringify(payload, null, 2), "utf8");
+
+  const parser = new j2xParser({ ignoreAttributes:false, format:true });
+  const xml = parser.parse({ root: payload });
+  const xmlPath = path.join(dir, "export.xml");
+  await fs.writeFile(xmlPath, xml, "utf8");
+  return { jsonPath, xmlPath };
+}
+Prompt para Replit:
+Crie server/integrations/esus/exporter.ts que recebe o payload (citizens, consultations, procedures), valida via schemas e gera dois arquivos: export.json e export.xml numa pasta tmp/esus_<municipio>_<period>. Retorne os paths. Adicione um endpoint de teste GET /api/internal/esus/generate?from=YYYY-MM-DD&to=YYYY-MM-DD que aciona a extração e geração de arquivos (modo só leitura, sem enviar). Teste o endpoint localmente.
+Critério de aceitação:
+Arquivos gerados no filesystem e endpoint retorna paths.
