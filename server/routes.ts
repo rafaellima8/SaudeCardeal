@@ -923,12 +923,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ACE Module - Sync API
-  const { aceSyncController } = await import("../modules/ace/server/controllers/sync.controller");
-  
-  app.post("/api/ace/sync", async (req, res) => {
-    await aceSyncController.sync(req, res);
-  });
+  // ACE Module - Guard check to avoid duplicate mounts
+  try {
+    const { aceRouter } = await import("../modules/ace/server/routes");
+    app.use("/api/ace", aceRouter);
+  } catch (error: any) {
+    console.warn("ACE module routes already mounted or failed to load:", error.message);
+  }
 
   const httpServer = createServer(app);
   return httpServer;
