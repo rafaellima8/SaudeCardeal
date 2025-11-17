@@ -1,6 +1,9 @@
 import { XMLBuilder } from "fast-xml-parser";
 import { promises as fs } from "fs";
 import path from "path";
+import { db } from "../../db";
+import { esusExports } from "@shared/schema";
+import { eq } from "drizzle-orm";
 import { 
   ESUSExportBatchSchema, 
   type ESUSExportBatchDTO,
@@ -219,16 +222,39 @@ export async function generateExport(options: ExportOptions): Promise<ExportResu
   console.log(`[e-SUS Exporter] Starting export process`);
   console.log(`[e-SUS Exporter] Options:`, options);
   
+  const batchId = crypto.randomUUID();
+  
   try {
-    // 1. Gerar payload validado
+    // 1. Registrar início da exportação no banco
+    await db.insert(esusExports).values({
+      batchId,
+      status: "processing",
+      startDate: options.from,
+      endDate: options.to,
+      healthUnitCNES: options.healthUnitCNES,
+    });
+    console.log(`[e-SUS Exporter] Export registered in database: ${batchId}`);
+    
+    // 2. Gerar payload validado
     const payload = await generateExportPayload(options);
     
-    // 2. Exportar para arquivos
+    // 3. Exportar para arquivos
     const result = await exportToFiles(
       MUNICIPALITY_CODE,
       { from: options.from, to: options.to },
       payload
     );
+    
+    // 4. Atualizar registro no banco com sucesso
+    await db.update(esusExports)
+      .set({
+        status: "completed",
+        jsonPath: result.jsonPath,
+        xmlPath: result.xmlPath,
+        totalRecords: result.totalRegistros,
+        completedAt: new Date(),
+      })
+      .where(eq(esusExports.batchId, batchId));
     
     console.log(`[e-SUS Exporter] Export completed successfully`);
     console.log(`[e-SUS Exporter] Batch ID: ${result.batchId}`);
@@ -239,6 +265,16 @@ export async function generateExport(options: ExportOptions): Promise<ExportResu
     
   } catch (error) {
     console.error(`[e-SUS Exporter] Export failed:`, error);
+    
+    // Atualizar registro no banco com erro
+    await db.update(esusExports)
+      .set({
+        status: "failed",
+        errorMessage: error instanceof Error ? error.message : String(error),
+        completedAt: new Date(),
+      })
+      .where(eq(esusExports.batchId, batchId));
+    
     throw new Error(`Export failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }

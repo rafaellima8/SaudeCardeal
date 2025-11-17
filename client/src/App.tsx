@@ -21,6 +21,7 @@ import Reports from "@/pages/reports";
 import Units from "@/pages/units";
 import Professionals from "@/pages/professionals";
 import Indicators from "@/pages/indicators";
+import EsusExports from "@/pages/admin/esus-exports";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -37,6 +38,7 @@ function Router() {
       <Route path="/unidades" component={Units} />
       <Route path="/profissionais" component={Professionals} />
       <Route path="/indicadores" component={Indicators} />
+      <Route path="/admin/esus-exports" component={EsusExports} />
       <Route component={NotFound} />
     </Switch>
   );

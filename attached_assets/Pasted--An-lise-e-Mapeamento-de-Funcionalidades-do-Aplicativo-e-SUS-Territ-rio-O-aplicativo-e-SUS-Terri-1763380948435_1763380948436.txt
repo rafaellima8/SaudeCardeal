@@ -1,0 +1,164 @@
+# Análise e Mapeamento de Funcionalidades do Aplicativo e-SUS Território
+
+O aplicativo **e-SUS Território** é uma ferramenta essencial para a Estratégia Saúde da Família (ESF) no Brasil, desenvolvida para otimizar o processo de trabalho dos Agentes Comunitários de Saúde (ACS), Agentes de Combate às Endemias (ACE) e Agentes de Ação Social (AAS) [1]. Seu principal objetivo é permitir o registro de dados de forma ágil e em campo, eliminando a necessidade de fichas de papel e o retrabalho de digitação posterior [2].
+
+## 1. Funcionamento e Arquitetura
+
+O e-SUS Território opera com uma arquitetura **offline-first**, ideal para o trabalho em áreas com conectividade limitada. O fluxo de dados é baseado na sincronização com o servidor do Prontuário Eletrônico do Cidadão (PEC) do e-SUS APS [2].
+
+| Componente | Descrição | Requisito para o Módulo ASAS |
+| :--- | :--- | :--- |
+| **Plataforma** | Aplicativo móvel (Android) para uso em *tablets* ou *smartphones* [2]. | **Aplicativo Móvel Nativo/Híbrido** (iOS/Android) ou **Web App Responsivo** com capacidades *offline*. |
+| **Sincronização** | Processo bidirecional que transfere dados do PEC para o dispositivo (cadastros de território) e do dispositivo para o PEC (novos cadastros e visitas) [2]. | **API de Sincronização** robusta para troca de dados com o sistema ASAS, suportando o conceito de microárea. |
+| **Autenticação** | Utiliza CPF e senha do agente, vinculados ao cadastro no PEC [2]. | **Integração com o Sistema de Usuários ASAS** (Login/Senha/CPF) e gestão de permissões por microárea/equipe. |
+| **Modo Offline** | Permite a coleta de dados (cadastros e visitas) sem conexão, armazenando-os localmente até a próxima sincronização [2]. | **Armazenamento Local** (SQLite, Realm, IndexedDB) para garantir a continuidade do trabalho em campo. |
+
+## 2. Mapeamento de Funcionalidades Principais
+
+As funcionalidades do e-SUS Território se concentram em duas grandes áreas: **Cadastro** e **Visita/Acompanhamento** [3] [4].
+
+### 2.1. Cadastro da Atenção Primária à Saúde
+
+O cadastro é estruturado em quatro dimensões (Imóvel, Territorial, Familiar e Individual) e serve como uma extensão do Cadastro Nacional do SUS (CadSUS) [3].
+
+| Funcionalidade | Detalhes | Módulo ASAS - Equivalente |
+| :--- | :--- | :--- |
+| **Cadastro de Imóvel** | Registro das características sociossanitárias do imóvel (tipo, condições de moradia, saneamento, etc.) [3]. Inclui a geolocalização do imóvel no mapa [3]. | **Gestão de Imóveis/Unidades** com campos de dados customizáveis e integração com serviços de geolocalização (GPS/Mapas). |
+| **Cadastro de Família** | Criação e edição do núcleo familiar, vinculando-o a um imóvel e definindo um responsável familiar [3]. | **Gestão de Famílias/Grupos** com estrutura hierárquica (Imóvel -> Família -> Indivíduos). |
+| **Cadastro de Cidadão** | Registro individual detalhado (dados pessoais, condições de saúde, situação de saúde, etc.) [3]. | **Gestão de Indivíduos/Clientes** com campos de dados para perfil social e de saúde. |
+| **Gestão Territorial** | Funções de busca, edição e unificação de logradouros, permitindo a organização da área de atuação [3]. | **Gestão de Território/Microárea** com ferramentas de busca e edição de endereços e áreas de cobertura. |
+
+### 2.2. Visita Domiciliar e Territorial
+
+O registro de visitas é o cerne do aplicativo, permitindo o acompanhamento contínuo dos cidadãos e famílias [4].
+
+| Funcionalidade | Detalhes | Módulo ASAS - Equivalente |
+| :--- | :--- | :--- |
+| **Registro de Visita** | Permite registrar visitas a Cidadãos, Famílias ou Imóveis [4]. Inclui o motivo da visita (busca ativa, acompanhamento, periódica, etc.) [4]. | **Registro de Interação/Visita** com tipificação da visita (Individual, Familiar, Imóvel) e campos para motivos e desfechos. |
+| **Coleta de Dados em Campo** | Durante a visita, permite registrar sinais vitais (temperatura, pressão arterial), glicemia capilar e anotações [4]. | **Formulários Dinâmicos de Coleta** para registro de dados de saúde e observações em campo. |
+| **Histórico de Visitas** | Visualização do histórico de visitas realizadas para o cidadão ou família [4]. | **Linha do Tempo/Histórico de Interações** associado ao perfil do Indivíduo e da Família. |
+
+### 2.3. Relatórios
+
+O aplicativo oferece relatórios consolidados para apoiar a gestão e o planejamento das ações [5].
+
+| Funcionalidade | Detalhes | Módulo ASAS - Equivalente |
+| :--- | :--- | :--- |
+| **Relatórios de Território** | Visão consolidada sobre Condições de Moradia, Distribuição Populacional (faixa etária) e Situação de Saúde (condições e doenças) [5]. | **Dashboard/Relatórios Gerenciais** que agregam os dados coletados em campo para análise e tomada de decisão. |
+
+## 3. Conclusão da Análise
+
+O e-SUS Território é, fundamentalmente, um sistema de **Gestão de Relacionamento com o Cidadão (GRC) em Campo** com foco na saúde pública. Para o módulo ASAS, a replicação das funcionalidades deve focar em:
+
+1.  **Capacidade Offline**: Essencial para o trabalho em campo.
+2.  **Estrutura Hierárquica de Dados**: Imóvel -> Família -> Indivíduo.
+3.  **Sincronização Segura**: Garantir a integridade e a atualização dos dados entre o módulo móvel e o *backend* ASAS.
+4.  **Geolocalização**: Mapeamento preciso dos pontos de interesse (imóveis).
+
+---
+## Referências
+
+[1] Gov.br. *e-SUS Território*. Disponível em: [https://www.gov.br/pt-br/apps/e-sus-territorio](https://www.gov.br/pt-br/apps/e-sus-territorio)
+[2] Ministério da Saúde. *Instalação e Sincronização*. Manual e-SUS Território. Disponível em: [https://sisaps.saude.gov.br/sistemas/esusaps/docs/manual/TERRITORIO/territorio_02](https://sisaps.saude.gov.br/sistemas/esusaps/docs/manual/TERRITORIO/territorio_02)
+[3] Ministério da Saúde. *Cadastro da Atenção Primária à Saúde*. Manual e-SUS Território. Disponível em: [https://sisaps.saude.gov.br/sistemas/esusaps/docs/manual/TERRITORIO/territorio_03](https://sisaps.saude.gov.br/sistemas/esusaps/docs/manual/TERRITORIO/territorio_03)
+[4] Ministério da Saúde. *Visita Domiciliar e Territorial*. Manual e-SUS Território. Disponível em: [https://sisaps.saude.gov.br/sistemas/esusaps/docs/manual/TERRITORIO/territorio_04](https://sisaps.saude.gov.br/sistemas/esusaps/docs/manual/TERRITORIO/territorio_04)
+[5] Ministério da Saúde. *Relatórios*. Manual e-SUS Território. Disponível em: [https://sisaps.saude.gov.br/sistemas/esusaps/docs/manual/TERRITORIO/territorio_05](https://sisaps.saude.gov.br/sistemas/esusaps/docs/manual/TERRITORIO/territorio_05)
+
+
+
+
+
+
+# Roteiro de Aplicativo: Módulo de Gestão Territorial para o Sistema ASAS (Inspirado no e-SUS Território)
+
+Este roteiro detalha as especificações e o fluxo de trabalho para o desenvolvimento de um módulo de Gestão Territorial e Visitas de Campo, a ser integrado ao sistema ASAS. O objetivo é replicar as funcionalidades essenciais do e-SUS Território, focando na otimização do trabalho de campo e na coleta de dados com capacidade *offline*.
+
+## 1. Visão Geral do Módulo
+
+O módulo será composto por duas partes principais:
+1.  **Backend/API (ASAS Core Integration):** Responsável pela gestão de dados, sincronização e autenticação.
+2.  **Aplicativo Móvel (Field Agent App):** Interface de campo com capacidade *offline* para coleta de dados.
+
+## 2. Especificações Técnicas e Arquitetura
+
+| Componente | Descrição | Tecnologia Sugerida |
+| :--- | :--- | :--- |
+| **Backend/API** | Gerenciamento de usuários, dados de território (logradouros, imóveis, famílias, indivíduos) e processamento da sincronização. Deve expor *endpoints* RESTful seguros. | Integrado ao *backend* ASAS (e.g., Python/Django, Node.js/Express, ou a tecnologia atual do ASAS). |
+| **Aplicativo Móvel** | Interface de usuário para coleta de dados em campo. Deve ser leve e otimizado para uso *offline*. | **React Native** ou **Flutter** (para compatibilidade iOS/Android) ou **Progressive Web App (PWA)** com Service Workers. |
+| **Armazenamento Offline** | Banco de dados local para armazenar dados de território e registros de visitas pendentes de sincronização. | **SQLite** (via bibliotecas como `sqlite-storage` ou `sqflite`) ou **Realm DB**. |
+| **Geolocalização** | Captura de coordenadas GPS para o cadastro de imóveis e registro de visitas. | API de Geolocalização nativa do dispositivo (iOS/Android). |
+| **Sincronização** | Mecanismo de sincronização bidirecional, preferencialmente incremental, para otimizar o uso de dados e bateria. | Implementação de **Timestamp/Versão** nos registros para controle de conflitos e sincronização de apenas dados alterados. |
+
+## 3. Fluxo de Trabalho do Agente de Campo
+
+O fluxo de trabalho deve ser simples e intuitivo, seguindo o modelo de trabalho do e-SUS Território:
+
+1.  **Login e Sincronização Inicial:** O agente faz o login (integrado ao ASAS) e realiza a primeira sincronização, baixando os dados de sua microárea (logradouros, imóveis, famílias, indivíduos) para o dispositivo.
+2.  **Trabalho Offline:** O agente realiza todas as atividades de campo (cadastros e visitas) sem a necessidade de conexão. Os dados são armazenados localmente.
+3.  **Sincronização Final:** Ao retornar a uma área com conectividade (ou na UBS), o agente sincroniza o aplicativo, enviando todos os novos registros e atualizações para o *backend* ASAS.
+
+## 4. Módulos e Telas do Aplicativo Móvel
+
+O aplicativo deve ser organizado nos seguintes módulos/telas:
+
+### 4.1. Módulo de Autenticação e Sincronização
+*   **Tela de Login:** CPF/Usuário e Senha (integrado ao ASAS).
+*   **Tela de Configuração de Servidor:** (Opcional, para ambientes de teste/produção).
+*   **Tela de Sincronização:** Indicador de progresso e status (Última Sincronização, Dados Pendentes). Botão "Sincronizar Agora".
+
+### 4.2. Módulo de Gestão Territorial (Home/Dashboard)
+*   **Lista de Logradouros/Ruas:** Exibe a lista de logradouros da microárea.
+*   **Lista de Imóveis:** Ao selecionar um logradouro, exibe a lista de imóveis.
+*   **Busca Global:** Permite buscar por Logradouro, Família ou Indivíduo.
+*   **Mapa do Território:** Visualização dos imóveis geolocalizados no mapa.
+
+### 4.3. Módulo de Cadastro (Imóvel, Família, Indivíduo)
+*   **Cadastro de Imóvel:**
+    *   **Dados de Endereço:** Tipo de imóvel, logradouro, número, complemento.
+    *   **Geolocalização:** Botão para capturar a coordenada GPS atual ou posicionar no mapa.
+    *   **Condições de Moradia:** Campos de dados sociossanitários (tipo de construção, saneamento, água, energia, animais).
+*   **Cadastro de Família:**
+    *   Vinculação ao Imóvel.
+    *   Definição do Responsável Familiar.
+*   **Cadastro de Indivíduo:**
+    *   Dados Pessoais (Nome, CPF/CNS, Data de Nascimento).
+    *   Condições de Saúde (Doenças crônicas, deficiências, gestação, etc.).
+    *   Vínculo Familiar.
+
+### 4.4. Módulo de Visitas e Acompanhamento
+*   **Perfil do Indivíduo/Família:** Exibe um resumo dos dados e o Histórico de Visitas.
+*   **Registro de Nova Visita:**
+    *   **Tipo de Visita:** Individual, Familiar, Imóvel.
+    *   **Motivo da Visita:** (Ex: Busca Ativa, Acompanhamento, Periódica, Controle Ambiental).
+    *   **Coleta de Dados:** Formulário dinâmico para Sinais Vitais, Glicemia Capilar, etc.
+    *   **Anotações:** Campo de texto livre para observações.
+    *   **Finalização:** Botão "Concluir Visita" (registra a visita localmente com *timestamp* e geolocalização).
+
+### 4.5. Módulo de Relatórios (Dashboard Local)
+*   **Relatórios de Campo:** Visão local e resumida dos dados coletados (e.g., total de cadastros novos, total de visitas realizadas, resumo por faixa etária).
+
+## 5. Requisitos Não Funcionais
+
+| Requisito | Detalhe |
+| :--- | :--- |
+| **Segurança** | Criptografia dos dados armazenados localmente (em repouso) e em trânsito (durante a sincronização - HTTPS/TLS). |
+| **Usabilidade** | Interface de usuário (UI) com alto contraste, fontes legíveis e botões grandes, otimizada para uso em campo (sob sol, com luvas, etc.). |
+| **Performance** | Tempo de carregamento de listas e telas de cadastro rápido, mesmo com grandes volumes de dados *offline*. |
+| **Manutenibilidade** | Código bem documentado e modular, facilitando a integração contínua com o sistema ASAS. |
+
+## 6. Próximos Passos Sugeridos
+
+1.  **Definição da API:** Detalhar os *endpoints* de sincronização (GET para dados do ASAS, POST para dados coletados).
+2.  **Modelagem de Dados:** Criar o esquema de banco de dados para Imóvel, Família, Indivíduo e Visita, garantindo a compatibilidade com o ASAS.
+3.  **Escolha da Tecnologia Móvel:** Finalizar a escolha entre React Native, Flutter ou PWA, considerando a *expertise* da equipe ASAS.
+
+---
+*Este roteiro foi elaborado com base na análise do Manual de Uso do Aplicativo e-SUS Território [1] [2] [3] [4] [5].*
+
+## Referências
+
+[1] Gov.br. *e-SUS Território*. Disponível em: [https://www.gov.br/pt-br/apps/e-sus-territorio](https://www.gov.br/pt-br/apps/e-sus-territorio)
+[2] Ministério da Saúde. *Instalação e Sincronização*. Manual e-SUS Território. Disponível em: [https://sisaps.saude.gov.br/sistemas/esusaps/docs/manual/TERRITORIO/territorio_02](https://sisaps.saude.gov.br/sistemas/esusaps/docs/manual/TERRITORIO/territorio_02)
+[3] Ministério da Saúde. *Cadastro da Atenção Primária à Saúde*. Manual e-SUS Território. Disponível em: [https://sisaps.saude.gov.br/sistemas/esusaps/docs/manual/TERRITORIO/territorio_03](https://sisaps.saude.gov.br/sistemas/esusaps/docs/manual/TERRITORIO/territorio_03)
+[4] Ministério da Saúde. *Visita Domiciliar e Territorial*. Manual e-SUS Território. Disponível em: [https://sisaps.saude.gov.br/sistemas/esusaps/docs/manual/TERRITORIO/territorio_04](https://sisaps.saude.gov.br/sistemas/esusaps/docs/manual/TERRITORIO/territorio_04)
+[5] Ministério da Saúde. *Relatórios*. Manual e-SUS Território. Disponível em: [https://sisaps.saude.gov.br/sistemas/esusaps/docs/manual/TERRITORIO/territorio_05](https://sisaps.saude.gov.br/sistemas/esusaps/docs/manual/TERRITORIO/territorio_05)

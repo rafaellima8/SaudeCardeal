@@ -669,6 +669,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================================================
+  // e-SUS Export Management API
+  // ============================================================================
+
+  // Listar histórico de exports
+  app.get("/api/esus/exports", async (req, res) => {
+    try {
+      const { limit, offset } = req.query;
+      const exports = await storage.getEsusExports({
+        limit: limit ? parseInt(limit as string) : 50,
+        offset: offset ? parseInt(offset as string) : 0,
+      });
+      res.json(exports);
+    } catch (error: any) {
+      console.error("[API] Error fetching e-SUS exports:", error);
+      res.status(500).json({ error: "Erro ao buscar histórico de exportações" });
+    }
+  });
+
+  // Download de arquivo de export (JSON ou XML)
+  app.get("/api/esus/exports/:id/download", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { type } = req.query; // 'json' ou 'xml'
+      
+      const exportRecord = await storage.getEsusExportById(id);
+      
+      if (!exportRecord) {
+        return res.status(404).json({ error: "Exportação não encontrada" });
+      }
+      
+      if (exportRecord.status !== "completed") {
+        return res.status(400).json({ 
+          error: "Exportação ainda não concluída ou falhou",
+          status: exportRecord.status 
+        });
+      }
+      
+      const filePath = type === "xml" ? exportRecord.xmlPath : exportRecord.jsonPath;
+      
+      if (!filePath) {
+        return res.status(404).json({ error: "Arquivo não encontrado" });
+      }
+      
+      // Verificar se arquivo existe
+      const fs = await import("fs/promises");
+      try {
+        await fs.access(filePath);
+      } catch {
+        return res.status(404).json({ error: "Arquivo não existe no sistema" });
+      }
+      
+      // Enviar arquivo
+      const fileName = `esus_export_${exportRecord.batchId}.${type === "xml" ? "xml" : "json"}`;
+      res.download(filePath, fileName);
+      
+    } catch (error: any) {
+      console.error("[API] Error downloading e-SUS export:", error);
+      res.status(500).json({ error: "Erro ao fazer download do arquivo" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -126,6 +126,10 @@ export interface IStorage {
 
   // Dashboard Stats
   getDashboardStats(unitId?: string): Promise<any>;
+
+  // e-SUS Exports
+  getEsusExports(params: { limit?: number; offset?: number }): Promise<schema.EsusExport[]>;
+  getEsusExportById(id: string): Promise<schema.EsusExport | undefined>;
 }
 
 export class DbStorage implements IStorage {
@@ -730,6 +734,27 @@ export class DbStorage implements IStorage {
   async deleteTfdRequest(id: string): Promise<boolean> {
     const result = await db.delete(schema.tfdRequests).where(eq(schema.tfdRequests.id, id));
     return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  // e-SUS Exports
+  async getEsusExports(params: { limit?: number; offset?: number }): Promise<schema.EsusExport[]> {
+    const limit = params.limit || 50;
+    const offset = params.offset || 0;
+    
+    return await db.select()
+      .from(schema.esusExports)
+      .orderBy(desc(schema.esusExports.createdAt))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  async getEsusExportById(id: string): Promise<schema.EsusExport | undefined> {
+    const results = await db.select()
+      .from(schema.esusExports)
+      .where(eq(schema.esusExports.id, id))
+      .limit(1);
+    
+    return results[0];
   }
 }
 

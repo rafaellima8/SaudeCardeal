@@ -11,6 +11,7 @@ export const attendanceStatusEnum = pgEnum("attendance_status", ["waiting", "in_
 export const priorityEnum = pgEnum("priority", ["normal", "urgent", "emergency"]);
 export const tfdStatusEnum = pgEnum("tfd_status", ["pending", "approved", "scheduled", "completed", "cancelled"]);
 export const prescriptionStatusEnum = pgEnum("prescription_status", ["active", "dispensed", "cancelled"]);
+export const esusExportStatusEnum = pgEnum("esus_export_status", ["pending", "processing", "completed", "failed"]);
 
 // Users and Authentication
 export const users = pgTable("users", {
@@ -219,6 +220,22 @@ export const auditLog = pgTable("audit_log", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// e-SUS Export History
+export const esusExports = pgTable("esus_exports", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  batchId: varchar("batch_id", { length: 100 }).notNull().unique(),
+  status: esusExportStatusEnum("status").notNull().default("pending"),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+  healthUnitCNES: varchar("health_unit_cnes", { length: 7 }).notNull(),
+  jsonPath: text("json_path"),
+  xmlPath: text("xml_path"),
+  totalRecords: jsonb("total_records"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+});
+
 // Zod Schemas for Validation
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertHealthUnitSchema = createInsertSchema(healthUnits).omit({ id: true, createdAt: true });
@@ -232,6 +249,7 @@ export const insertMedicationSchema = createInsertSchema(medications).omit({ id:
 export const insertMedicationStockSchema = createInsertSchema(medicationStock).omit({ id: true, entryDate: true, updatedAt: true });
 export const insertExamSchema = createInsertSchema(exams).omit({ id: true, createdAt: true });
 export const insertTfdRequestSchema = createInsertSchema(tfdRequests).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertEsusExportSchema = createInsertSchema(esusExports).omit({ id: true, createdAt: true, completedAt: true });
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -258,3 +276,5 @@ export type InsertExam = z.infer<typeof insertExamSchema>;
 export type Exam = typeof exams.$inferSelect;
 export type InsertTfdRequest = z.infer<typeof insertTfdRequestSchema>;
 export type TfdRequest = typeof tfdRequests.$inferSelect;
+export type InsertEsusExport = z.infer<typeof insertEsusExportSchema>;
+export type EsusExport = typeof esusExports.$inferSelect;
