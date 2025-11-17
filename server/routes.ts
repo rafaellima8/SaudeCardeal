@@ -7,7 +7,10 @@ import { generateExport } from "./integrations/esus/exporter";
 import { authenticateUser, requireAuth, requireRole } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Authentication API
+  // ============================================================================
+  // AUTHENTICATION API - Must be registered BEFORE global protection middleware
+  // ============================================================================
+  
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { email, password } = loginSchema.parse(req.body);
@@ -43,6 +46,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     res.json(req.session.user);
   });
+
+  // ============================================================================
+  // GLOBAL PROTECTION MIDDLEWARE - All routes after this require authentication
+  // ============================================================================
+  app.use("/api", (req, res, next) => {
+    // Exact list of allowed unauthenticated endpoints
+    const allowedPaths = ["/auth/login", "/auth/logout", "/auth/me"];
+    if (allowedPaths.includes(req.path)) {
+      return next();
+    }
+    // Require authentication for all other API routes
+    return requireAuth(req, res, next);
+  });
+
+  // ============================================================================
+  // PROTECTED API ROUTES - All routes below require authentication
+  // ============================================================================
 
   // Citizens API
   app.get("/api/citizens", async (req, res) => {
@@ -961,13 +981,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ACE Module - Guard check to avoid duplicate mounts
+  // ACE Module - Guard check to avoid duplicate mounts  
   try {
-    const { aceRouter } = await import("../modules/ace/server/routes");
+    const { aceRouter} = await import("../modules/ace/server/routes");
     app.use("/api/ace", aceRouter);
   } catch (error: any) {
     console.warn("ACE module routes already mounted or failed to load:", error.message);
   }
+
+  // 404 handler for undefined API routes
+  app.use("/api/*", (req, res) => {
+    res.status(404).json({ error: "Endpoint não encontrado" });
+  });
 
   const httpServer = createServer(app);
   return httpServer;
