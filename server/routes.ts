@@ -923,6 +923,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ACE Module - Sync API
+  const { aceSyncController } = await import("../modules/ace/server/controllers/sync.controller");
+  
+  app.post("/api/ace/sync", async (req, res) => {
+    await aceSyncController.sync(req, res);
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
