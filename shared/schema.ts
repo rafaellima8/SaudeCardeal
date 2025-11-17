@@ -23,6 +23,7 @@ export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
+  passwordHash: text("password_hash").notNull(),
   role: userRoleEnum("role").notNull().default("recepcao"),
   unitId: uuid("unit_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -308,7 +309,11 @@ export const esusExports = pgTable("esus_exports", {
 });
 
 // Zod Schemas for Validation
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, passwordHash: true });
+export const loginSchema = z.object({
+  email: z.string().email("Email inválido"),
+  password: z.string().min(6, "Senha deve ter no mínimo 6 caracteres"),
+});
 export const insertHealthUnitSchema = createInsertSchema(healthUnits).omit({ id: true, createdAt: true });
 export const insertProfessionalSchema = createInsertSchema(professionals).omit({ id: true, createdAt: true });
 export const insertCitizenSchema = createInsertSchema(citizens).omit({ id: true, createdAt: true, updatedAt: true });

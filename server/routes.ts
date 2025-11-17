@@ -1,11 +1,49 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCitizenSchema, insertAppointmentSchema, insertConsultationSchema, insertPrescriptionSchema, insertExamSchema, insertTfdRequestSchema, insertAttendanceQueueSchema, insertHealthUnitSchema, insertProfessionalSchema, insertDwellingSchema, insertFamilySchema, insertHomeVisitSchema } from "@shared/schema";
+import { insertCitizenSchema, insertAppointmentSchema, insertConsultationSchema, insertPrescriptionSchema, insertExamSchema, insertTfdRequestSchema, insertAttendanceQueueSchema, insertHealthUnitSchema, insertProfessionalSchema, insertDwellingSchema, insertFamilySchema, insertHomeVisitSchema, loginSchema } from "@shared/schema";
 import { z } from "zod";
 import { generateExport } from "./integrations/esus/exporter";
+import { authenticateUser, requireAuth, requireRole } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Authentication API
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { email, password } = loginSchema.parse(req.body);
+      
+      const user = await authenticateUser(email, password);
+      
+      if (!user) {
+        return res.status(401).json({ error: "Email ou senha inválidos" });
+      }
+
+      req.session.user = user;
+      res.json(user);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ error: "Erro ao fazer logout" });
+      }
+      res.json({ message: "Logout realizado com sucesso" });
+    });
+  });
+
+  app.get("/api/auth/me", (req, res) => {
+    if (!req.session.user) {
+      return res.status(401).json({ error: "Não autenticado" });
+    }
+    res.json(req.session.user);
+  });
+
   // Citizens API
   app.get("/api/citizens", async (req, res) => {
     try {

@@ -1,5 +1,7 @@
 import { db } from "./db";
 import * as schema from "@shared/schema";
+import { eq } from "drizzle-orm";
+import bcrypt from "bcrypt";
 
 async function seed() {
   console.log("🌱 Iniciando seed do banco de dados...");
@@ -21,10 +23,15 @@ async function seed() {
 
   console.log("✅ Unidades de saúde criadas");
 
-  // Create Users
+  // Create Users WITH PASSWORDS
+  const adminPassword = "Admin@2025";
+  const acsPassword = "Acs@2025";
+  const defaultPassword = "Senha@2025";
+  
   const [user1] = await db.insert(schema.users).values({
     email: "dra.maria@cardealdasilva.ba.gov.br",
     name: "Dra. Maria Silva",
+    passwordHash: await bcrypt.hash(defaultPassword, 10),
     role: "medico",
     unitId: unit1.id,
   }).returning();
@@ -32,6 +39,7 @@ async function seed() {
   const [user2] = await db.insert(schema.users).values({
     email: "enf.carlos@cardealdasilva.ba.gov.br",
     name: "Enf. Carlos Santos",
+    passwordHash: await bcrypt.hash(defaultPassword, 10),
     role: "enfermeiro",
     unitId: unit1.id,
   }).returning();
@@ -39,11 +47,37 @@ async function seed() {
   const [user3] = await db.insert(schema.users).values({
     email: "recepcao@cardealdasilva.ba.gov.br",
     name: "Ana Paula Recepcionista",
+    passwordHash: await bcrypt.hash(defaultPassword, 10),
     role: "recepcao",
     unitId: unit1.id,
   }).returning();
 
+  // ADMINISTRATOR USER - Full access
+  const [adminUser] = await db.insert(schema.users).values({
+    email: "admin@saude.gov.br",
+    name: "Administrador do Sistema",
+    passwordHash: await bcrypt.hash(adminPassword, 10),
+    role: "admin",
+    unitId: unit1.id,
+  }).returning();
+
+  // ACS USER - Restricted to Territory and ACE
+  const [acsUser] = await db.insert(schema.users).values({
+    email: "acs@saude.gov.br",
+    name: "João Silva",
+    passwordHash: await bcrypt.hash(acsPassword, 10),
+    role: "acs",
+    unitId: unit1.id,
+  }).returning();
+
   console.log("✅ Usuários criados");
+  console.log("\n📝 CREDENCIAIS DE ACESSO:");
+  console.log("\n🔐 ADMINISTRADOR:");
+  console.log(`   Email: admin@saude.gov.br`);
+  console.log(`   Senha: ${adminPassword}`);
+  console.log("\n🔐 AGENTE COMUNITÁRIO (ACS):");
+  console.log(`   Email: acs@saude.gov.br`);
+  console.log(`   Senha: ${acsPassword}`);
 
   // Create Professionals
   const [prof1] = await db.insert(schema.professionals).values({
