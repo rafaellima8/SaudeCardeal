@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { DevRoleSwitcher } from "@/hooks/use-current-user";
 import { Bell, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,6 +91,7 @@ function App() {
           </div>
         </SidebarProvider>
         <Toaster />
+        <DevRoleSwitcher />
       </TooltipProvider>
     </QueryClientProvider>
   );

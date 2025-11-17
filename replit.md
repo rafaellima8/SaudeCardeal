@@ -12,6 +12,17 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+**November 17, 2025** - Implemented Role-Based Access Control (RBAC):
+- Created permissions system with role-based menu filtering
+- New hook `useCurrentUser()` for user context and permissions
+- Sidebar dynamically filters menu items based on user role
+- ACS (Agente Comunitário de Saúde) profile with restricted access to:
+  - ✅ Território (Territory Management)
+  - ✅ ACE (Community Health Agent Dashboard)
+- Development role switcher component for testing different profiles
+- Role labels in Portuguese for all 7 user types
+- User avatar with dynamic initials in sidebar footer
+
 **November 17, 2025** - Implemented ACE Dashboard and Stats Module:
 - Created ACE Dashboard page (`/ace`) with Recharts visualizations
 - Implemented GET `/api/ace/stats` endpoint for aggregated statistics
@@ -20,6 +31,7 @@ Preferred communication style: Simple, everyday language.
 - Added ACE navigation link in sidebar with Activity icon
 - Configured TypeScript paths with `@modules/*` alias for ACE module imports
 - All ACE unit tests passing (11/11)
+- Stats service correctly queries main schema tables (dwellings, home_visits)
 
 **November 17, 2025** - Implemented Territorial Management Module (e-SUS Território):
 - Created hierarchical data structure: Dwelling → Family → Citizen → Home Visits
@@ -96,9 +108,25 @@ Preferred communication style: Simple, everyday language.
   - `/api/professionals` - Healthcare professional registry
   - `/api/reports` - Analytics and reporting
   - `/api/stats/dashboard` - Dashboard statistics
+  - `/api/ace/stats` - ACE module statistics
   - `/api/dwellings` - Territorial dwelling management (e-SUS Território)
   - `/api/families` - Family registry and management
   - `/api/home-visits` - Home visit tracking and data collection
+
+**Security & Access Control**
+- Role-based access control (RBAC) with 7 user roles
+- Permission matrix defined in `client/src/lib/permissions.ts`
+- Dynamic menu filtering based on user role
+- User roles:
+  - `admin` - Full system access
+  - `medico` - Medical staff access
+  - `enfermeiro` - Nursing staff access
+  - `acs` - Community health agent (restricted to Território and ACE only)
+  - `farmaceutico` - Pharmacy management
+  - `gestor` - Manager/supervisor access
+  - `recepcao` - Reception/front desk access
+- User context hook: `useCurrentUser()` for permission checks
+- Development role switcher for testing different permission levels
 
 **Database Schema Design**
 - Enum types for status fields (appointment_status, attendance_status, priority, tfd_status, prescription_status)
