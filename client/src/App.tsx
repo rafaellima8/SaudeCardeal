@@ -23,6 +23,7 @@ import Professionals from "@/pages/professionals";
 import Indicators from "@/pages/indicators";
 import EsusExports from "@/pages/admin/esus-exports";
 import TerritoryPage from "@/pages/territorio";
+import AceDashboard from "@modules/ace/client/pages/ace-dashboard";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -41,6 +42,7 @@ function Router() {
       <Route path="/indicadores" component={Indicators} />
       <Route path="/admin/esus-exports" component={EsusExports} />
       <Route path="/territorio" component={TerritoryPage} />
+      <Route path="/ace" component={AceDashboard} />
       <Route component={NotFound} />
     </Switch>
   );

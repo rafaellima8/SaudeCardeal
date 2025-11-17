@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { aceSyncController } from "./controllers/sync.controller";
 import { dwellingController } from "./controllers/dwelling.controller";
+import { aceStatsController } from "./controllers/stats.controller";
 
 export const aceRouter = Router();
 
@@ -12,4 +13,9 @@ aceRouter.post("/sync", async (req, res) => {
 // ACE Module - Dwelling API
 aceRouter.post("/dwellings", async (req, res) => {
   await dwellingController.createDwelling(req, res);
+});
+
+// ACE Module - Stats API
+aceRouter.get("/stats", async (req, res) => {
+  await aceStatsController.getStats(req, res);
 });

@@ -12,7 +12,8 @@ import {
   ClipboardList,
   LayoutDashboard,
   Clock,
-  MapPin
+  MapPin,
+  Activity
 } from "lucide-react";
 import {
   Sidebar,
@@ -35,6 +36,7 @@ const menuItems = [
   { title: "Pacientes", icon: Users, url: "/pacientes" },
   { title: "Agendamentos", icon: Calendar, url: "/agendamentos" },
   { title: "Território", icon: MapPin, url: "/territorio" },
+  { title: "ACE", icon: Activity, url: "/ace" },
   { title: "Farmácia", icon: Pill, url: "/farmacia" },
   { title: "TFD", icon: Truck, url: "/tfd" },
   { title: "Relatórios", icon: FileText, url: "/relatorios" },

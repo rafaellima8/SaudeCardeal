@@ -12,6 +12,15 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+**November 17, 2025** - Implemented ACE Dashboard and Stats Module:
+- Created ACE Dashboard page (`/ace`) with Recharts visualizations
+- Implemented GET `/api/ace/stats` endpoint for aggregated statistics
+- Dashboard displays: total visits, focos vetoriais, dwellings count, recent activity
+- Charts: Dwellings by status (bar chart), Visits by type (pie chart)
+- Added ACE navigation link in sidebar with Activity icon
+- Configured TypeScript paths with `@modules/*` alias for ACE module imports
+- All ACE unit tests passing (11/11)
+
 **November 17, 2025** - Implemented Territorial Management Module (e-SUS Território):
 - Created hierarchical data structure: Dwelling → Family → Citizen → Home Visits
 - New database tables: dwellings, families, home_visits
