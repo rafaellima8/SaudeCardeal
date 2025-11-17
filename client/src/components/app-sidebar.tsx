@@ -11,7 +11,8 @@ import {
   ChevronDown,
   ClipboardList,
   MapPin,
-  Activity
+  Activity,
+  LogOut,
 } from "lucide-react";
 import {
   Sidebar,
@@ -29,6 +30,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { filterMenuByRole } from "@/lib/permissions";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 const allMenuItems = [
   { title: "Dashboard", icon: Home, url: "/" },
@@ -60,6 +65,33 @@ const roleLabels: Record<string, string> = {
 
 export function AppSidebar() {
   const { user, isLoading } = useCurrentUser();
+  const { toast } = useToast();
+  const [, setLocation] = useLocation();
+
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", "/api/auth/logout", {});
+    },
+    onSuccess: () => {
+      queryClient.clear();
+      toast({
+        title: "Logout realizado",
+        description: "Você saiu do sistema com sucesso.",
+      });
+      setLocation("/login");
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: "Erro ao sair",
+        description: "Não foi possível fazer logout.",
+      });
+    },
+  });
+
+  function handleLogout() {
+    logoutMutation.mutate();
+  }
 
   if (isLoading || !user) {
     return (
@@ -170,7 +202,15 @@ export function AppSidebar() {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuItem data-testid="menu-perfil">Meu Perfil</DropdownMenuItem>
             <DropdownMenuItem data-testid="menu-configuracoes">Configurações</DropdownMenuItem>
-            <DropdownMenuItem data-testid="menu-sair" className="text-destructive">Sair</DropdownMenuItem>
+            <DropdownMenuItem 
+              data-testid="menu-sair" 
+              className="text-destructive"
+              onClick={handleLogout}
+              disabled={logoutMutation.isPending}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              {logoutMutation.isPending ? "Saindo..." : "Sair"}
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarFooter>
