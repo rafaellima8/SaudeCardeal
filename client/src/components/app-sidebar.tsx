@@ -34,6 +34,7 @@ const menuItems = [
   { title: "Recepção", icon: ClipboardList, url: "/recepcao" },
   { title: "Pacientes", icon: Users, url: "/pacientes" },
   { title: "Agendamentos", icon: Calendar, url: "/agendamentos" },
+  { title: "Território", icon: MapPin, url: "/territorio" },
   { title: "Farmácia", icon: Pill, url: "/farmacia" },
   { title: "TFD", icon: Truck, url: "/tfd" },
   { title: "Relatórios", icon: FileText, url: "/relatorios" },

@@ -25,6 +25,12 @@ import type {
   InsertProfessional,
   Professional,
   User,
+  InsertDwelling,
+  Dwelling,
+  InsertFamily,
+  Family,
+  InsertHomeVisit,
+  HomeVisit,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -130,6 +136,26 @@ export interface IStorage {
   // e-SUS Exports
   getEsusExports(params: { limit?: number; offset?: number }): Promise<schema.EsusExport[]>;
   getEsusExportById(id: string): Promise<schema.EsusExport | undefined>;
+
+  // Territorial Management - Dwellings
+  getDwellings(params: { unitId?: string; microarea?: string; search?: string; limit?: number; offset?: number }): Promise<Dwelling[]>;
+  getDwellingById(id: string): Promise<Dwelling | undefined>;
+  createDwelling(dwelling: InsertDwelling): Promise<Dwelling>;
+  updateDwelling(id: string, dwelling: Partial<InsertDwelling>): Promise<Dwelling | undefined>;
+  deleteDwelling(id: string): Promise<boolean>;
+
+  // Families
+  getFamilies(params: { dwellingId?: string; unitId?: string; search?: string; limit?: number; offset?: number }): Promise<Family[]>;
+  getFamilyById(id: string): Promise<Family | undefined>;
+  createFamily(family: InsertFamily): Promise<Family>;
+  updateFamily(id: string, family: Partial<InsertFamily>): Promise<Family | undefined>;
+  deleteFamily(id: string): Promise<boolean>;
+
+  // Home Visits
+  getHomeVisits(params: { citizenId?: string; familyId?: string; dwellingId?: string; agentId?: string; unitId?: string; limit?: number; offset?: number }): Promise<HomeVisit[]>;
+  getHomeVisitById(id: string): Promise<HomeVisit | undefined>;
+  createHomeVisit(visit: InsertHomeVisit): Promise<HomeVisit>;
+  deleteHomeVisit(id: string): Promise<boolean>;
 }
 
 export class DbStorage implements IStorage {
@@ -755,6 +781,138 @@ export class DbStorage implements IStorage {
       .limit(1);
     
     return results[0];
+  }
+
+  // Territorial Management - Dwellings
+  async getDwellings(params: { unitId?: string; microarea?: string; search?: string; limit?: number; offset?: number }): Promise<Dwelling[]> {
+    let query = db.select().from(schema.dwellings);
+    const conditions: any[] = [];
+
+    if (params.unitId) conditions.push(eq(schema.dwellings.unitId, params.unitId));
+    if (params.microarea) conditions.push(eq(schema.dwellings.microarea, params.microarea));
+    if (params.search) {
+      conditions.push(
+        or(
+          like(schema.dwellings.street, `%${params.search}%`),
+          like(schema.dwellings.neighborhood, `%${params.search}%`),
+          like(schema.dwellings.number, `%${params.search}%`)
+        )
+      );
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    return query
+      .orderBy(desc(schema.dwellings.createdAt))
+      .limit(params.limit || 50)
+      .offset(params.offset || 0);
+  }
+
+  async getDwellingById(id: string): Promise<Dwelling | undefined> {
+    const [dwelling] = await db.select().from(schema.dwellings).where(eq(schema.dwellings.id, id));
+    return dwelling;
+  }
+
+  async createDwelling(dwelling: InsertDwelling): Promise<Dwelling> {
+    const [created] = await db.insert(schema.dwellings).values(dwelling).returning();
+    return created;
+  }
+
+  async updateDwelling(id: string, dwelling: Partial<InsertDwelling>): Promise<Dwelling | undefined> {
+    const [updated] = await db
+      .update(schema.dwellings)
+      .set({ ...dwelling, updatedAt: new Date() })
+      .where(eq(schema.dwellings.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteDwelling(id: string): Promise<boolean> {
+    const result = await db.delete(schema.dwellings).where(eq(schema.dwellings.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Families
+  async getFamilies(params: { dwellingId?: string; unitId?: string; search?: string; limit?: number; offset?: number }): Promise<Family[]> {
+    let query = db.select().from(schema.families);
+    const conditions: any[] = [];
+
+    if (params.dwellingId) conditions.push(eq(schema.families.dwellingId, params.dwellingId));
+    if (params.unitId) conditions.push(eq(schema.families.unitId, params.unitId));
+    if (params.search) {
+      conditions.push(like(schema.families.familyCode, `%${params.search}%`));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    return query
+      .orderBy(desc(schema.families.createdAt))
+      .limit(params.limit || 50)
+      .offset(params.offset || 0);
+  }
+
+  async getFamilyById(id: string): Promise<Family | undefined> {
+    const [family] = await db.select().from(schema.families).where(eq(schema.families.id, id));
+    return family;
+  }
+
+  async createFamily(family: InsertFamily): Promise<Family> {
+    const [created] = await db.insert(schema.families).values(family).returning();
+    return created;
+  }
+
+  async updateFamily(id: string, family: Partial<InsertFamily>): Promise<Family | undefined> {
+    const [updated] = await db
+      .update(schema.families)
+      .set({ ...family, updatedAt: new Date() })
+      .where(eq(schema.families.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteFamily(id: string): Promise<boolean> {
+    const result = await db.delete(schema.families).where(eq(schema.families.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Home Visits
+  async getHomeVisits(params: { citizenId?: string; familyId?: string; dwellingId?: string; agentId?: string; unitId?: string; limit?: number; offset?: number }): Promise<HomeVisit[]> {
+    let query = db.select().from(schema.homeVisits);
+    const conditions: any[] = [];
+
+    if (params.citizenId) conditions.push(eq(schema.homeVisits.citizenId, params.citizenId));
+    if (params.familyId) conditions.push(eq(schema.homeVisits.familyId, params.familyId));
+    if (params.dwellingId) conditions.push(eq(schema.homeVisits.dwellingId, params.dwellingId));
+    if (params.agentId) conditions.push(eq(schema.homeVisits.agentId, params.agentId));
+    if (params.unitId) conditions.push(eq(schema.homeVisits.unitId, params.unitId));
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    return query
+      .orderBy(desc(schema.homeVisits.visitDate))
+      .limit(params.limit || 50)
+      .offset(params.offset || 0);
+  }
+
+  async getHomeVisitById(id: string): Promise<HomeVisit | undefined> {
+    const [visit] = await db.select().from(schema.homeVisits).where(eq(schema.homeVisits.id, id));
+    return visit;
+  }
+
+  async createHomeVisit(visit: InsertHomeVisit): Promise<HomeVisit> {
+    const [created] = await db.insert(schema.homeVisits).values(visit).returning();
+    return created;
+  }
+
+  async deleteHomeVisit(id: string): Promise<boolean> {
+    const result = await db.delete(schema.homeVisits).where(eq(schema.homeVisits.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 }
 

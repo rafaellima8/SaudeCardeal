@@ -10,6 +10,18 @@ The application serves multiple user roles including administrators, physicians,
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+**November 17, 2025** - Implemented Territorial Management Module (e-SUS Território):
+- Created hierarchical data structure: Dwelling → Family → Citizen → Home Visits
+- New database tables: dwellings, families, home_visits
+- New enums: dwelling_type, sanitation, water_supply, visit_type, visit_motive
+- Complete REST APIs for territorial CRUD operations
+- UI with tabs for Dwellings, Families, and Home Visits management
+- Added geolocation support (latitude/longitude fields)
+- Integrated with existing health units and professionals
+- Added navigation link in sidebar
+
 ## System Architecture
 
 ### Frontend Architecture
@@ -75,14 +87,19 @@ Preferred communication style: Simple, everyday language.
   - `/api/professionals` - Healthcare professional registry
   - `/api/reports` - Analytics and reporting
   - `/api/stats/dashboard` - Dashboard statistics
+  - `/api/dwellings` - Territorial dwelling management (e-SUS Território)
+  - `/api/families` - Family registry and management
+  - `/api/home-visits` - Home visit tracking and data collection
 
 **Database Schema Design**
 - Enum types for status fields (appointment_status, attendance_status, priority, tfd_status, prescription_status)
+- Territorial enums (dwelling_type, sanitation, water_supply, visit_type, visit_motive)
 - User roles enum (admin, medico, enfermeiro, acs, farmaceutico, gestor, recepcao)
 - UUID primary keys for all entities
 - Timestamp tracking (createdAt) on all major tables
 - Foreign key relationships maintaining referential integrity
-- Separate tables for health units, professionals, citizens, appointments, consultations, prescriptions, medications, exams, TFD requests, and attendance queues
+- Hierarchical territorial structure: dwellings → families → citizens → home visits
+- Separate tables for health units, professionals, citizens, appointments, consultations, prescriptions, medications, exams, TFD requests, attendance queues, dwellings, families, and home visits
 
 ### Development & Deployment
 

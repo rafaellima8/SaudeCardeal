@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCitizenSchema, insertAppointmentSchema, insertConsultationSchema, insertPrescriptionSchema, insertExamSchema, insertTfdRequestSchema, insertAttendanceQueueSchema, insertHealthUnitSchema, insertProfessionalSchema } from "@shared/schema";
+import { insertCitizenSchema, insertAppointmentSchema, insertConsultationSchema, insertPrescriptionSchema, insertExamSchema, insertTfdRequestSchema, insertAttendanceQueueSchema, insertHealthUnitSchema, insertProfessionalSchema, insertDwellingSchema, insertFamilySchema, insertHomeVisitSchema } from "@shared/schema";
 import { z } from "zod";
 import { generateExport } from "./integrations/esus/exporter";
 
@@ -728,6 +728,198 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("[API] Error downloading e-SUS export:", error);
       res.status(500).json({ error: "Erro ao fazer download do arquivo" });
+    }
+  });
+
+  // ============================================
+  // GESTÃO TERRITORIAL (e-SUS Território)
+  // ============================================
+
+  // Dwellings (Imóveis)
+  app.get("/api/dwellings", async (req, res) => {
+    try {
+      const { unitId, microarea, search, limit, offset } = req.query;
+      const dwellings = await storage.getDwellings({
+        unitId: unitId as string,
+        microarea: microarea as string,
+        search: search as string,
+        limit: limit ? parseInt(limit as string) : undefined,
+        offset: offset ? parseInt(offset as string) : undefined,
+      });
+      res.json(dwellings);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/dwellings/:id", async (req, res) => {
+    try {
+      const dwelling = await storage.getDwellingById(req.params.id);
+      if (!dwelling) {
+        return res.status(404).json({ error: "Imóvel não encontrado" });
+      }
+      res.json(dwelling);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/dwellings", async (req, res) => {
+    try {
+      const data = insertDwellingSchema.parse(req.body);
+      const dwelling = await storage.createDwelling(data);
+      res.status(201).json(dwelling);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/dwellings/:id", async (req, res) => {
+    try {
+      const dwelling = await storage.updateDwelling(req.params.id, req.body);
+      if (!dwelling) {
+        return res.status(404).json({ error: "Imóvel não encontrado" });
+      }
+      res.json(dwelling);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/dwellings/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteDwelling(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Imóvel não encontrado" });
+      }
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Families (Famílias)
+  app.get("/api/families", async (req, res) => {
+    try {
+      const { dwellingId, unitId, search, limit, offset } = req.query;
+      const families = await storage.getFamilies({
+        dwellingId: dwellingId as string,
+        unitId: unitId as string,
+        search: search as string,
+        limit: limit ? parseInt(limit as string) : undefined,
+        offset: offset ? parseInt(offset as string) : undefined,
+      });
+      res.json(families);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/families/:id", async (req, res) => {
+    try {
+      const family = await storage.getFamilyById(req.params.id);
+      if (!family) {
+        return res.status(404).json({ error: "Família não encontrada" });
+      }
+      res.json(family);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/families", async (req, res) => {
+    try {
+      const data = insertFamilySchema.parse(req.body);
+      const family = await storage.createFamily(data);
+      res.status(201).json(family);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/families/:id", async (req, res) => {
+    try {
+      const family = await storage.updateFamily(req.params.id, req.body);
+      if (!family) {
+        return res.status(404).json({ error: "Família não encontrada" });
+      }
+      res.json(family);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/families/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteFamily(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Família não encontrada" });
+      }
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Home Visits (Visitas Domiciliares)
+  app.get("/api/home-visits", async (req, res) => {
+    try {
+      const { citizenId, familyId, dwellingId, agentId, unitId, limit, offset } = req.query;
+      const visits = await storage.getHomeVisits({
+        citizenId: citizenId as string,
+        familyId: familyId as string,
+        dwellingId: dwellingId as string,
+        agentId: agentId as string,
+        unitId: unitId as string,
+        limit: limit ? parseInt(limit as string) : undefined,
+        offset: offset ? parseInt(offset as string) : undefined,
+      });
+      res.json(visits);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/home-visits/:id", async (req, res) => {
+    try {
+      const visit = await storage.getHomeVisitById(req.params.id);
+      if (!visit) {
+        return res.status(404).json({ error: "Visita não encontrada" });
+      }
+      res.json(visit);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/home-visits", async (req, res) => {
+    try {
+      const data = insertHomeVisitSchema.parse(req.body);
+      const visit = await storage.createHomeVisit(data);
+      res.status(201).json(visit);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/home-visits/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteHomeVisit(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Visita não encontrada" });
+      }
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 

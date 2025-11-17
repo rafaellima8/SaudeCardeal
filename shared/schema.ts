@@ -12,6 +12,11 @@ export const priorityEnum = pgEnum("priority", ["normal", "urgent", "emergency"]
 export const tfdStatusEnum = pgEnum("tfd_status", ["pending", "approved", "scheduled", "completed", "cancelled"]);
 export const prescriptionStatusEnum = pgEnum("prescription_status", ["active", "dispensed", "cancelled"]);
 export const esusExportStatusEnum = pgEnum("esus_export_status", ["pending", "processing", "completed", "failed"]);
+export const dwellingTypeEnum = pgEnum("dwelling_type", ["casa", "apartamento", "comodo", "barraco", "outro"]);
+export const sanitationEnum = pgEnum("sanitation", ["rede_publica", "fossa_septica", "fossa_rudimentar", "ceu_aberto", "outro"]);
+export const waterSupplyEnum = pgEnum("water_supply", ["rede_publica", "poco", "cisterna", "outro"]);
+export const visitTypeEnum = pgEnum("visit_type", ["individual", "familiar", "imovel"]);
+export const visitMotiveEnum = pgEnum("visit_motive", ["busca_ativa", "acompanhamento", "periodica", "controle_ambiental", "outro"]);
 
 // Users and Authentication
 export const users = pgTable("users", {
@@ -47,6 +52,44 @@ export const professionals = pgTable("professionals", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Territorial Management - Dwellings (Imóveis)
+export const dwellings = pgTable("dwellings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  unitId: uuid("unit_id").references(() => healthUnits.id).notNull(),
+  microarea: varchar("microarea", { length: 10 }),
+  street: text("street").notNull(),
+  number: varchar("number", { length: 20 }),
+  complement: text("complement"),
+  neighborhood: text("neighborhood"),
+  zipCode: varchar("zip_code", { length: 10 }),
+  latitude: text("latitude"),
+  longitude: text("longitude"),
+  dwellingType: dwellingTypeEnum("dwelling_type").default("casa"),
+  sanitation: sanitationEnum("sanitation"),
+  waterSupply: waterSupplyEnum("water_supply"),
+  hasElectricity: boolean("has_electricity").default(true),
+  hasAnimals: boolean("has_animals").default(false),
+  animalTypes: text("animal_types").array().default(sql`ARRAY[]::text[]`),
+  householdMembers: integer("household_members").default(0),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Families (Famílias)
+export const families = pgTable("families", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  dwellingId: uuid("dwelling_id").references(() => dwellings.id).notNull(),
+  unitId: uuid("unit_id").references(() => healthUnits.id).notNull(),
+  responsibleId: uuid("responsible_id"),
+  familyCode: varchar("family_code", { length: 50 }),
+  memberCount: integer("member_count").default(0),
+  monthlyIncome: text("monthly_income"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Citizens/Patients
 export const citizens = pgTable("citizens", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -61,7 +104,11 @@ export const citizens = pgTable("citizens", {
   bloodType: varchar("blood_type", { length: 5 }),
   allergies: text("allergies").array().default(sql`ARRAY[]::text[]`),
   unitId: uuid("unit_id").references(() => healthUnits.id),
-  familyGroup: text("family_group"),
+  familyId: uuid("family_id").references(() => families.id),
+  dwellingId: uuid("dwelling_id").references(() => dwellings.id),
+  isResponsible: boolean("is_responsible").default(false),
+  healthConditions: text("health_conditions").array().default(sql`ARRAY[]::text[]`),
+  disabilities: text("disabilities").array().default(sql`ARRAY[]::text[]`),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -207,6 +254,30 @@ export const tfdRequests = pgTable("tfd_requests", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Home Visits (Visitas Domiciliares)
+export const homeVisits = pgTable("home_visits", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  visitType: visitTypeEnum("visit_type").notNull(),
+  visitMotive: visitMotiveEnum("visit_motive").notNull(),
+  agentId: uuid("agent_id").references(() => professionals.id).notNull(),
+  unitId: uuid("unit_id").references(() => healthUnits.id).notNull(),
+  citizenId: uuid("citizen_id").references(() => citizens.id),
+  familyId: uuid("family_id").references(() => families.id),
+  dwellingId: uuid("dwelling_id").references(() => dwellings.id),
+  visitDate: timestamp("visit_date").defaultNow().notNull(),
+  latitude: text("latitude"),
+  longitude: text("longitude"),
+  temperature: text("temperature"),
+  bloodPressure: text("blood_pressure"),
+  bloodGlucose: text("blood_glucose"),
+  weight: text("weight"),
+  height: text("height"),
+  observations: text("observations"),
+  wasSuccessful: boolean("was_successful").default(true),
+  refusalReason: text("refusal_reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Audit Log (LGPD Compliance)
 export const auditLog = pgTable("audit_log", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -250,6 +321,9 @@ export const insertMedicationStockSchema = createInsertSchema(medicationStock).o
 export const insertExamSchema = createInsertSchema(exams).omit({ id: true, createdAt: true });
 export const insertTfdRequestSchema = createInsertSchema(tfdRequests).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertEsusExportSchema = createInsertSchema(esusExports).omit({ id: true, createdAt: true, completedAt: true });
+export const insertDwellingSchema = createInsertSchema(dwellings).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertFamilySchema = createInsertSchema(families).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertHomeVisitSchema = createInsertSchema(homeVisits).omit({ id: true, createdAt: true });
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -278,3 +352,9 @@ export type InsertTfdRequest = z.infer<typeof insertTfdRequestSchema>;
 export type TfdRequest = typeof tfdRequests.$inferSelect;
 export type InsertEsusExport = z.infer<typeof insertEsusExportSchema>;
 export type EsusExport = typeof esusExports.$inferSelect;
+export type InsertDwelling = z.infer<typeof insertDwellingSchema>;
+export type Dwelling = typeof dwellings.$inferSelect;
+export type InsertFamily = z.infer<typeof insertFamilySchema>;
+export type Family = typeof families.$inferSelect;
+export type InsertHomeVisit = z.infer<typeof insertHomeVisitSchema>;
+export type HomeVisit = typeof homeVisits.$inferSelect;
