@@ -607,6 +607,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get("/api/internal/esus/generate", async (req, res) => {
     try {
+      // Proteção por token dev (ambiente de desenvolvimento/teste)
+      const devToken = req.headers["x-dev-token"] || req.query.token;
+      const expectedToken = process.env.DEV_TOKEN || "dev-token-2906501";
+      
+      if (devToken !== expectedToken) {
+        return res.status(401).json({ 
+          error: "Token de autorização inválido",
+          hint: "Use header 'X-Dev-Token' ou query param '?token='"
+        });
+      }
+      
       const { from, to, cnes, limit } = req.query;
       
       // Validar parâmetros
