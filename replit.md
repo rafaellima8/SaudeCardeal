@@ -12,9 +12,25 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+**November 17, 2025** - Implemented Complete Authentication System:
+- **Password Authentication**: Bcrypt hashing (10 rounds) for secure password storage
+- **Session Management**: PostgreSQL session store via connect-pg-simple with secure cookies (httpOnly, sameSite, secure in production)
+- **Auth API Endpoints**:
+  - POST `/api/auth/login` - Email/password authentication
+  - POST `/api/auth/logout` - Session destruction
+  - GET `/api/auth/me` - Current user retrieval
+- **Route Protection**: Global middleware protecting all /api/* routes with exact allowlist for auth endpoints
+- **Frontend Login**: Dedicated login page with form validation and credential display
+- **Seed Users**: 
+  - admin@saude.gov.br / Admin@2025 (full access)
+  - acs@saude.gov.br / Acs@2025 (Território + ACE only)
+- **Role-Based Dashboards**: Different statistics displayed based on user role
+- **Session Security**: Automatic redirect to login for unauthenticated users
+- **Users Table**: Added passwordHash field via migration
+
 **November 17, 2025** - Implemented Role-Based Access Control (RBAC):
 - Created permissions system with role-based menu filtering
-- New hook `useCurrentUser()` for user context and permissions
+- New hook `useCurrentUser()` for user context and permissions (now using real API)
 - Sidebar dynamically filters menu items based on user role
 - ACS (Agente Comunitário de Saúde) profile with restricted access to:
   - ✅ Território (Territory Management)
@@ -114,19 +130,31 @@ Preferred communication style: Simple, everyday language.
   - `/api/home-visits` - Home visit tracking and data collection
 
 **Security & Access Control**
-- Role-based access control (RBAC) with 7 user roles
-- Permission matrix defined in `client/src/lib/permissions.ts`
-- Dynamic menu filtering based on user role
-- User roles:
-  - `admin` - Full system access
-  - `medico` - Medical staff access
-  - `enfermeiro` - Nursing staff access
-  - `acs` - Community health agent (restricted to Território and ACE only)
-  - `farmaceutico` - Pharmacy management
-  - `gestor` - Manager/supervisor access
-  - `recepcao` - Reception/front desk access
-- User context hook: `useCurrentUser()` for permission checks
-- Development role switcher for testing different permission levels
+- **Authentication System**:
+  - Password-based authentication with bcrypt hashing (10 rounds)
+  - Session-based authentication via express-session
+  - PostgreSQL session persistence (connect-pg-simple)
+  - Secure cookie configuration (httpOnly, sameSite, secure in production)
+  - Global API route protection with exact allowlist for auth endpoints
+  - Auth middleware: `requireAuth` for route protection, `requireRole` for role-based access
+- **Authorization (RBAC)**:
+  - Role-based access control with 7 user roles
+  - Permission matrix defined in `client/src/lib/permissions.ts`
+  - Dynamic menu filtering based on user role
+  - User roles:
+    - `admin` - Full system access
+    - `medico` - Medical staff access
+    - `enfermeiro` - Nursing staff access
+    - `acs` - Community health agent (restricted to Território and ACE only)
+    - `farmaceutico` - Pharmacy management
+    - `gestor` - Manager/supervisor access
+    - `recepcao` - Reception/front desk access
+  - User context hook: `useCurrentUser()` for permission checks
+  - Development role switcher for testing different permission levels
+- **API Protection**:
+  - All `/api/*` routes require authentication (except `/api/auth/login|logout|me`)
+  - Exact path allowlist prevents bypass vulnerabilities
+  - 401 Unauthorized responses for unauthenticated requests
 
 **Database Schema Design**
 - Enum types for status fields (appointment_status, attendance_status, priority, tfd_status, prescription_status)
@@ -137,6 +165,7 @@ Preferred communication style: Simple, everyday language.
 - Foreign key relationships maintaining referential integrity
 - Hierarchical territorial structure: dwellings → families → citizens → home visits
 - Separate tables for health units, professionals, citizens, appointments, consultations, prescriptions, medications, exams, TFD requests, attendance queues, dwellings, families, and home visits
+- **Users table**: Includes passwordHash field for secure authentication, name, email (unique), cpf, role, unitId, and active status
 
 ### Development & Deployment
 
