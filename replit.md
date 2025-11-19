@@ -26,6 +26,34 @@ The development workflow includes Hot Module Replacement via Vite, TypeScript co
 
 The system incorporates a modern UI with a clean aesthetic, supporting dark mode. Typography uses Inter for readability and JetBrains Mono for code elements. Components are designed for accessibility, including ARIA labels, keyboard navigation, and screen reader compatibility. Dashboards feature summary cards, tables, and Recharts-powered graphs for data visualization. PDF exports are professionally styled with institutional branding and data representation consistent with the UI.
 
+### Brand Identity System (COMPLETE ✅)
+
+-   **Logo Component** (`client/src/components/Logo.tsx`): Professional React component with:
+    -   **4 Sizes**: `sm` (24px), `md` (32px), `lg` (48px), `xl` (64px)
+    -   **3 Color Schemes**: `color` (default #10B981), `monochrome` (current text color), `inverse` (for dark backgrounds)
+    -   **2 Variants**: Full logo with text "MuniSaúde Integrado" + icon-only variant
+    -   Applied in: login page, sidebar navigation, PDF headers
+    
+-   **SVG Logo Utilities** (`client/src/lib/logo-svg.ts`): Helper functions for PDF generation
+    -   `getLogoSVG()`: Full logo with text for headers
+    -   `getLogoIconSVG()`: Icon-only for compact spaces
+    -   Embedded in jsPDF using data URIs with institutional #10B981 palette
+    
+-   **Professional PDFs** (jsPDF + autoTable):
+    -   **Prescription PDFs**: Institutional header with embedded SVG logo, patient data, medication table, digital signature with professional registration
+    -   **Report PDFs**: Logo header, aggregated indicators, data tables with grid theme, footer with institutional address
+    -   Typography: Helvetica bold for headers, regular for body, monospace for data
+    
+-   **Favicon** (`client/public/favicon.svg`): SVG icon version of the logo for browser tabs
+    
+-   **Functional Color Palette** (`client/src/index.css`): Complete semantic color system
+    -   **Success**: `#10B981` (emerald) with auto-computed borders for light/dark themes
+    -   **Warning**: `#F59E0B` (amber) with auto-computed borders
+    -   **Info**: `#3B82F6` (blue) with auto-computed borders
+    -   **Destructive**: `#EF4444` (red) with auto-computed borders
+    -   All colors include matching foreground colors and auto-elevated border variants using CSS `hsl(from ...)` syntax
+    -   Fully compatible with light/dark mode switching
+
 ### Feature Specifications
 
 The system currently includes fully functional modules for:
