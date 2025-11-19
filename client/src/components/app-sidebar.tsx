@@ -33,6 +33,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { Logo } from "@/components/Logo";
 import { filterMenuByRole } from "@/lib/permissions";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -105,15 +106,7 @@ export function AppSidebar() {
     return (
       <Sidebar>
         <SidebarHeader className="border-b border-sidebar-border p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-semibold">
-              MS
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-semibold text-sidebar-foreground">MuniSaúde Integrado</span>
-              <span className="text-xs text-muted-foreground">Sec. Saúde - Cardeal da Silva</span>
-            </div>
-          </div>
+          <Logo size="sm" variant="full" />
         </SidebarHeader>
         <SidebarContent>
           <div className="p-4 text-center text-sm text-muted-foreground">
@@ -137,15 +130,7 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-semibold text-xs">
-            MS
-          </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold text-sidebar-foreground">MuniSaúde Integrado</span>
-            <span className="text-xs text-muted-foreground">Sec. Saúde - Cardeal da Silva</span>
-          </div>
-        </div>
+        <Logo size="sm" variant="full" />
       </SidebarHeader>
 
       <SidebarContent>

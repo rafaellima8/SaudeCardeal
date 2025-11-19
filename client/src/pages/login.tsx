@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Activity } from "lucide-react";
+import { Logo } from "@/components/Logo";
 
 const loginFormSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -59,17 +59,16 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-8">
-        <div className="flex flex-col items-center space-y-2 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary">
-            <Activity className="h-8 w-8 text-primary-foreground" />
+        <div className="flex flex-col items-center space-y-4 text-center">
+          <Logo size="lg" variant="full" className="justify-center" />
+          <div className="space-y-1">
+            <p className="text-muted-foreground">
+              Secretaria Municipal de Saúde
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Cardeal da Silva - Bahia
+            </p>
           </div>
-          <h1 className="text-3xl font-bold">MuniSaúde Integrado</h1>
-          <p className="text-muted-foreground">
-            Secretaria Municipal de Saúde
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Cardeal da Silva - Bahia
-          </p>
         </div>
 
         <Card>

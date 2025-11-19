@@ -1,0 +1,483 @@
+import React, { useState } from 'react';
+import { Heart, Activity, Users, Calendar, Pill, FileText, MapPin, Bug, TrendingUp, Download } from 'lucide-react';
+
+const BrandIdentity = () => {
+  const [activeTab, setActiveTab] = useState('logo');
+
+  // Paleta de cores principal
+  const colors = {
+    primary: '#10B981', // Verde saúde
+    primaryDark: '#059669',
+    primaryLight: '#34D399',
+    secondary: '#3B82F6', // Azul confiança
+    secondaryDark: '#2563EB',
+    accent: '#8B5CF6', // Roxo inovação
+    success: '#10B981',
+    warning: '#F59E0B',
+    error: '#EF4444',
+    neutral: {
+      50: '#F9FAFB',
+      100: '#F3F4F6',
+      200: '#E5E7EB',
+      300: '#D1D5DB',
+      700: '#374151',
+      800: '#1F2937',
+      900: '#111827'
+    }
+  };
+
+  const Logo = ({ size = 'md', variant = 'full' }) => {
+    const sizes = {
+      sm: { container: 'w-32', icon: 24, text: 'text-sm' },
+      md: { container: 'w-48', icon: 32, text: 'text-base' },
+      lg: { container: 'w-64', icon: 48, text: 'text-xl' },
+      xl: { container: 'w-80', icon: 64, text: 'text-2xl' }
+    };
+
+    return (
+      <div className={`${sizes[size].container} flex items-center gap-3`}>
+        {/* Ícone - Cruz médica + Pulso */}
+        <div className="relative flex-shrink-0" style={{ width: sizes[size].icon, height: sizes[size].icon }}>
+          <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            {/* Círculo de fundo */}
+            <circle cx="32" cy="32" r="30" fill={colors.primary} opacity="0.1"/>
+            {/* Cruz médica */}
+            <path d="M32 16V48M16 32H48" stroke={colors.primary} strokeWidth="6" strokeLinecap="round"/>
+            {/* Pulso cardíaco integrado */}
+            <path d="M12 32 L18 32 L22 24 L28 40 L34 20 L38 32 L42 32" 
+                  stroke={colors.secondary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" 
+                  opacity="0.8" transform="translate(0, 8)"/>
+          </svg>
+        </div>
+        
+        {variant === 'full' && (
+          <div className="flex flex-col leading-tight">
+            <span className={`font-bold ${sizes[size].text} tracking-tight`} style={{ color: colors.neutral[900] }}>
+              Muni<span style={{ color: colors.primary }}>Saúde</span>
+            </span>
+            <span className="text-xs font-medium" style={{ color: colors.neutral[700] }}>
+              Integrado
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-8">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-8 text-center">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">MuniSaúde Integrado</h1>
+          <p className="text-gray-600">Manual de Identidade Visual</p>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6 overflow-x-auto">
+          {[
+            { id: 'logo', label: 'Logo' },
+            { id: 'cores', label: 'Cores' },
+            { id: 'tipografia', label: 'Tipografia' },
+            { id: 'icones', label: 'Ícones' },
+            { id: 'aplicacoes', label: 'Aplicações' }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                activeTab === tab.id
+                  ? 'bg-emerald-500 text-white shadow-lg'
+                  : 'bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          {/* Logo Tab */}
+          {activeTab === 'logo' && (
+            <div className="space-y-8">
+              <div>
+                <h2 className="text-2xl font-bold mb-4">Logotipo Principal</h2>
+                <p className="text-gray-600 mb-6">
+                  O logo combina uma cruz médica com um traço de pulso cardíaco, simbolizando cuidado integrado e tecnologia em saúde.
+                </p>
+              </div>
+
+              {/* Variações de tamanho */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="p-8 bg-gray-50 rounded-xl flex items-center justify-center">
+                  <Logo size="xl" />
+                </div>
+                <div className="p-8 bg-gray-900 rounded-xl flex items-center justify-center">
+                  <div style={{ filter: 'invert(1)' }}>
+                    <Logo size="xl" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Tamanhos */}
+              <div>
+                <h3 className="text-xl font-bold mb-4">Tamanhos</h3>
+                <div className="space-y-4 p-6 bg-gray-50 rounded-xl">
+                  <div className="flex items-center gap-6">
+                    <span className="text-sm text-gray-600 w-24">Extra Large</span>
+                    <Logo size="xl" />
+                  </div>
+                  <div className="flex items-center gap-6">
+                    <span className="text-sm text-gray-600 w-24">Large</span>
+                    <Logo size="lg" />
+                  </div>
+                  <div className="flex items-center gap-6">
+                    <span className="text-sm text-gray-600 w-24">Medium</span>
+                    <Logo size="md" />
+                  </div>
+                  <div className="flex items-center gap-6">
+                    <span className="text-sm text-gray-600 w-24">Small</span>
+                    <Logo size="sm" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Versões */}
+              <div>
+                <h3 className="text-xl font-bold mb-4">Versões</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-6 bg-gray-50 rounded-xl text-center">
+                    <Logo size="lg" variant="full" />
+                    <p className="text-sm text-gray-600 mt-4">Completo</p>
+                  </div>
+                  <div className="p-6 bg-gray-50 rounded-xl text-center flex items-center justify-center">
+                    <Logo size="lg" variant="icon" />
+                    <p className="text-sm text-gray-600 mt-4 absolute bottom-6">Ícone</p>
+                  </div>
+                  <div className="p-6 bg-emerald-500 rounded-xl text-center flex items-center justify-center">
+                    <div style={{ filter: 'brightness(0) invert(1)' }}>
+                      <Logo size="lg" />
+                    </div>
+                    <p className="text-sm text-white mt-4 absolute bottom-6">Monocromático</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Cores Tab */}
+          {activeTab === 'cores' && (
+            <div className="space-y-8">
+              <div>
+                <h2 className="text-2xl font-bold mb-4">Paleta de Cores</h2>
+                <p className="text-gray-600 mb-6">
+                  Cores cuidadosamente selecionadas para transmitir confiança, saúde e modernidade.
+                </p>
+              </div>
+
+              {/* Cores Principais */}
+              <div>
+                <h3 className="text-xl font-bold mb-4">Cores Principais</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <div className="h-32 rounded-xl" style={{ backgroundColor: colors.primary }}></div>
+                    <p className="font-semibold">Verde Saúde</p>
+                    <p className="text-sm text-gray-600">#10B981</p>
+                    <p className="text-xs text-gray-500">RGB: 16, 185, 129</p>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="h-32 rounded-xl" style={{ backgroundColor: colors.secondary }}></div>
+                    <p className="font-semibold">Azul Confiança</p>
+                    <p className="text-sm text-gray-600">#3B82F6</p>
+                    <p className="text-xs text-gray-500">RGB: 59, 130, 246</p>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="h-32 rounded-xl" style={{ backgroundColor: colors.accent }}></div>
+                    <p className="font-semibold">Roxo Inovação</p>
+                    <p className="text-sm text-gray-600">#8B5CF6</p>
+                    <p className="text-xs text-gray-500">RGB: 139, 92, 246</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Cores Funcionais */}
+              <div>
+                <h3 className="text-xl font-bold mb-4">Cores Funcionais</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {[
+                    { name: 'Sucesso', color: colors.success, hex: '#10B981' },
+                    { name: 'Alerta', color: colors.warning, hex: '#F59E0B' },
+                    { name: 'Erro', color: colors.error, hex: '#EF4444' },
+                    { name: 'Info', color: colors.secondary, hex: '#3B82F6' }
+                  ].map(item => (
+                    <div key={item.name} className="space-y-2">
+                      <div className="h-20 rounded-lg" style={{ backgroundColor: item.color }}></div>
+                      <p className="font-medium text-sm">{item.name}</p>
+                      <p className="text-xs text-gray-600">{item.hex}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Escala de Cinzas */}
+              <div>
+                <h3 className="text-xl font-bold mb-4">Escala de Neutros</h3>
+                <div className="flex gap-2">
+                  {Object.entries(colors.neutral).map(([key, value]) => (
+                    <div key={key} className="flex-1 space-y-2">
+                      <div className="h-20 rounded-lg" style={{ backgroundColor: value }}></div>
+                      <p className="text-xs text-center text-gray-600">{key}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Tipografia Tab */}
+          {activeTab === 'tipografia' && (
+            <div className="space-y-8">
+              <div>
+                <h2 className="text-2xl font-bold mb-4">Tipografia</h2>
+                <p className="text-gray-600 mb-6">
+                  Fontes escolhidas para garantir legibilidade e profissionalismo.
+                </p>
+              </div>
+
+              {/* Inter */}
+              <div className="p-6 bg-gray-50 rounded-xl">
+                <div className="mb-4">
+                  <h3 className="text-xl font-bold mb-2" style={{ fontFamily: 'Inter' }}>Inter</h3>
+                  <p className="text-sm text-gray-600">Fonte principal do sistema</p>
+                </div>
+                <div className="space-y-4">
+                  <div style={{ fontFamily: 'Inter' }}>
+                    <p className="text-4xl font-bold mb-2">Sistema de Gestão de Saúde</p>
+                    <p className="text-2xl font-semibold mb-2">Atendimento Integrado</p>
+                    <p className="text-xl font-medium mb-2">Cadastro de Pacientes</p>
+                    <p className="text-base">O MuniSaúde Integrado é uma plataforma completa para gestão municipal de saúde pública.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* JetBrains Mono */}
+              <div className="p-6 bg-gray-50 rounded-xl">
+                <div className="mb-4">
+                  <h3 className="text-xl font-bold mb-2" style={{ fontFamily: 'JetBrains Mono' }}>JetBrains Mono</h3>
+                  <p className="text-sm text-gray-600">Fonte para código e dados técnicos</p>
+                </div>
+                <div className="space-y-2" style={{ fontFamily: 'JetBrains Mono' }}>
+                  <p className="text-sm">CNS: 123.4567.8901.2345</p>
+                  <p className="text-sm">CPF: 123.456.789-01</p>
+                  <p className="text-sm">CID-10: J00.0 - Nasofaringite aguda</p>
+                  <p className="text-sm">const consultationId = "abc-123-def";</p>
+                </div>
+              </div>
+
+              {/* Hierarquia */}
+              <div>
+                <h3 className="text-xl font-bold mb-4">Hierarquia Tipográfica</h3>
+                <div className="space-y-4 p-6 bg-gray-50 rounded-xl">
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Heading 1 - Bold 32px</p>
+                    <p className="text-4xl font-bold">Dashboard Principal</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Heading 2 - Bold 24px</p>
+                    <p className="text-2xl font-bold">Atendimentos Hoje</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Heading 3 - Semibold 20px</p>
+                    <p className="text-xl font-semibold">Pacientes Cadastrados</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Body - Regular 16px</p>
+                    <p className="text-base">Texto padrão para conteúdo e descrições gerais do sistema.</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Small - Regular 14px</p>
+                    <p className="text-sm">Informações complementares e metadados.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Ícones Tab */}
+          {activeTab === 'icones' && (
+            <div className="space-y-8">
+              <div>
+                <h2 className="text-2xl font-bold mb-4">Sistema de Ícones</h2>
+                <p className="text-gray-600 mb-6">
+                  Ícones baseados em Lucide React para consistência visual.
+                </p>
+              </div>
+
+              {/* Ícones por Módulo */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="p-6 bg-gray-50 rounded-xl">
+                  <h3 className="font-bold mb-4">Módulos Principais</h3>
+                  <div className="grid grid-cols-3 gap-4">
+                    {[
+                      { icon: <Activity />, label: 'Dashboard' },
+                      { icon: <Users />, label: 'Pacientes' },
+                      { icon: <Calendar />, label: 'Agendamentos' },
+                      { icon: <Heart />, label: 'Consultas' },
+                      { icon: <Pill />, label: 'Farmácia' },
+                      { icon: <FileText />, label: 'Relatórios' }
+                    ].map(item => (
+                      <div key={item.label} className="flex flex-col items-center gap-2 p-3 hover:bg-white rounded-lg transition-colors">
+                        <div style={{ color: colors.primary }}>{item.icon}</div>
+                        <span className="text-xs text-center">{item.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-6 bg-gray-50 rounded-xl">
+                  <h3 className="font-bold mb-4">Funcionalidades</h3>
+                  <div className="grid grid-cols-3 gap-4">
+                    {[
+                      { icon: <MapPin />, label: 'Território' },
+                      { icon: <Bug />, label: 'Endemias' },
+                      { icon: <TrendingUp />, label: 'Indicadores' },
+                      { icon: <Download />, label: 'Exportar' },
+                      { icon: <Users />, label: 'Profissionais' },
+                      { icon: <Heart />, label: 'Saúde' }
+                    ].map(item => (
+                      <div key={item.label} className="flex flex-col items-center gap-2 p-3 hover:bg-white rounded-lg transition-colors">
+                        <div style={{ color: colors.secondary }}>{item.icon}</div>
+                        <span className="text-xs text-center">{item.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Tamanhos */}
+              <div className="p-6 bg-gray-50 rounded-xl">
+                <h3 className="font-bold mb-4">Tamanhos de Ícones</h3>
+                <div className="flex items-end gap-8">
+                  <div className="text-center">
+                    <Heart size={16} style={{ color: colors.primary }} className="mx-auto mb-2" />
+                    <p className="text-xs">16px</p>
+                  </div>
+                  <div className="text-center">
+                    <Heart size={20} style={{ color: colors.primary }} className="mx-auto mb-2" />
+                    <p className="text-xs">20px</p>
+                  </div>
+                  <div className="text-center">
+                    <Heart size={24} style={{ color: colors.primary }} className="mx-auto mb-2" />
+                    <p className="text-xs">24px</p>
+                  </div>
+                  <div className="text-center">
+                    <Heart size={32} style={{ color: colors.primary }} className="mx-auto mb-2" />
+                    <p className="text-xs">32px</p>
+                  </div>
+                  <div className="text-center">
+                    <Heart size={48} style={{ color: colors.primary }} className="mx-auto mb-2" />
+                    <p className="text-xs">48px</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Aplicações Tab */}
+          {activeTab === 'aplicacoes' && (
+            <div className="space-y-8">
+              <div>
+                <h2 className="text-2xl font-bold mb-4">Aplicações da Marca</h2>
+                <p className="text-gray-600 mb-6">
+                  Exemplos de uso da identidade visual em diferentes contextos.
+                </p>
+              </div>
+
+              {/* Card de Aplicação */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Cartão de Visita */}
+                <div className="aspect-[3.5/2] bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-6 text-white flex flex-col justify-between shadow-2xl">
+                  <Logo size="md" />
+                  <div className="text-sm space-y-1">
+                    <p className="font-bold">Dr. João Silva</p>
+                    <p className="opacity-90">Médico Clínico Geral</p>
+                    <p className="opacity-75 text-xs">CRM 12345 | (75) 98765-4321</p>
+                  </div>
+                </div>
+
+                {/* Header de Documento */}
+                <div className="aspect-[3.5/2] bg-white border-2 border-gray-200 rounded-xl p-6 flex flex-col justify-between">
+                  <div className="flex items-start justify-between">
+                    <Logo size="sm" />
+                    <div className="text-right text-xs text-gray-600">
+                      <p>Secretaria de Saúde</p>
+                      <p>Cardeal da Silva - BA</p>
+                    </div>
+                  </div>
+                  <div className="border-t pt-3">
+                    <p className="text-sm font-semibold">Receita Médica</p>
+                    <p className="text-xs text-gray-500">Documento gerado pelo sistema</p>
+                  </div>
+                </div>
+
+                {/* Badge/Crachá */}
+                <div className="aspect-[2/3] bg-white border-2 rounded-xl p-4 flex flex-col items-center text-center shadow-lg">
+                  <div className="mb-4">
+                    <Logo size="md" variant="icon" />
+                  </div>
+                  <div className="w-24 h-24 rounded-full bg-gray-200 mb-3"></div>
+                  <p className="font-bold text-sm">Maria Santos</p>
+                  <p className="text-xs text-gray-600 mb-2">Enfermeira</p>
+                  <div className="mt-auto pt-4 border-t w-full">
+                    <p className="text-xs text-gray-500">COREN 123456</p>
+                  </div>
+                </div>
+
+                {/* Social Media Post */}
+                <div className="aspect-[2/3] bg-gradient-to-br from-emerald-400 via-emerald-500 to-blue-500 rounded-xl p-6 text-white flex flex-col justify-between shadow-2xl">
+                  <Logo size="sm" />
+                  <div className="text-center space-y-2">
+                    <h3 className="text-2xl font-bold">Vacinação</h3>
+                    <p className="text-sm opacity-90">Campanha disponível em todas as unidades</p>
+                  </div>
+                  <div className="text-xs opacity-75 text-center">
+                    <p>Prefeitura Municipal</p>
+                    <p>Cardeal da Silva</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Assinatura de Email */}
+              <div className="p-6 bg-gray-50 rounded-xl">
+                <h3 className="font-bold mb-4">Assinatura de E-mail</h3>
+                <div className="bg-white p-4 rounded border">
+                  <div className="flex items-center gap-3 pb-3 border-b">
+                    <Logo size="sm" variant="icon" />
+                    <div>
+                      <p className="font-bold text-sm">Ana Costa</p>
+                      <p className="text-xs text-gray-600">Coordenadora de Atenção Básica</p>
+                    </div>
+                  </div>
+                  <div className="pt-3 text-xs text-gray-600 space-y-1">
+                    <p>📧 ana.costa@cardealdasilva.ba.gov.br</p>
+                    <p>📞 (75) 3456-7890</p>
+                    <p className="text-emerald-600 font-medium">MuniSaúde Integrado - Secretaria de Saúde</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="mt-8 text-center text-sm text-gray-600">
+          <p>Manual de Identidade Visual - MuniSaúde Integrado</p>
+          <p className="text-xs mt-1">Prefeitura Municipal de Cardeal da Silva - Bahia</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default BrandIdentity;
