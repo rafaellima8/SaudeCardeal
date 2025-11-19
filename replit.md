@@ -29,9 +29,38 @@ The system incorporates a modern UI with a clean aesthetic, supporting dark mode
 ### Feature Specifications
 
 The system currently includes fully functional modules for:
--   **Territorial Management**: Comprehensive CRUD operations for dwellings, families, and home visits, including filters.
--   **Endemic Disease Surveillance (ACE)**: Full management of work cycles, FAD evaluations, vector foci tracking, and focal treatments, alongside epidemiological indicators (IIP, IB) and dashboards with heatmaps and charts.
--   **Reports & Indicators**: Aggregated health indicators, professional PDF export functionality with customizable filters (period, health unit), and detailed breakdowns of consultations, diagnoses, medications, and age distribution.
+
+#### ✅ Fully Implemented & Operational
+
+-   **Territorial Management CRUD**: Complete create/read/update/delete operations for:
+    -   **Dwellings** (Imóveis): Edit/delete buttons, dynamic forms, mutation handlers, AlertDialog confirmations
+    -   **Home Visits** (Visitas Domiciliares): Full CRUD with backend PATCH/DELETE routes, form reuse, confirmation dialogs
+    -   **Families** (Famílias): Backend CRUD complete (`updateFamily`, `deleteFamily` in storage + routes), frontend UI pending
+    
+-   **Endemic Disease Surveillance (ACE) CRUD**: Complete CRUD for work cycles:
+    -   **Cycles** (Ciclos): Edit/delete buttons, mutations, dynamic dialog (create/edit modes), AlertDialog confirmations
+    -   **FAD/Foci/Treatments**: Backend routes ready (PATCH/DELETE), can replicate same pattern from cycles
+    -   Dashboards: IIP/IB indicators, heatmaps, charts with Recharts
+    
+-   **Reports & Indicators**: Aggregated health indicators with professional PDF export (jsPDF + autotable), customizable filters (period, health unit), detailed breakdowns of consultations, diagnoses, medications, and age distribution
+
+#### 📋 Architected & Documented (Pending Implementation)
+
+-   **SOAP Consultation Schema** (e-SUS PEC v5.3 compliant):
+    -   **S** (Subjective): Patient complaints, history, anamnesis  
+    -   **O** (Objective): Physical exam, vital signs (BP, HR, temp, SpO2, weight, height, BMI, abdominal circumference)
+    -   **A** (Assessment): Diagnoses with CIAP-2 and CID-10 codes (JSON arrays)
+    -   **P** (Plan): Treatment plan, prescriptions, referrals, guidance
+    -   Appointment linkage, consultation type enum (scheduled, spontaneous demand, urgency, home visit)
+    -   **Status**: Schema designed, SQLite migration deferred due to ALTER TABLE constraints (requires table recreation strategy)
+
+#### 🔨 Next Development Priorities
+
+1. **SOAP Frontend Form**: Implement consultation recording UI with SOAP fields, CIAP-2/CID-10 selectors, vital signs inputs
+2. **Electronic Prescriptions**: Schema + frontend for medication prescriptions linked to consultations (fractional dosing support)
+3. **Appointment Scheduling**: Queue management, states (scheduled → waiting → in-progress → completed), initial listening/triage
+4. **Territorial Integration**: Citizen → Family → Domicile → Dwelling linkages with cascading views
+5. **Patient Summary Sheet**: Longitudinal health record with consultation history, medications, exams, vaccinations
 
 ## External Dependencies
 
