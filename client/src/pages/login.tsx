@@ -63,9 +63,9 @@ export default function LoginPage() {
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary">
             <Activity className="h-8 w-8 text-primary-foreground" />
           </div>
-          <h1 className="text-3xl font-bold">PEC Integrado Municipal</h1>
+          <h1 className="text-3xl font-bold">MuniSaúde Integrado</h1>
           <p className="text-muted-foreground">
-            Sistema de Gestão de Saúde Pública
+            Secretaria Municipal de Saúde
           </p>
           <p className="text-sm text-muted-foreground">
             Cardeal da Silva - Bahia

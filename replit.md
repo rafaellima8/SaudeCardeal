@@ -1,8 +1,8 @@
-# PEC Integrado Municipal - Sistema de Gestão de Saúde Pública
+# MuniSaúde Integrado - Sistema de Gestão em Saúde Municipal
 
 ## Overview
 
-PEC Integrado Municipal is a comprehensive healthcare management system designed for the municipality of Cardeal da Silva, Bahia, Brazil. Its primary purpose is to integrate and streamline primary healthcare services, including electronic health records (EHR), appointment scheduling, pharmacy management, inter-municipal patient transport (TFD), and robust reporting, all in compliance with e-SUS APS standards. The system supports various user roles such as administrators, physicians, nurses, community health agents, pharmacists, managers, and reception staff, providing tailored interfaces to enhance healthcare delivery, administrative efficiency, and public health oversight. The business vision is to modernize municipal health management, improve patient care coordination, and provide valuable data for public health initiatives.
+MuniSaúde Integrado é um sistema abrangente de gestão em saúde municipal desenvolvido para a Secretaria Municipal de Saúde de Cardeal da Silva, Bahia, Brasil. Seu propósito principal é integrar e otimizar os serviços de atenção primária à saúde, incluindo prontuário eletrônico (PEC), agendamentos, gestão de farmácia, transporte inter-municipal de pacientes (TFD) e relatórios robustos, tudo em conformidade com os padrões e-SUS APS. O sistema suporta diversos perfis de usuários como administradores, médicos, enfermeiros, agentes comunitários de saúde, farmacêuticos, gestores e recepcionistas, fornecendo interfaces personalizadas para melhorar a prestação de serviços de saúde, eficiência administrativa e supervisão de saúde pública. A visão de negócio é modernizar a gestão municipal de saúde, melhorar a coordenação do cuidado ao paciente e fornecer dados valiosos para iniciativas de saúde pública.
 
 ## User Preferences
 

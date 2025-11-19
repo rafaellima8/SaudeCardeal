@@ -46,12 +46,12 @@ export function exportReportToPDF(data: ReportData, options: ExportOptions) {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(20);
   doc.setFont('helvetica', 'bold');
-  doc.text('PEC Integrado Municipal', pageWidth / 2, yPosition, { align: 'center' });
+  doc.text('MuniSaúde Integrado', pageWidth / 2, yPosition, { align: 'center' });
   
   yPosition += 8;
   doc.setFontSize(11);
   doc.setFont('helvetica', 'normal');
-  doc.text('Sistema de Gestão de Saúde Pública', pageWidth / 2, yPosition, { align: 'center' });
+  doc.text('Secretaria Municipal de Saúde', pageWidth / 2, yPosition, { align: 'center' });
   
   yPosition += 6;
   doc.setFontSize(10);

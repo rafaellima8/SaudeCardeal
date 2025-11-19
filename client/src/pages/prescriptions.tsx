@@ -85,8 +85,13 @@ export default function Prescriptions() {
     doc.setFont("helvetica", "normal");
     doc.text("Secretaria Municipal de Saúde", pageWidth / 2, 26, { align: "center" });
     
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.text("Estado da Bahia - CNPJ: 14.105.349/0001-02", pageWidth / 2, 32, { align: "center" });
+    
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.text("MuniSaúde Integrado - Sistema de Gestão em Saúde", pageWidth / 2, 36, { align: "center" });
+    doc.setTextColor(0, 0, 0);
     
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");

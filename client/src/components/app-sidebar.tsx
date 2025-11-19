@@ -107,11 +107,11 @@ export function AppSidebar() {
         <SidebarHeader className="border-b border-sidebar-border p-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-semibold">
-              PEC
+              MS
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-semibold text-sidebar-foreground">PEC Integrado</span>
-              <span className="text-xs text-muted-foreground">Cardeal da Silva</span>
+              <span className="text-sm font-semibold text-sidebar-foreground">MuniSaúde Integrado</span>
+              <span className="text-xs text-muted-foreground">Sec. Saúde - Cardeal da Silva</span>
             </div>
           </div>
         </SidebarHeader>
@@ -138,12 +138,12 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-semibold">
-            PEC
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-semibold text-xs">
+            MS
           </div>
           <div className="flex flex-col">
-            <span className="text-sm font-semibold text-sidebar-foreground">PEC Integrado</span>
-            <span className="text-xs text-muted-foreground">Cardeal da Silva</span>
+            <span className="text-sm font-semibold text-sidebar-foreground">MuniSaúde Integrado</span>
+            <span className="text-xs text-muted-foreground">Sec. Saúde - Cardeal da Silva</span>
           </div>
         </div>
       </SidebarHeader>
