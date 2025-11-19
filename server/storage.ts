@@ -152,10 +152,41 @@ export interface IStorage {
   deleteFamily(id: string): Promise<boolean>;
 
   // Home Visits
-  getHomeVisits(params: { citizenId?: string; familyId?: string; dwellingId?: string; agentId?: string; unitId?: string; limit?: number; offset?: number }): Promise<HomeVisit[]>;
+  getHomeVisits(params: { familyId?: string; dwellingId?: string; professionalId?: string; limit?: number; offset?: number }): Promise<HomeVisit[]>;
   getHomeVisitById(id: string): Promise<HomeVisit | undefined>;
   createHomeVisit(visit: InsertHomeVisit): Promise<HomeVisit>;
   deleteHomeVisit(id: string): Promise<boolean>;
+
+  // Endemic Control - Cycles
+  getEndemicCycles(params: { unitId?: string; status?: string; limit?: number; offset?: number }): Promise<schema.EndemicCycle[]>;
+  getEndemicCycleById(id: string): Promise<schema.EndemicCycle | undefined>;
+  createEndemicCycle(cycle: schema.InsertEndemicCycle): Promise<schema.EndemicCycle>;
+  updateEndemicCycle(id: string, cycle: Partial<schema.InsertEndemicCycle>): Promise<schema.EndemicCycle | undefined>;
+  deleteEndemicCycle(id: string): Promise<boolean>;
+
+  // Endemic Control - FAD Evaluations
+  getFadEvaluations(params: { cycleId?: string; dwellingId?: string; professionalId?: string; limit?: number; offset?: number }): Promise<schema.FadEvaluation[]>;
+  getFadEvaluationById(id: string): Promise<schema.FadEvaluation | undefined>;
+  createFadEvaluation(evaluation: schema.InsertFadEvaluation): Promise<schema.FadEvaluation>;
+  updateFadEvaluation(id: string, evaluation: Partial<schema.InsertFadEvaluation>): Promise<schema.FadEvaluation | undefined>;
+  deleteFadEvaluation(id: string): Promise<boolean>;
+
+  // Endemic Control - Foci
+  getFoci(params: { fadId?: string; dwellingId?: string; depositType?: string; limit?: number; offset?: number }): Promise<schema.Focus[]>;
+  getFocusById(id: string): Promise<schema.Focus | undefined>;
+  createFocus(focus: schema.InsertFocus): Promise<schema.Focus>;
+  updateFocus(id: string, focus: Partial<schema.InsertFocus>): Promise<schema.Focus | undefined>;
+  deleteFocus(id: string): Promise<boolean>;
+
+  // Endemic Control - Focal Treatments
+  getFocalTreatments(params: { cycleId?: string; dwellingId?: string; professionalId?: string; limit?: number; offset?: number }): Promise<schema.FocalTreatment[]>;
+  getFocalTreatmentById(id: string): Promise<schema.FocalTreatment | undefined>;
+  createFocalTreatment(treatment: schema.InsertFocalTreatment): Promise<schema.FocalTreatment>;
+  updateFocalTreatment(id: string, treatment: Partial<schema.InsertFocalTreatment>): Promise<schema.FocalTreatment | undefined>;
+  deleteFocalTreatment(id: string): Promise<boolean>;
+
+  // Endemic Control - Statistics & Indicators
+  getEndemicStats(params: { unitId?: string; cycleId?: string; startDate?: Date; endDate?: Date }): Promise<any>;
 }
 
 export class DbStorage implements IStorage {
@@ -905,6 +936,248 @@ export class DbStorage implements IStorage {
   async deleteHomeVisit(id: string): Promise<boolean> {
     const result = await db.delete(schema.homeVisits).where(eq(schema.homeVisits.id, id));
     return result.changes > 0;
+  }
+
+  // ============================================================================
+  // ENDEMIC CONTROL METHODS
+  // ============================================================================
+
+  // Endemic Cycles
+  async getEndemicCycles(params: { unitId?: string; status?: string; limit?: number; offset?: number }): Promise<schema.EndemicCycle[]> {
+    let query = db.select().from(schema.endemicCycles);
+    const conditions: any[] = [];
+
+    if (params.unitId) conditions.push(eq(schema.endemicCycles.unitId, params.unitId));
+    if (params.status) conditions.push(eq(schema.endemicCycles.status, params.status as any));
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    return query
+      .orderBy(desc(schema.endemicCycles.startDate))
+      .limit(params.limit || 50)
+      .offset(params.offset || 0);
+  }
+
+  async getEndemicCycleById(id: string): Promise<schema.EndemicCycle | undefined> {
+    const [cycle] = await db.select().from(schema.endemicCycles).where(eq(schema.endemicCycles.id, id));
+    return cycle;
+  }
+
+  async createEndemicCycle(cycle: schema.InsertEndemicCycle): Promise<schema.EndemicCycle> {
+    const [created] = await db.insert(schema.endemicCycles).values(cycle).returning();
+    return created;
+  }
+
+  async updateEndemicCycle(id: string, cycle: Partial<schema.InsertEndemicCycle>): Promise<schema.EndemicCycle | undefined> {
+    const [updated] = await db
+      .update(schema.endemicCycles)
+      .set({ ...cycle, updatedAt: new Date() })
+      .where(eq(schema.endemicCycles.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteEndemicCycle(id: string): Promise<boolean> {
+    const result = await db.delete(schema.endemicCycles).where(eq(schema.endemicCycles.id, id));
+    return result.changes > 0;
+  }
+
+  // FAD Evaluations
+  async getFadEvaluations(params: { cycleId?: string; dwellingId?: string; professionalId?: string; limit?: number; offset?: number }): Promise<schema.FadEvaluation[]> {
+    let query = db.select().from(schema.fadEvaluations);
+    const conditions: any[] = [];
+
+    if (params.cycleId) conditions.push(eq(schema.fadEvaluations.cycleId, params.cycleId));
+    if (params.dwellingId) conditions.push(eq(schema.fadEvaluations.dwellingId, params.dwellingId));
+    if (params.professionalId) conditions.push(eq(schema.fadEvaluations.professionalId, params.professionalId));
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    return query
+      .orderBy(desc(schema.fadEvaluations.visitDate))
+      .limit(params.limit || 50)
+      .offset(params.offset || 0);
+  }
+
+  async getFadEvaluationById(id: string): Promise<schema.FadEvaluation | undefined> {
+    const [evaluation] = await db.select().from(schema.fadEvaluations).where(eq(schema.fadEvaluations.id, id));
+    return evaluation;
+  }
+
+  async createFadEvaluation(evaluation: schema.InsertFadEvaluation): Promise<schema.FadEvaluation> {
+    const [created] = await db.insert(schema.fadEvaluations).values(evaluation).returning();
+    return created;
+  }
+
+  async updateFadEvaluation(id: string, evaluation: Partial<schema.InsertFadEvaluation>): Promise<schema.FadEvaluation | undefined> {
+    const [updated] = await db
+      .update(schema.fadEvaluations)
+      .set(evaluation)
+      .where(eq(schema.fadEvaluations.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteFadEvaluation(id: string): Promise<boolean> {
+    const result = await db.delete(schema.fadEvaluations).where(eq(schema.fadEvaluations.id, id));
+    return result.changes > 0;
+  }
+
+  // Foci
+  async getFoci(params: { fadId?: string; dwellingId?: string; depositType?: string; limit?: number; offset?: number }): Promise<schema.Focus[]> {
+    let query = db.select().from(schema.foci);
+    const conditions: any[] = [];
+
+    if (params.fadId) conditions.push(eq(schema.foci.fadId, params.fadId));
+    if (params.dwellingId) conditions.push(eq(schema.foci.dwellingId, params.dwellingId));
+    if (params.depositType) conditions.push(eq(schema.foci.depositType, params.depositType as any));
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    return query
+      .orderBy(desc(schema.foci.createdAt))
+      .limit(params.limit || 50)
+      .offset(params.offset || 0);
+  }
+
+  async getFocusById(id: string): Promise<schema.Focus | undefined> {
+    const [focus] = await db.select().from(schema.foci).where(eq(schema.foci.id, id));
+    return focus;
+  }
+
+  async createFocus(focus: schema.InsertFocus): Promise<schema.Focus> {
+    const [created] = await db.insert(schema.foci).values(focus).returning();
+    return created;
+  }
+
+  async updateFocus(id: string, focus: Partial<schema.InsertFocus>): Promise<schema.Focus | undefined> {
+    const [updated] = await db
+      .update(schema.foci)
+      .set(focus)
+      .where(eq(schema.foci.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteFocus(id: string): Promise<boolean> {
+    const result = await db.delete(schema.foci).where(eq(schema.foci.id, id));
+    return result.changes > 0;
+  }
+
+  // Focal Treatments
+  async getFocalTreatments(params: { cycleId?: string; dwellingId?: string; professionalId?: string; limit?: number; offset?: number }): Promise<schema.FocalTreatment[]> {
+    let query = db.select().from(schema.focalTreatments);
+    const conditions: any[] = [];
+
+    if (params.cycleId) conditions.push(eq(schema.focalTreatments.cycleId, params.cycleId));
+    if (params.dwellingId) conditions.push(eq(schema.focalTreatments.dwellingId, params.dwellingId));
+    if (params.professionalId) conditions.push(eq(schema.focalTreatments.professionalId, params.professionalId));
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    return query
+      .orderBy(desc(schema.focalTreatments.treatmentDate))
+      .limit(params.limit || 50)
+      .offset(params.offset || 0);
+  }
+
+  async getFocalTreatmentById(id: string): Promise<schema.FocalTreatment | undefined> {
+    const [treatment] = await db.select().from(schema.focalTreatments).where(eq(schema.focalTreatments.id, id));
+    return treatment;
+  }
+
+  async createFocalTreatment(treatment: schema.InsertFocalTreatment): Promise<schema.FocalTreatment> {
+    const [created] = await db.insert(schema.focalTreatments).values(treatment).returning();
+    return created;
+  }
+
+  async updateFocalTreatment(id: string, treatment: Partial<schema.InsertFocalTreatment>): Promise<schema.FocalTreatment | undefined> {
+    const [updated] = await db
+      .update(schema.focalTreatments)
+      .set(treatment)
+      .where(eq(schema.focalTreatments.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteFocalTreatment(id: string): Promise<boolean> {
+    const result = await db.delete(schema.focalTreatments).where(eq(schema.focalTreatments.id, id));
+    return result.changes > 0;
+  }
+
+  // Endemic Statistics & Indicators
+  async getEndemicStats(params: { unitId?: string; cycleId?: string; startDate?: Date; endDate?: Date }): Promise<any> {
+    const conditions: any[] = [];
+    
+    // IIP - Índice de Infestação Predial
+    // IIP = (Imóveis positivos / Imóveis inspecionados) x 100
+    let iipQuery = db.select({
+      inspected: sql<number>`count(CASE WHEN ${schema.fadEvaluations.dwellingInspected} = 1 THEN 1 END)`,
+      positive: sql<number>`count(CASE WHEN ${schema.fadEvaluations.containersWithLarvae} > 0 THEN 1 END)`
+    }).from(schema.fadEvaluations);
+
+    if (params.cycleId) {
+      iipQuery = iipQuery.where(eq(schema.fadEvaluations.cycleId, params.cycleId)) as any;
+    }
+
+    const [iipData] = await iipQuery;
+    const iip = iipData.inspected > 0 ? (Number(iipData.positive) / Number(iipData.inspected)) * 100 : 0;
+
+    // IB - Índice de Breteau
+    // IB = (Recipientes positivos / Imóveis inspecionados) x 100
+    let ibQuery = db.select({
+      inspected: sql<number>`count(CASE WHEN ${schema.fadEvaluations.dwellingInspected} = 1 THEN 1 END)`,
+      containers: sql<number>`sum(${schema.fadEvaluations.containersWithLarvae})`
+    }).from(schema.fadEvaluations);
+
+    if (params.cycleId) {
+      ibQuery = ibQuery.where(eq(schema.fadEvaluations.cycleId, params.cycleId)) as any;
+    }
+
+    const [ibData] = await ibQuery;
+    const ib = ibData.inspected > 0 ? (Number(ibData.containers) / Number(ibData.inspected)) * 100 : 0;
+
+    // Total de focos por tipo de depósito
+    let fociByTypeQuery = db.select({
+      depositType: schema.foci.depositType,
+      count: sql<number>`count(*)`
+    }).from(schema.foci).groupBy(schema.foci.depositType);
+
+    const fociByType = await fociByTypeQuery;
+
+    // Total de tratamentos por tipo
+    let treatmentsByTypeQuery = db.select({
+      treatmentType: schema.focalTreatments.treatmentType,
+      count: sql<number>`count(*)`
+    }).from(schema.focalTreatments).groupBy(schema.focalTreatments.treatmentType);
+
+    const treatmentsByType = await treatmentsByTypeQuery;
+
+    return {
+      indicators: {
+        iip: Number(iip.toFixed(2)),
+        ib: Number(ib.toFixed(2)),
+        dwellingsInspected: Number(iipData.inspected) || 0,
+        dwellingsPositive: Number(iipData.positive) || 0,
+        containersWithLarvae: Number(ibData.containers) || 0,
+      },
+      fociByType: fociByType.map(f => ({
+        depositType: f.depositType,
+        count: Number(f.count)
+      })),
+      treatmentsByType: treatmentsByType.map(t => ({
+        treatmentType: t.treatmentType,
+        count: Number(t.count)
+      })),
+    };
   }
 }
 
