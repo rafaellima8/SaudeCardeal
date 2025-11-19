@@ -17,20 +17,12 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
+import { insertDwellingSchema, insertHomeVisitSchema } from "@shared/schema";
 
-const dwellingFormSchema = z.object({
-  unitId: z.string().min(1, "Selecione uma unidade"),
-  microarea: z.string().min(1, "Microárea é obrigatória"),
-  address: z.string().min(5, "Endereço deve ter no mínimo 5 caracteres"),
-  number: z.string().optional(),
-  complement: z.string().optional(),
-  neighborhood: z.string().min(3, "Bairro é obrigatório"),
-  zipCode: z.string().optional(),
-  dwellingType: z.enum(["casa", "apartamento", "comodo", "outro"]),
-  sanitation: z.enum(["rede_esgoto", "fossa_septica", "ceu_aberto", "outro"]).optional(),
-  waterSupply: z.enum(["rede_publica", "poco", "cisterna", "outro"]).optional(),
-  hasElectricity: z.boolean().default(true),
-  hasAnimals: z.boolean().default(false),
+const dwellingFormSchema = insertDwellingSchema.extend({
+  latitude: z.coerce.number().optional(),
+  longitude: z.coerce.number().optional(),
+  familiesCount: z.coerce.number().default(1),
 });
 
 const homeVisitFormSchema = z.object({
@@ -107,6 +99,9 @@ export default function TerritoryPage() {
       waterSupply: "rede_publica",
       hasElectricity: true,
       hasAnimals: false,
+      latitude: undefined,
+      longitude: undefined,
+      familiesCount: 1,
     },
   });
 
@@ -127,7 +122,12 @@ export default function TerritoryPage() {
 
   const createDwellingMutation = useMutation({
     mutationFn: async (data: DwellingFormData) => {
-      return await apiRequest("POST", "/api/dwellings", data);
+      const payload = {
+        ...data,
+        latitude: data.latitude || null,
+        longitude: data.longitude || null,
+      };
+      return await apiRequest("POST", "/api/dwellings", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/dwellings'] });
@@ -149,7 +149,11 @@ export default function TerritoryPage() {
 
   const createVisitMutation = useMutation({
     mutationFn: async (data: HomeVisitFormData) => {
-      return await apiRequest("POST", "/api/home-visits", data);
+      const payload = {
+        ...data,
+        visitDate: new Date(data.visitDate).getTime() / 1000,
+      };
+      return await apiRequest("POST", "/api/home-visits", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/home-visits'] });
@@ -559,6 +563,36 @@ export default function TerritoryPage() {
                               <SelectItem value="outro">Outro</SelectItem>
                             </SelectContent>
                           </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={dwellingForm.control}
+                      name="latitude"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Latitude (Opcional)</FormLabel>
+                          <FormControl>
+                            <Input type="number" step="any" placeholder="-12.345678" {...field} data-testid="input-latitude" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={dwellingForm.control}
+                      name="longitude"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Longitude (Opcional)</FormLabel>
+                          <FormControl>
+                            <Input type="number" step="any" placeholder="-38.123456" {...field} data-testid="input-longitude" />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}

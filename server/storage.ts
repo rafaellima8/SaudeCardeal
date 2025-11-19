@@ -725,6 +725,64 @@ export class DbStorage implements IStorage {
     
     const consultationsByType = await consultationsByTypeQuery;
 
+    // Top diagnoses
+    const topDiagnosesQuery = db.select({
+      diagnosis: schema.consultations.diagnosis,
+      count: sql<number>`count(*)`
+    })
+      .from(schema.consultations)
+      .where(
+        and(
+          gte(schema.consultations.consultationDate, startDate),
+          sql`${schema.consultations.diagnosis} IS NOT NULL AND ${schema.consultations.diagnosis} != ''`
+        )
+      )
+      .groupBy(schema.consultations.diagnosis)
+      .orderBy(desc(sql`count(*)`))
+      .limit(5);
+    
+    const topDiagnoses = await topDiagnosesQuery;
+
+    // Medication usage (top 5 from prescriptions)
+    const medicationUsageQuery = db.select({
+      medication: schema.prescriptions.medication,
+      quantity: sql<number>`sum(${schema.prescriptions.quantity})`
+    })
+      .from(schema.prescriptions)
+      .where(gte(schema.prescriptions.createdAt, startDate))
+      .groupBy(schema.prescriptions.medication)
+      .orderBy(desc(sql`sum(${schema.prescriptions.quantity})`))
+      .limit(5);
+    
+    const medicationUsage = await medicationUsageQuery;
+
+    // Age distribution
+    const ageDistributionQuery = db.select({
+      range: sql<string>`
+        CASE
+          WHEN (unixepoch('now') - ${schema.citizens.birthDate}) / 31557600 < 18 THEN '0-17 anos'
+          WHEN (unixepoch('now') - ${schema.citizens.birthDate}) / 31557600 < 30 THEN '18-29 anos'
+          WHEN (unixepoch('now') - ${schema.citizens.birthDate}) / 31557600 < 45 THEN '30-44 anos'
+          WHEN (unixepoch('now') - ${schema.citizens.birthDate}) / 31557600 < 60 THEN '45-59 anos'
+          ELSE '60+ anos'
+        END
+      `,
+      count: sql<number>`count(*)`
+    })
+      .from(schema.citizens)
+      .groupBy(sql`range`)
+      .orderBy(sql`
+        CASE range
+          WHEN '0-17 anos' THEN 1
+          WHEN '18-29 anos' THEN 2
+          WHEN '30-44 anos' THEN 3
+          WHEN '45-59 anos' THEN 4
+          WHEN '60+ anos' THEN 5
+        END
+      `);
+    
+    const ageDistribution = await ageDistributionQuery;
+
     return {
       summary: {
         totalPatients: Number(totalPatients) || 0,
@@ -735,9 +793,9 @@ export class DbStorage implements IStorage {
         tfdRequests: Number(tfdRequests) || 0,
       },
       consultationsByType: consultationsByType.map(c => ({ type: c.type, count: Number(c.count) })),
-      topDiagnoses: [],
-      medicationUsage: [],
-      ageDistribution: [],
+      topDiagnoses: topDiagnoses.map(d => ({ diagnosis: d.diagnosis || 'Não especificado', count: Number(d.count) })),
+      medicationUsage: medicationUsage.map(m => ({ medication: m.medication, quantity: Number(m.quantity) })),
+      ageDistribution: ageDistribution.map(a => ({ range: a.range, count: Number(a.count) })),
     };
   }
 
