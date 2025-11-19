@@ -16,22 +16,22 @@ export class AceStatsService {
       
       const totalVisits = Number(totalVisitsCount) || 0;
 
-      // Total de focos identificados (dwellings com envHealthStatus = 'inadequate')
+      // Total de focos identificados (dwellings com saneamento a céu aberto)
       const [{ count: totalFociCount }] = await db
         .select({ count: sql<number>`count(*)` })
         .from(dwellings)
-        .where(sql`${dwellings.envHealthStatus} = 'inadequate'`);
+        .where(sql`${dwellings.sanitation} = 'ceu_aberto'`);
       
       const totalFoci = Number(totalFociCount) || 0;
 
-      // Domicílios por status
+      // Domicílios por tipo de saneamento
       const dwellingsByStatusRaw = await db
         .select({
-          status: dwellings.envHealthStatus,
+          status: dwellings.sanitation,
           count: sql<number>`count(*)`
         })
         .from(dwellings)
-        .groupBy(dwellings.envHealthStatus);
+        .groupBy(dwellings.sanitation);
       
       const dwellingsByStatus = dwellingsByStatusRaw.map(d => ({
         status: d.status || 'unknown',

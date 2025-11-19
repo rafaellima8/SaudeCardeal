@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, or, desc, asc, like, sql, gte, lte } from "drizzle-orm";
+import { eq, and, or, desc, asc, like, sql, gte, lte, lt } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import type {
   InsertCitizen,
