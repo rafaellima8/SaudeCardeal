@@ -1,7 +1,26 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { loginSchema, insertHealthUnitSchema, insertUserSchema } from "@shared/schema";
+import { 
+  loginSchema, 
+  insertHealthUnitSchema, 
+  insertUserSchema,
+  insertCitizenSchema,
+  insertAppointmentSchema,
+  insertAttendanceQueueSchema,
+  insertConsultationSchema,
+  insertPrescriptionSchema,
+  insertExamSchema,
+  insertTfdRequestSchema,
+  insertProfessionalSchema,
+  insertDwellingSchema,
+  insertFamilySchema,
+  insertHomeVisitSchema,
+  insertEndemicCycleSchema,
+  insertFadEvaluationSchema,
+  insertFocusSchema,
+  insertFocalTreatmentSchema,
+} from "@shared/schema";
 import { z } from "zod";
 import { generateExport } from "./integrations/esus/exporter";
 import { authenticateUser, requireAuth, requireRole } from "./auth";
@@ -928,13 +947,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Home Visits (Visitas Domiciliares)
   app.get("/api/home-visits", async (req, res) => {
     try {
-      const { citizenId, familyId, dwellingId, agentId, unitId, limit, offset } = req.query;
+      const { familyId, dwellingId, professionalId, limit, offset } = req.query;
       const visits = await storage.getHomeVisits({
-        citizenId: citizenId as string,
         familyId: familyId as string,
         dwellingId: dwellingId as string,
-        agentId: agentId as string,
-        unitId: unitId as string,
+        professionalId: professionalId as string,
         limit: limit ? parseInt(limit as string) : undefined,
         offset: offset ? parseInt(offset as string) : undefined,
       });
@@ -976,6 +993,305 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Visita não encontrada" });
       }
       res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // ENDEMIC CONTROL ROUTES
+  // ============================================================================
+
+  // Endemic Cycles
+  app.get("/api/endemic/cycles", async (req, res) => {
+    try {
+      const { unitId, status, limit, offset } = req.query;
+      const cycles = await storage.getEndemicCycles({
+        unitId: unitId as string,
+        status: status as string,
+        limit: limit ? parseInt(limit as string) : undefined,
+        offset: offset ? parseInt(offset as string) : undefined,
+      });
+      res.json(cycles);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/endemic/cycles/:id", async (req, res) => {
+    try {
+      const cycle = await storage.getEndemicCycleById(req.params.id);
+      if (!cycle) {
+        return res.status(404).json({ error: "Ciclo não encontrado" });
+      }
+      res.json(cycle);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/endemic/cycles", async (req, res) => {
+    try {
+      const data = insertEndemicCycleSchema.parse(req.body);
+      const cycle = await storage.createEndemicCycle(data);
+      res.status(201).json(cycle);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/endemic/cycles/:id", async (req, res) => {
+    try {
+      const data = insertEndemicCycleSchema.partial().parse(req.body);
+      const cycle = await storage.updateEndemicCycle(req.params.id, data);
+      if (!cycle) {
+        return res.status(404).json({ error: "Ciclo não encontrado" });
+      }
+      res.json(cycle);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/endemic/cycles/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteEndemicCycle(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Ciclo não encontrado" });
+      }
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // FAD Evaluations
+  app.get("/api/endemic/fad-evaluations", async (req, res) => {
+    try {
+      const { cycleId, dwellingId, professionalId, limit, offset } = req.query;
+      const evaluations = await storage.getFadEvaluations({
+        cycleId: cycleId as string,
+        dwellingId: dwellingId as string,
+        professionalId: professionalId as string,
+        limit: limit ? parseInt(limit as string) : undefined,
+        offset: offset ? parseInt(offset as string) : undefined,
+      });
+      res.json(evaluations);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/endemic/fad-evaluations/:id", async (req, res) => {
+    try {
+      const evaluation = await storage.getFadEvaluationById(req.params.id);
+      if (!evaluation) {
+        return res.status(404).json({ error: "Avaliação FAD não encontrada" });
+      }
+      res.json(evaluation);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/endemic/fad-evaluations", async (req, res) => {
+    try {
+      const data = insertFadEvaluationSchema.parse(req.body);
+      const evaluation = await storage.createFadEvaluation(data);
+      res.status(201).json(evaluation);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/endemic/fad-evaluations/:id", async (req, res) => {
+    try {
+      const data = insertFadEvaluationSchema.partial().parse(req.body);
+      const evaluation = await storage.updateFadEvaluation(req.params.id, data);
+      if (!evaluation) {
+        return res.status(404).json({ error: "Avaliação FAD não encontrada" });
+      }
+      res.json(evaluation);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/endemic/fad-evaluations/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteFadEvaluation(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Avaliação FAD não encontrada" });
+      }
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Foci
+  app.get("/api/endemic/foci", async (req, res) => {
+    try {
+      const { fadId, dwellingId, depositType, limit, offset } = req.query;
+      const foci = await storage.getFoci({
+        fadId: fadId as string,
+        dwellingId: dwellingId as string,
+        depositType: depositType as string,
+        limit: limit ? parseInt(limit as string) : undefined,
+        offset: offset ? parseInt(offset as string) : undefined,
+      });
+      res.json(foci);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/endemic/foci/:id", async (req, res) => {
+    try {
+      const focus = await storage.getFocusById(req.params.id);
+      if (!focus) {
+        return res.status(404).json({ error: "Foco não encontrado" });
+      }
+      res.json(focus);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/endemic/foci", async (req, res) => {
+    try {
+      const data = insertFocusSchema.parse(req.body);
+      const focus = await storage.createFocus(data);
+      res.status(201).json(focus);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/endemic/foci/:id", async (req, res) => {
+    try {
+      const data = insertFocusSchema.partial().parse(req.body);
+      const focus = await storage.updateFocus(req.params.id, data);
+      if (!focus) {
+        return res.status(404).json({ error: "Foco não encontrado" });
+      }
+      res.json(focus);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/endemic/foci/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteFocus(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Foco não encontrado" });
+      }
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Focal Treatments
+  app.get("/api/endemic/treatments", async (req, res) => {
+    try {
+      const { cycleId, dwellingId, professionalId, limit, offset } = req.query;
+      const treatments = await storage.getFocalTreatments({
+        cycleId: cycleId as string,
+        dwellingId: dwellingId as string,
+        professionalId: professionalId as string,
+        limit: limit ? parseInt(limit as string) : undefined,
+        offset: offset ? parseInt(offset as string) : undefined,
+      });
+      res.json(treatments);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/endemic/treatments/:id", async (req, res) => {
+    try {
+      const treatment = await storage.getFocalTreatmentById(req.params.id);
+      if (!treatment) {
+        return res.status(404).json({ error: "Tratamento não encontrado" });
+      }
+      res.json(treatment);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/endemic/treatments", async (req, res) => {
+    try {
+      const data = insertFocalTreatmentSchema.parse(req.body);
+      const treatment = await storage.createFocalTreatment(data);
+      res.status(201).json(treatment);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/endemic/treatments/:id", async (req, res) => {
+    try {
+      const data = insertFocalTreatmentSchema.partial().parse(req.body);
+      const treatment = await storage.updateFocalTreatment(req.params.id, data);
+      if (!treatment) {
+        return res.status(404).json({ error: "Tratamento não encontrado" });
+      }
+      res.json(treatment);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/endemic/treatments/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteFocalTreatment(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Tratamento não encontrado" });
+      }
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Endemic Statistics
+  app.get("/api/endemic/stats", async (req, res) => {
+    try {
+      const { unitId, cycleId, startDate, endDate } = req.query;
+      const stats = await storage.getEndemicStats({
+        unitId: unitId as string,
+        cycleId: cycleId as string,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+      });
+      res.json(stats);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
