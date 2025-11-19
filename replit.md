@@ -64,7 +64,15 @@ Preferred communication style: Simple, everyday language.
     -   IB (Índice de Breteau): Number of positive containers per 100 inspected dwellings
     -   Foci distribution by deposit type (water storage, planters, trash, etc.)
     -   Treatment distribution by type (focal vs perifocal)
--   **Implementation Status**: Backend fully functional and validated. Frontend components pending (Task 6-7).
+-   **Implementation Status**: Backend and frontend fully functional and validated.
+-   **Frontend Components**:
+    -   `/endemias` route with complete dashboard
+    -   Automatic loading of active cycle indicators on page load
+    -   5 tabs: Indicadores, Mapa de Calor, Ciclos, FAD, Focos
+    -   Visual heatmap with intensity bars (red/orange/yellow/green)
+    -   Priority deposit ranking and risk classification
+    -   Cycle creation form with Zod validation
+    -   Recharts integration for bar and pie charts
 
 ### Key NPM Packages
 
