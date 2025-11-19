@@ -79,8 +79,19 @@ Preferred communication style: Simple, everyday language.
     -   Period selector (7, 30, 90, 365 days)
     -   Health unit filter
     -   Summary cards with KPIs
-    -   Tables for consultations by type, diagnoses, medications, age distribution
-    -   Export to PDF (placeholder for future implementation)
+    -   Tables for consultations by type, diagnoses, medications, age distribution with zero-division protection
+    -   Professional PDF export functionality
+-   **PDF Export Feature** (`client/src/lib/pdf-export.ts`):
+    -   Professional institutional header with logo (medical cross icon using geometric shapes)
+    -   Blue branded banner (#0078D7) with system identification
+    -   Complete report metadata (period, unit, generation date/time)
+    -   Formatted tables with striped theme and institutional colors
+    -   Data safety: Zero-division protection (Math.max) for all percentage calculations
+    -   Top 5 enforcement: Diagnoses and medications capped at 5 entries (aligned with UI)
+    -   Localized number formatting (pt-BR)
+    -   Professional footer with pagination and branding
+    -   Uses jsPDF and jspdf-autotable libraries
+    -   Consistent data representation between UI and PDF export
 
 **Endemic Disease Surveillance (ACE Module)**:
 -   **Database Tables** (4 tables):
