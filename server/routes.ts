@@ -277,11 +277,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Consultations API
   app.get("/api/consultations", async (req, res) => {
     try {
-      const { citizenId } = req.query;
-      if (!citizenId) {
-        return res.status(400).json({ error: "citizenId é obrigatório" });
-      }
-      const consultations = await storage.getConsultations(citizenId as string);
+      const { citizenId, professionalId, limit } = req.query;
+      const consultations = await storage.getConsultations({
+        citizenId: citizenId as string,
+        professionalId: professionalId as string,
+        limit: limit ? parseInt(limit as string) : undefined,
+      });
       res.json(consultations);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

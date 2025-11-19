@@ -54,9 +54,21 @@ The system currently includes fully functional modules for:
     -   Appointment linkage, consultation type enum (scheduled, spontaneous demand, urgency, home visit)
     -   **Status**: Schema designed, SQLite migration deferred due to ALTER TABLE constraints (requires table recreation strategy)
 
+#### 🚧 Partially Implemented (Awaiting Database Migration)
+
+-   **SOAP Consultation UI (Frontend Complete)**:
+    -   ✅ Full consultation form with 4 SOAP tabs (Subjetivo, Objetivo, Avaliação, Plano)
+    -   ✅ 9 vital signs inputs (PA, FC, temp, FR, SpO2, peso, altura, circ. abdominal)
+    -   ✅ CIAP-2 selector with 15 common codes + CID-10 selector with 14 common codes
+    -   ✅ Consultation listing with patient/professional join
+    -   ✅ Backend API routes updated with proper filtering (`and()` composite conditions)
+    -   ❌ **SOAP fields NOT persisted**: subjective/objective/assessment/plan, vitalSigns JSON, ciap2Codes/cid10Codes arrays are collected but dropped (SQLite limitation)
+    -   ⚠️ **Workaround**: Legacy fields still functional (chiefComplaint, diagnosis, treatmentPlan, notes)
+    -   📌 **Next**: Migrate to PostgreSQL or recreate SQLite table with SOAP schema
+
 #### 🔨 Next Development Priorities
 
-1. **SOAP Frontend Form**: Implement consultation recording UI with SOAP fields, CIAP-2/CID-10 selectors, vital signs inputs
+1. **Database Migration**: PostgreSQL migration or SQLite table recreation to persist SOAP fields
 2. **Electronic Prescriptions**: Schema + frontend for medication prescriptions linked to consultations (fractional dosing support)
 3. **Appointment Scheduling**: Queue management, states (scheduled → waiting → in-progress → completed), initial listening/triage
 4. **Territorial Integration**: Citizen → Family → Domicile → Dwelling linkages with cascading views

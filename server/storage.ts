@@ -64,7 +64,7 @@ export interface IStorage {
   deleteQueueEntry(id: string): Promise<boolean>;
 
   // Consultations
-  getConsultations(citizenId: string): Promise<Consultation[]>;
+  getConsultations(params?: { citizenId?: string; professionalId?: string; limit?: number }): Promise<Consultation[]>;
   getConsultationById(id: string): Promise<Consultation | undefined>;
   createConsultation(consultation: InsertConsultation): Promise<Consultation>;
   deleteConsultation(id: string): Promise<boolean>;
@@ -326,11 +326,49 @@ export class DbStorage implements IStorage {
   }
 
   // Consultations
-  async getConsultations(citizenId: string): Promise<Consultation[]> {
-    return db.select()
+  async getConsultations(params?: { citizenId?: string; professionalId?: string; limit?: number }): Promise<Consultation[]> {
+    const conditions = [];
+    
+    if (params?.citizenId) {
+      conditions.push(eq(schema.consultations.citizenId, params.citizenId));
+    }
+    if (params?.professionalId) {
+      conditions.push(eq(schema.consultations.professionalId, params.professionalId));
+    }
+
+    let query = db.select({
+      id: schema.consultations.id,
+      citizenId: schema.consultations.citizenId,
+      professionalId: schema.consultations.professionalId,
+      unitId: schema.consultations.unitId,
+      consultationDate: schema.consultations.consultationDate,
+      type: schema.consultations.type,
+      chiefComplaint: schema.consultations.chiefComplaint,
+      diagnosis: schema.consultations.diagnosis,
+      citizen: {
+        name: schema.citizens.name,
+        cns: schema.citizens.cns,
+      },
+      professional: {
+        name: schema.professionals.name,
+      },
+    })
       .from(schema.consultations)
-      .where(eq(schema.consultations.citizenId, citizenId))
-      .orderBy(desc(schema.consultations.consultationDate));
+      .leftJoin(schema.citizens, eq(schema.consultations.citizenId, schema.citizens.id))
+      .leftJoin(schema.professionals, eq(schema.consultations.professionalId, schema.professionals.id))
+      .$dynamic();
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
+    }
+
+    query = query.orderBy(desc(schema.consultations.consultationDate));
+
+    if (params?.limit) {
+      query = query.limit(params.limit);
+    }
+
+    return query;
   }
 
   async getConsultationById(id: string): Promise<Consultation | undefined> {
