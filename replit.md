@@ -44,6 +44,11 @@ The system currently includes fully functional modules for:
     
 -   **Reports & Indicators**: Aggregated health indicators with professional PDF export (jsPDF + autotable), customizable filters (period, health unit), detailed breakdowns of consultations, diagnoses, medications, and age distribution
 
+-   **Appointment Scheduling System**: Complete scheduling and queue management solution:
+    -   **Appointments Page** (/agendamentos): Weekly calendar grid, day/week view toggle, appointment creation dialog, filters by professional/unit, detailed daily schedule with colored status badges
+    -   **Attendance Queue** (/fila-atendimento): Reception dashboard with status-based workflow (scheduled → confirmed → in-progress → completed), transition buttons with AlertDialog confirmations, separate sections for completed/cancelled/no-show appointments
+    -   Backend CRUD already complete with composite filters (date, professional, unit, status)
+
 #### 📋 Architected & Documented (Pending Implementation)
 
 -   **SOAP Consultation Schema** (e-SUS PEC v5.3 compliant):
@@ -70,9 +75,9 @@ The system currently includes fully functional modules for:
 
 1. **Database Migration**: PostgreSQL migration or SQLite table recreation to persist SOAP fields
 2. **Electronic Prescriptions**: Schema + frontend for medication prescriptions linked to consultations (fractional dosing support)
-3. **Appointment Scheduling**: Queue management, states (scheduled → waiting → in-progress → completed), initial listening/triage
-4. **Territorial Integration**: Citizen → Family → Domicile → Dwelling linkages with cascading views
-5. **Patient Summary Sheet**: Longitudinal health record with consultation history, medications, exams, vaccinations
+3. **Territorial Integration**: Citizen → Family → Domicile → Dwelling linkages with cascading views
+4. **Patient Summary Sheet**: Longitudinal health record with consultation history, medications, exams, vaccinations
+5. **Reception Workflow Enhancements**: Add escuta inicial (initial triage), risk classification, automatic queue ordering by priority
 
 ## External Dependencies
 
