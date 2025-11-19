@@ -684,6 +684,307 @@ async function seed() {
     console.log("✅ Visitas domiciliares criadas");
 
     // ============================================================================
+    // ENDEMIC CONTROL DATA (Controle de Endemias)
+    // ============================================================================
+    console.log("\n📋 Criando dados de controle de endemias...");
+
+    // Endemic Cycles (Ciclos de Trabalho)
+    const [liraaCycle, pveCycle] = await db.insert(schema.endemicCycles).values([
+      {
+        id: "ec-liraa-2025-1",
+        unitId: unit1.id,
+        name: "LIRAa 1º Ciclo 2025",
+        cycleType: "liraa",
+        description: "Levantamento de Índice Rápido de Infestação por Aedes aegypti",
+        startDate: new Date("2025-01-15"),
+        endDate: new Date("2025-02-15"),
+        targetMicroareas: JSON.stringify(["01", "02", "03"]),
+        status: "in_progress",
+        totalDwellings: 150,
+        visitedDwellings: 127,
+        fociFound: 8,
+      },
+      {
+        id: "ec-pve-2024-4",
+        unitId: unit1.id,
+        name: "PVE 4º Ciclo 2024",
+        cycleType: "pve",
+        description: "Pesquisa Vetorial Especial",
+        startDate: new Date("2024-10-01"),
+        endDate: new Date("2024-11-30"),
+        targetMicroareas: JSON.stringify(["01", "02", "03", "04"]),
+        status: "completed",
+        totalDwellings: 200,
+        visitedDwellings: 195,
+        fociFound: 12,
+      },
+    ]).returning();
+
+    console.log("✅ Ciclos de trabalho criados");
+
+    // FAD Evaluations (Fichas de Avaliação de Densidade)
+    const [fad1, fad2, fad3, fad4, fad5] = await db.insert(schema.fadEvaluations).values([
+      {
+        id: "fad-001",
+        cycleId: liraaCycle.id,
+        dwellingId: dwelling1.id,
+        professionalId: profAcs.id,
+        visitDate: new Date("2025-01-20T09:00:00"),
+        dwellingInspected: true,
+        dwellingClosed: false,
+        dwellingRefused: false,
+        residentsCount: 4,
+        containersInspected: 12,
+        containersWithLarvae: 2,
+        containersEliminated: 3,
+        larvicideApplied: true,
+        larvicideType: "BTI",
+      },
+      {
+        id: "fad-002",
+        cycleId: liraaCycle.id,
+        dwellingId: dwelling2.id,
+        professionalId: profAcs.id,
+        visitDate: new Date("2025-01-21T10:30:00"),
+        dwellingInspected: true,
+        dwellingClosed: false,
+        dwellingRefused: false,
+        residentsCount: 3,
+        containersInspected: 15,
+        containersWithLarvae: 1,
+        containersEliminated: 2,
+        larvicideApplied: true,
+        larvicideType: "BTI",
+      },
+      {
+        id: "fad-003",
+        cycleId: liraaCycle.id,
+        dwellingId: dwelling3.id,
+        professionalId: profAcs.id,
+        visitDate: new Date("2025-01-22T08:00:00"),
+        dwellingInspected: true,
+        dwellingClosed: false,
+        dwellingRefused: false,
+        residentsCount: 5,
+        containersInspected: 9,
+        containersWithLarvae: 0,
+        containersEliminated: 1,
+        larvicideApplied: false,
+      },
+      {
+        id: "fad-004",
+        cycleId: pveCycle.id,
+        dwellingId: dwelling1.id,
+        professionalId: profAcs.id,
+        visitDate: new Date("2024-10-15T09:00:00"),
+        dwellingInspected: true,
+        dwellingClosed: false,
+        dwellingRefused: false,
+        residentsCount: 4,
+        containersInspected: 14,
+        containersWithLarvae: 3,
+        containersEliminated: 4,
+        larvicideApplied: true,
+        larvicideType: "Pyriproxyfen",
+      },
+      {
+        id: "fad-005",
+        cycleId: pveCycle.id,
+        dwellingId: dwelling2.id,
+        professionalId: profAcs.id,
+        visitDate: new Date("2024-10-16T11:00:00"),
+        dwellingInspected: true,
+        dwellingClosed: false,
+        dwellingRefused: false,
+        residentsCount: 3,
+        containersInspected: 11,
+        containersWithLarvae: 2,
+        containersEliminated: 3,
+        larvicideApplied: true,
+        larvicideType: "BTI",
+      },
+    ]).returning();
+
+    console.log("✅ Avaliações FAD criadas");
+
+    // Foci (Focos/Criadouros Identificados)
+    await db.insert(schema.foci).values([
+      {
+        id: "focus-001",
+        fadId: fad1.id,
+        dwellingId: dwelling1.id,
+        depositType: "A1",
+        depositDescription: "Caixa d'água elevada sem tampa",
+        larvaeFound: true,
+        pupaeFound: true,
+        actionTaken: "treatment",
+        larvicideApplied: "BTI",
+        quantity: 1,
+      },
+      {
+        id: "focus-002",
+        fadId: fad1.id,
+        dwellingId: dwelling1.id,
+        depositType: "D2",
+        depositDescription: "Pneus expostos no quintal",
+        larvaeFound: true,
+        pupaeFound: false,
+        actionTaken: "elimination",
+        quantity: 3,
+      },
+      {
+        id: "focus-003",
+        fadId: fad2.id,
+        dwellingId: dwelling2.id,
+        depositType: "B",
+        depositDescription: "Vaso sanitário abandonado",
+        larvaeFound: true,
+        pupaeFound: false,
+        actionTaken: "treatment",
+        larvicideApplied: "BTI",
+        quantity: 1,
+      },
+      {
+        id: "focus-004",
+        fadId: fad4.id,
+        dwellingId: dwelling1.id,
+        depositType: "A2",
+        depositDescription: "Tambor armazenando água",
+        larvaeFound: true,
+        pupaeFound: true,
+        actionTaken: "treatment",
+        larvicideApplied: "Pyriproxyfen",
+        quantity: 1,
+      },
+      {
+        id: "focus-005",
+        fadId: fad4.id,
+        dwellingId: dwelling1.id,
+        depositType: "C",
+        depositDescription: "Calha entupida com água parada",
+        larvaeFound: true,
+        pupaeFound: false,
+        actionTaken: "treatment",
+        larvicideApplied: "Deltametrina",
+        quantity: 1,
+      },
+      {
+        id: "focus-006",
+        fadId: fad5.id,
+        dwellingId: dwelling2.id,
+        depositType: "D1",
+        depositDescription: "Garrafa plástica descartada",
+        larvaeFound: true,
+        pupaeFound: false,
+        actionTaken: "elimination",
+        quantity: 2,
+      },
+      {
+        id: "focus-007",
+        fadId: fad4.id,
+        dwellingId: dwelling1.id,
+        depositType: "E",
+        depositDescription: "Bromélia ornamental",
+        larvaeFound: true,
+        pupaeFound: false,
+        actionTaken: "education",
+        quantity: 1,
+      },
+      {
+        id: "focus-008",
+        fadId: fad5.id,
+        dwellingId: dwelling2.id,
+        depositType: "A1",
+        depositDescription: "Cisterna sem vedação adequada",
+        larvaeFound: true,
+        pupaeFound: false,
+        actionTaken: "protection",
+        larvicideApplied: "BTI",
+        quantity: 1,
+      },
+    ]);
+
+    console.log("✅ Focos/criadouros criados");
+
+    // Focal Treatments (Tratamentos Focais)
+    await db.insert(schema.focalTreatments).values([
+      {
+        id: "treatment-001",
+        cycleId: liraaCycle.id,
+        dwellingId: dwelling1.id,
+        professionalId: profAcs.id,
+        treatmentDate: new Date("2025-01-20T10:00:00"),
+        treatmentType: "focal",
+        productUsed: "BTI (Bacillus thuringiensis israelensis)",
+        dosage: "1g/10L",
+        targetArea: 50,
+        containersCount: 1,
+      },
+      {
+        id: "treatment-002",
+        cycleId: liraaCycle.id,
+        dwellingId: dwelling2.id,
+        professionalId: profAcs.id,
+        treatmentDate: new Date("2025-01-21T11:00:00"),
+        treatmentType: "focal",
+        productUsed: "BTI (Bacillus thuringiensis israelensis)",
+        dosage: "1g/10L",
+        targetArea: 30,
+        containersCount: 1,
+      },
+      {
+        id: "treatment-003",
+        cycleId: pveCycle.id,
+        dwellingId: dwelling1.id,
+        professionalId: profAcs.id,
+        treatmentDate: new Date("2024-10-15T10:30:00"),
+        treatmentType: "perifocal",
+        productUsed: "Deltametrina 25 PM",
+        dosage: "25mg/m²",
+        targetArea: 150,
+        containersCount: 3,
+      },
+      {
+        id: "treatment-004",
+        cycleId: pveCycle.id,
+        dwellingId: dwelling1.id,
+        professionalId: profAcs.id,
+        treatmentDate: new Date("2024-10-15T11:00:00"),
+        treatmentType: "focal",
+        productUsed: "BTI (Bacillus thuringiensis israelensis)",
+        dosage: "1g/10L",
+        targetArea: 20,
+        containersCount: 1,
+      },
+      {
+        id: "treatment-005",
+        cycleId: pveCycle.id,
+        dwellingId: dwelling2.id,
+        professionalId: profAcs.id,
+        treatmentDate: new Date("2024-10-16T12:00:00"),
+        treatmentType: "focal",
+        productUsed: "BTI (Bacillus thuringiensis israelensis)",
+        dosage: "1g/10L",
+        targetArea: 40,
+        containersCount: 1,
+      },
+      {
+        id: "treatment-006",
+        cycleId: liraaCycle.id,
+        dwellingId: dwelling3.id,
+        professionalId: profAcs.id,
+        treatmentDate: new Date("2025-01-22T09:00:00"),
+        treatmentType: "focal",
+        productUsed: "Peixes larvófagos (Betta splendens)",
+        dosage: "2 peixes/recipiente",
+        targetArea: 25,
+        containersCount: 1,
+      },
+    ]);
+
+    console.log("✅ Tratamentos focais criados");
+
+    // ============================================================================
     // SUMMARY
     // ============================================================================
     console.log("\n" + "=".repeat(70));
@@ -705,6 +1006,10 @@ async function seed() {
     console.log("   • 3 Domicílios");
     console.log("   • 3 Famílias");
     console.log("   • 3 Visitas domiciliares");
+    console.log("   • 2 Ciclos de trabalho (LIRAa/PVE)");
+    console.log("   • 5 Avaliações FAD");
+    console.log("   • 8 Focos/criadouros identificados");
+    console.log("   • 6 Tratamentos focais realizados");
     console.log("\n🔐 Credenciais para login:");
     console.log("   Admin: admin@saude.gov.br / Admin@2025");
     console.log("   ACS: acs@saude.gov.br / Acs@2025");
