@@ -14,6 +14,7 @@ import {
   Activity,
   LogOut,
   Bug,
+  Stethoscope,
 } from "lucide-react";
 import {
   Sidebar,
@@ -41,6 +42,7 @@ const allMenuItems = [
   { title: "Recepção", icon: ClipboardList, url: "/recepcao" },
   { title: "Pacientes", icon: Users, url: "/pacientes" },
   { title: "Agendamentos", icon: Calendar, url: "/agendamentos" },
+  { title: "Atendimentos", icon: Stethoscope, url: "/atendimentos" },
   { title: "Território", icon: MapPin, url: "/territorio" },
   { title: "ACE", icon: Activity, url: "/ace" },
   { title: "Endemias", icon: Bug, url: "/endemias" },
