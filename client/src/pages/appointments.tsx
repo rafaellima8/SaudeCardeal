@@ -106,10 +106,13 @@ export default function Appointments() {
 
   const createMutation = useMutation({
     mutationFn: async (data: InsertAppointment) => {
-      return await apiRequest("/api/appointments", {
+      const response = await fetch("/api/appointments", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
+      if (!response.ok) throw new Error("Erro ao criar agendamento");
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
@@ -207,7 +210,7 @@ export default function Appointments() {
                         <SelectContent>
                           {professionals.map((prof) => (
                             <SelectItem key={prof.id} value={prof.id}>
-                              {prof.name} - {prof.role}
+                              {prof.name} - {prof.specialty}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -308,7 +311,7 @@ export default function Appointments() {
                     <FormItem>
                       <FormLabel>Observações</FormLabel>
                       <FormControl>
-                        <Textarea {...field} data-testid="input-notes" placeholder="Observações adicionais" />
+                        <Textarea {...field} value={field.value || ""} data-testid="input-notes" placeholder="Observações adicionais" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
