@@ -8,6 +8,34 @@ import { authenticateUser, requireAuth, requireRole } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
+  // TEMPORARY SETUP ROUTE - Remove after database is initialized
+  // ============================================================================
+  app.get("/api/_setup", async (req, res) => {
+    try {
+      const { db } = await import("./db");
+      const { migrate } = await import("drizzle-orm/neon-http/migrator");
+      const { seed } = await import("./seed");
+      
+      console.log("🚀 Iniciando setup do banco de dados...");
+      
+      // Try to create tables using the schema
+      console.log("📦 Aplicando schema...");
+      
+      // Run seed which will create tables if they don't exist
+      await seed();
+      
+      console.log("✅ Setup concluído!");
+      res.json({ 
+        success: true, 
+        message: "Banco de dados configurado com sucesso! Você pode fazer login agora." 
+      });
+    } catch (error: any) {
+      console.error("❌ Erro no setup:", error);
+      res.status(500).json({ error: error.message, stack: error.stack });
+    }
+  });
+
+  // ============================================================================
   // AUTHENTICATION API - Must be registered BEFORE global protection middleware
   // ============================================================================
   
