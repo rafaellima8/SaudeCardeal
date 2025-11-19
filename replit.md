@@ -23,7 +23,7 @@ Preferred communication style: Simple, everyday language.
 **Server Framework**: Express.js with TypeScript on Node.js, RESTful API design with JSON responses, middleware for logging, JSON parsing, and error handling.
 **Database Layer**: PostgreSQL (primary) or SQLite (temporary) with Drizzle ORM for type-safe queries and migrations. Schema-first design with Zod validation.
 **Data Access Pattern**: Storage abstraction layer (`server/storage.ts`) using a repository pattern with interface-based contracts.
-**API Structure**: Resource-based RESTful endpoints for managing citizens, appointments, consultations, prescriptions, medications, exams, TFD, queues, health units, professionals, reports, and territorial management (dwellings, families, home visits).
+**API Structure**: Resource-based RESTful endpoints for managing citizens, appointments, consultations, prescriptions, medications, exams, TFD, queues, health units, professionals, reports, territorial management (dwellings, families, home visits), and endemic disease surveillance (work cycles, FAD evaluations, vector foci, focal treatments).
 **Security & Access Control**:
 -   **Authentication**: Password-based authentication with bcrypt hashing, session-based authentication via express-session with secure cookies, global API route protection.
 -   **Authorization (RBAC)**: Role-based access control with 7 user roles (admin, medico, enfermeiro, acs, farmaceutico, gestor, recepcao), dynamic menu filtering based on role, permission matrix, user context hook (`useCurrentUser()`).
@@ -40,12 +40,31 @@ Preferred communication style: Simple, everyday language.
 ### Third-Party Services
 
 **Database**:
--   SQLite (local, temporary, `saude.db`, 28KB, minimal schema with `users` and `health_units` tables).
+-   SQLite (local, temporary, `saude.db`, 200KB, 19 tables including endemic disease surveillance).
 -   PostgreSQL (intended primary database).
 
 **e-SUS APS Integration**:
 -   Export module (`server/integrations/esus/`) for Brazilian national healthcare system compliance.
 -   Uses Zod schemas for data conformity and mapping documentation for database-to-e-SUS field transformation (e.g., Citizen data, consultations).
+
+**Endemic Disease Surveillance (ACE Module)**:
+-   **Database Tables** (4 new tables):
+    -   `endemic_cycles`: Work cycles for vector control (LIRAa, PVE) with target microareas and status tracking.
+    -   `fad_evaluations`: Ficha de Atividade Diária evaluations linked to dwellings and cycles.
+    -   `foci`: Vector foci tracking with deposit types (A1, A2, B, C, D1, D2, E) and species identification.
+    -   `focal_treatments`: Treatment records (focal/perifocal) with products and results.
+-   **API Endpoints** (21 RESTful endpoints):
+    -   `/api/endemic/cycles` - CRUD operations for work cycles
+    -   `/api/endemic/fad` - CRUD operations for FAD evaluations
+    -   `/api/endemic/foci` - CRUD operations for vector foci
+    -   `/api/endemic/treatments` - CRUD operations for focal treatments
+    -   `/api/endemic/stats` - Epidemiological indicators and statistics
+-   **Epidemiological Indicators**:
+    -   IIP (Índice de Infestação Predial): Percentage of dwellings with larvae/pupae
+    -   IB (Índice de Breteau): Number of positive containers per 100 inspected dwellings
+    -   Foci distribution by deposit type (water storage, planters, trash, etc.)
+    -   Treatment distribution by type (focal vs perifocal)
+-   **Implementation Status**: Backend fully functional and validated. Frontend components pending (Task 6-7).
 
 ### Key NPM Packages
 
