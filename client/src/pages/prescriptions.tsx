@@ -77,26 +77,28 @@ export default function Prescriptions() {
     const pageHeight = doc.internal.pageSize.getHeight();
 
     // ========== CABEÇALHO INSTITUCIONAL ==========
-    doc.setFontSize(14);
+    doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text("PREFEITURA MUNICIPAL DE CARDEAL DA SILVA", pageWidth / 2, 20, { align: "center" });
-    
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
-    doc.text("Secretaria Municipal de Saúde", pageWidth / 2, 22, { align: "center" });
-    doc.text("Estado da Bahia - CNPJ: 14.105.349/0001-02", pageWidth / 2, 28, { align: "center" });
+    doc.text("PREFEITURA MUNICIPAL DE CARDEAL DA SILVA", pageWidth / 2, 18, { align: "center" });
     
     doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    doc.text("Secretaria Municipal de Saúde", pageWidth / 2, 26, { align: "center" });
+    
+    doc.setFontSize(10);
+    doc.text("Estado da Bahia - CNPJ: 14.105.349/0001-02", pageWidth / 2, 32, { align: "center" });
+    
+    doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("RECEITUÁRIO MÉDICO", pageWidth / 2, 36, { align: "center" });
+    doc.text("RECEITUÁRIO MÉDICO", pageWidth / 2, 40, { align: "center" });
 
     // Linha separadora
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.5);
-    doc.line(15, 40, pageWidth - 15, 40);
+    doc.line(15, 45, pageWidth - 15, 45);
 
     // ========== DADOS DO PACIENTE ==========
-    let currentY = 48;
+    let currentY = 53;
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
     doc.text("IDENTIFICAÇÃO DO PACIENTE", 15, currentY);

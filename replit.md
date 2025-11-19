@@ -57,6 +57,20 @@ The system currently includes fully functional modules for:
     -   **Data Integrity**: Impossible to create orphaned prescriptions or consultations without prescriptions when prescribed
     -   **UX Features**: Draft state persists on error for retry, success feedback with prescription count, form validation with Zod
     -   **Code Quality**: Architect-approved implementation, reduced from ~90 to ~45 lines with cleaner deterministic UX
+    
+-   **Prescription History & PDF Export (Production-Ready)**: Complete prescription tracking and professional PDF generation:
+    -   **Page**: `/prescricoes` with comprehensive filtering interface (4-column grid layout)
+    -   **Server-Side Filtering**: GET `/api/prescriptions` with citizenId, professionalId, consultationId, startDate, endDate filters
+    -   **UI Filters**: Text search (patient/medication/professional), select dropdowns (patient, professional), date range picker (Popover + dual Calendar)
+    -   **Data Display**: Table with date, patient, medication, dosage (Badge), professional, PDF download button
+    -   **PDF Generation**: Professional jsPDF + autoTable layout with:
+        - Institutional header: Prefeitura + Secretaria + State + CNPJ
+        - Patient identification: name, CNS, birthDate/age, consultation date
+        - Prescription table: medication, dosage, frequency, duration, quantity, instructions (grid theme)
+        - Digital signature: professional name + registration (CRM/COREN/etc) + role
+        - Footer: institutional data + full address + CEP + emission timestamp
+    -   **IStorage Interface**: Updated with all filter parameters (citizenId, consultationId, professionalId, startDate, endDate)
+    -   **Test Coverage**: 100% data-testid attributes on interactive elements (buttons, inputs, table rows, select options)
 
 #### 📋 Architected & Documented (Pending Implementation)
 
@@ -82,10 +96,10 @@ The system currently includes fully functional modules for:
 
 #### 🔨 Next Development Priorities
 
-1. **Prescription History & PDF Export**: View patient prescription history with professional PDF generation (jsPDF + autotable) with institutional branding and digital signature
-2. **Database Migration**: PostgreSQL migration or SQLite table recreation to persist SOAP fields
-3. **Territorial Integration**: Citizen → Family → Domicile → Dwelling linkages with cascading views
-4. **Patient Summary Sheet**: Longitudinal health record with consultation history, medications, exams, vaccinations
+1. **Database Migration**: PostgreSQL migration or SQLite table recreation to persist SOAP fields (subjective, objective, assessment, plan, vitalSigns, ciap2Codes, cid10Codes)
+2. **Territorial Integration**: Citizen → Family → Domicile → Dwelling linkages with cascading views
+3. **Patient Summary Sheet**: Longitudinal health record with consultation history, medications, exams, vaccinations
+4. **Medication Stock Management**: Pharmacy inventory control with batch tracking, expiration alerts, and automated reorder points
 5. **Reception Workflow Enhancements**: Add escuta inicial (initial triage), risk classification, automatic queue ordering by priority
 
 ## External Dependencies
