@@ -21,6 +21,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { exportReportToPDF } from "@/lib/pdf-export";
+import { useToast } from "@/hooks/use-toast";
 
 interface ReportData {
   summary: {
@@ -40,6 +42,7 @@ interface ReportData {
 export default function Reports() {
   const [period, setPeriod] = useState("30");
   const [unitId, setUnitId] = useState<string>("all");
+  const { toast } = useToast();
 
   const { data: units = [] } = useQuery<Array<{ id: string; name: string }>>({
     queryKey: ['/api/units'],
@@ -60,8 +63,32 @@ export default function Reports() {
   });
 
   const handleExportPDF = () => {
-    // Implementação futura de exportação PDF
-    alert('Funcionalidade de exportação em desenvolvimento');
+    if (!reportData) {
+      toast({
+        title: "Erro",
+        description: "Nenhum dado disponível para exportação",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const unitName = unitId === 'all' 
+      ? 'Todas as unidades' 
+      : units.find(u => u.id === unitId)?.name || 'Unidade não identificada';
+
+    try {
+      exportReportToPDF(reportData, { period, unitName });
+      toast({
+        title: "PDF exportado com sucesso",
+        description: "O relatório foi baixado para o seu computador",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro na exportação",
+        description: "Não foi possível gerar o PDF",
+        variant: "destructive",
+      });
+    }
   };
 
   const getPercentageChange = (current: number, previous: number) => {
@@ -76,7 +103,7 @@ export default function Reports() {
           <h1 className="text-3xl font-bold text-foreground">Relatórios e Indicadores</h1>
           <p className="text-muted-foreground mt-1">Acompanhe os indicadores de saúde da atenção básica</p>
         </div>
-        <Button onClick={handleExportPDF}>
+        <Button onClick={handleExportPDF} disabled={isLoading || !reportData} data-testid="button-export-pdf">
           <Download className="h-4 w-4 mr-2" />
           Exportar PDF
         </Button>
@@ -194,15 +221,17 @@ export default function Reports() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {reportData.consultationsByType.map((item) => (
-                      <TableRow key={item.type}>
-                        <TableCell className="font-medium">{item.type}</TableCell>
-                        <TableCell className="text-right">{item.count}</TableCell>
-                        <TableCell className="text-right">
-                          {((item.count / reportData.summary.totalConsultations) * 100).toFixed(1)}%
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {reportData.consultationsByType.map((item) => {
+                      const totalConsultations = Math.max(reportData.summary.totalConsultations, 1);
+                      const percentage = ((item.count / totalConsultations) * 100).toFixed(1);
+                      return (
+                        <TableRow key={item.type}>
+                          <TableCell className="font-medium">{item.type}</TableCell>
+                          <TableCell className="text-right">{item.count}</TableCell>
+                          <TableCell className="text-right">{percentage}%</TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -222,7 +251,7 @@ export default function Reports() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {reportData.topDiagnoses.map((item, index) => (
+                    {reportData.topDiagnoses.slice(0, 5).map((item, index) => (
                       <TableRow key={index}>
                         <TableCell className="font-medium">{item.diagnosis}</TableCell>
                         <TableCell className="text-right">
@@ -249,7 +278,7 @@ export default function Reports() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {reportData.medicationUsage.map((item, index) => (
+                    {reportData.medicationUsage.slice(0, 5).map((item, index) => (
                       <TableRow key={index}>
                         <TableCell className="font-medium">{item.medication}</TableCell>
                         <TableCell className="text-right">
@@ -277,15 +306,17 @@ export default function Reports() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {reportData.ageDistribution.map((item) => (
-                      <TableRow key={item.range}>
-                        <TableCell className="font-medium">{item.range}</TableCell>
-                        <TableCell className="text-right">{item.count}</TableCell>
-                        <TableCell className="text-right">
-                          {((item.count / reportData.summary.totalPatients) * 100).toFixed(1)}%
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {reportData.ageDistribution.map((item) => {
+                      const totalPatients = Math.max(reportData.summary.totalPatients, 1);
+                      const percentage = ((item.count / totalPatients) * 100).toFixed(1);
+                      return (
+                        <TableRow key={item.range}>
+                          <TableCell className="font-medium">{item.range}</TableCell>
+                          <TableCell className="text-right">{item.count}</TableCell>
+                          <TableCell className="text-right">{percentage}%</TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>
