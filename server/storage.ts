@@ -549,170 +549,32 @@ export class DbStorage implements IStorage {
   }
 
   // Dashboard Stats
+  // TEMPORARY STUB: Returns empty stats while full schema is disabled
   async getDashboardStats(unitId?: string): Promise<any> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    // Get today's appointments count
-    const appointmentsQuery = db.select({ count: sql<number>`count(*)` })
-      .from(schema.appointments)
-      .where(
-        and(
-          gte(schema.appointments.appointmentDate, today),
-          lte(schema.appointments.appointmentDate, tomorrow),
-          unitId ? eq(schema.appointments.unitId, unitId) : undefined
-        )
-      );
-
-    const [{ count: appointmentsToday }] = await appointmentsQuery as any;
-
-    // Get queue waiting count
-    const queueQuery = db.select({ count: sql<number>`count(*)` })
-      .from(schema.attendanceQueue)
-      .where(
-        and(
-          eq(schema.attendanceQueue.status, 'waiting'),
-          unitId ? eq(schema.attendanceQueue.unitId, unitId) : undefined
-        )
-      );
-
-    const [{ count: queueWaiting }] = await queueQuery as any;
-
-    // Get low stock count
-    const lowStockQuery = db.select({ count: sql<number>`count(*)` })
-      .from(schema.medications)
-      .innerJoin(schema.medicationStock, eq(schema.medications.id, schema.medicationStock.medicationId))
-      .where(
-        and(
-          unitId ? eq(schema.medications.unitId, unitId) : undefined,
-          sql`${schema.medicationStock.quantity} < ${schema.medicationStock.minStock}`
-        )
-      );
-
-    const [{ count: lowStockCount }] = await lowStockQuery as any;
-
-    // Get total citizens
-    const citizensQuery = db.select({ count: sql<number>`count(*)` })
-      .from(schema.citizens);
-
-    const [{ count: totalCitizens }] = await citizensQuery as any;
-
     return {
-      appointmentsToday: Number(appointmentsToday),
-      queueWaiting: Number(queueWaiting),
-      lowStockCount: Number(lowStockCount),
-      totalCitizens: Number(totalCitizens),
+      appointmentsToday: 0,
+      queueWaiting: 0,
+      lowStockCount: 0,
+      totalCitizens: 0,
     };
   }
 
+  // Reports
+  // TEMPORARY STUB: Returns empty reports while full schema is disabled
   async getReports(days: number, unitId?: string): Promise<any> {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-
-    // Get all consultations in period
-    const consultations = unitId && unitId !== 'all'
-      ? await db.select().from(schema.consultations)
-          .where(and(
-            gte(schema.consultations.consultationDate, startDate),
-            eq(schema.consultations.unitId, unitId)
-          ))
-      : await db.select().from(schema.consultations)
-          .where(gte(schema.consultations.consultationDate, startDate));
-
-    // Get new patients in period
-    const newPatients = unitId && unitId !== 'all'
-      ? await db.select().from(schema.citizens)
-          .where(and(
-            gte(schema.citizens.createdAt, startDate),
-            eq(schema.citizens.unitId, unitId)
-          ))
-      : await db.select().from(schema.citizens)
-          .where(gte(schema.citizens.createdAt, startDate));
-
-    // Get all patients
-    let allPatientsQuery = db.select().from(schema.citizens);
-    if (unitId && unitId !== 'all') {
-      allPatientsQuery = allPatientsQuery.where(eq(schema.citizens.unitId, unitId)) as any;
-    }
-    const allPatients = await allPatientsQuery;
-
-    // Get prescriptions
-    const prescriptions = await db.select().from(schema.prescriptions)
-      .where(gte(schema.prescriptions.createdAt, startDate));
-
-    // Get exams
-    const exams = await db.select().from(schema.exams)
-      .where(gte(schema.exams.requestDate, startDate));
-
-    // Get TFD requests
-    const tfdRequests = unitId && unitId !== 'all'
-      ? await db.select().from(schema.tfdRequests)
-          .where(and(
-            gte(schema.tfdRequests.requestDate, startDate),
-            eq(schema.tfdRequests.unitId, unitId)
-          ))
-      : await db.select().from(schema.tfdRequests)
-          .where(gte(schema.tfdRequests.requestDate, startDate));
-
-    // Process consultation types
-    const consultationsByType = consultations.reduce((acc: any, c) => {
-      acc[c.type] = (acc[c.type] || 0) + 1;
-      return acc;
-    }, {});
-
-    // Process diagnoses
-    const diagnosesCount: any = {};
-    consultations.forEach(c => {
-      if (c.diagnosis) {
-        diagnosesCount[c.diagnosis] = (diagnosesCount[c.diagnosis] || 0) + 1;
-      }
-    });
-
-    // Process medication usage
-    const medicationUsage: any = {};
-    prescriptions.forEach(p => {
-      medicationUsage[p.medication] = (medicationUsage[p.medication] || 0) + p.quantity;
-    });
-
-    // Calculate age distribution
-    const ageDistribution = allPatients.reduce((acc: any, p) => {
-      const age = Math.floor((Date.now() - new Date(p.birthDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-      let range = '';
-      if (age < 5) range = '0-4 anos';
-      else if (age < 15) range = '5-14 anos';
-      else if (age < 25) range = '15-24 anos';
-      else if (age < 45) range = '25-44 anos';
-      else if (age < 65) range = '45-64 anos';
-      else range = '65+ anos';
-
-      acc[range] = (acc[range] || 0) + 1;
-      return acc;
-    }, {});
-
     return {
       summary: {
-        totalPatients: allPatients.length,
-        newPatients: newPatients.length,
-        totalConsultations: consultations.length,
-        totalPrescriptions: prescriptions.length,
-        totalExams: exams.length,
-        tfdRequests: tfdRequests.length,
+        totalPatients: 0,
+        newPatients: 0,
+        totalConsultations: 0,
+        totalPrescriptions: 0,
+        totalExams: 0,
+        tfdRequests: 0,
       },
-      consultationsByType: Object.entries(consultationsByType)
-        .map(([type, count]) => ({ type, count }))
-        .sort((a: any, b: any) => b.count - a.count),
-      topDiagnoses: Object.entries(diagnosesCount)
-        .map(([diagnosis, count]) => ({ diagnosis, count }))
-        .sort((a: any, b: any) => b.count - a.count)
-        .slice(0, 5),
-      medicationUsage: Object.entries(medicationUsage)
-        .map(([medication, quantity]) => ({ medication, quantity }))
-        .sort((a: any, b: any) => b.quantity - a.quantity)
-        .slice(0, 5),
-      ageDistribution: Object.entries(ageDistribution)
-        .map(([range, count]) => ({ range, count })),
+      consultationsByType: [],
+      topDiagnoses: [],
+      medicationUsage: [],
+      ageDistribution: [],
     };
   }
 
