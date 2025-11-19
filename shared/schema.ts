@@ -1,10 +1,14 @@
 import { sql } from "drizzle-orm";
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Helper for UUID generation in SQLite
 const generateId = () => crypto.randomUUID();
+
+// ============================================================================
+// CORE TABLES
+// ============================================================================
 
 // Health Units (Unidades Básicas de Saúde)
 export const healthUnits = sqliteTable("health_units", {
@@ -32,7 +36,268 @@ export const users = sqliteTable("users", {
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
-// Insert Schemas
+// Professionals (Profissionais de Saúde)
+export const professionals = sqliteTable("professionals", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  name: text("name").notNull(),
+  cpf: text("cpf").notNull().unique(),
+  cns: text("cns"),
+  specialty: text("specialty").notNull(),
+  councilType: text("council_type").notNull(),
+  councilNumber: text("council_number").notNull(),
+  councilState: text("council_state").notNull(),
+  phone: text("phone"),
+  email: text("email"),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  active: integer("active", { mode: "boolean" }).default(true).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Citizens/Patients (Cidadãos/Pacientes)
+export const citizens = sqliteTable("citizens", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  name: text("name").notNull(),
+  cpf: text("cpf").notNull().unique(),
+  cns: text("cns").unique(),
+  rg: text("rg"),
+  birthDate: integer("birth_date", { mode: "timestamp" }).notNull(),
+  gender: text("gender", { enum: ["M", "F", "outro"] }).notNull(),
+  motherName: text("mother_name"),
+  fatherName: text("father_name"),
+  phone: text("phone"),
+  email: text("email"),
+  address: text("address").notNull(),
+  neighborhood: text("neighborhood"),
+  city: text("city").notNull().default("Cardeal da Silva"),
+  state: text("state").notNull().default("BA"),
+  zipCode: text("zip_code"),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// ============================================================================
+// ATTENDANCE TABLES
+// ============================================================================
+
+// Appointments (Agendamentos)
+export const appointments = sqliteTable("appointments", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  citizenId: text("citizen_id").notNull().references(() => citizens.id),
+  professionalId: text("professional_id").notNull().references(() => professionals.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  appointmentDate: integer("appointment_date", { mode: "timestamp" }).notNull(),
+  type: text("type").notNull(),
+  status: text("status", { 
+    enum: ["scheduled", "confirmed", "in_progress", "completed", "cancelled", "no_show"] 
+  }).notNull().default("scheduled"),
+  notes: text("notes"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Attendance Queue (Fila de Atendimento)
+export const attendanceQueue = sqliteTable("attendance_queue", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  citizenId: text("citizen_id").notNull().references(() => citizens.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  ticket: text("ticket").notNull(),
+  priority: text("priority", { enum: ["normal", "urgent", "emergency"] }).notNull().default("normal"),
+  type: text("type").notNull(),
+  status: text("status", { enum: ["waiting", "in_progress", "completed", "cancelled"] }).notNull().default("waiting"),
+  arrivedAt: integer("arrived_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  calledAt: integer("called_at", { mode: "timestamp" }),
+  completedAt: integer("completed_at", { mode: "timestamp" }),
+});
+
+// Consultations (Consultas Médicas)
+export const consultations = sqliteTable("consultations", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  citizenId: text("citizen_id").notNull().references(() => citizens.id),
+  professionalId: text("professional_id").notNull().references(() => professionals.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  consultationDate: integer("consultation_date", { mode: "timestamp" }).notNull(),
+  type: text("type").notNull(),
+  chiefComplaint: text("chief_complaint"),
+  historyOfPresentIllness: text("history_of_present_illness"),
+  physicalExam: text("physical_exam"),
+  diagnosis: text("diagnosis"),
+  treatmentPlan: text("treatment_plan"),
+  notes: text("notes"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// ============================================================================
+// PHARMACY TABLES
+// ============================================================================
+
+// Medications (Medicamentos)
+export const medications = sqliteTable("medications", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  name: text("name").notNull(),
+  genericName: text("generic_name"),
+  manufacturer: text("manufacturer"),
+  presentation: text("presentation").notNull(),
+  concentration: text("concentration"),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Medication Stock (Estoque de Medicamentos)
+export const medicationStock = sqliteTable("medication_stock", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  medicationId: text("medication_id").notNull().references(() => medications.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  batchNumber: text("batch_number").notNull(),
+  quantity: integer("quantity").notNull(),
+  minStock: integer("min_stock").notNull().default(10),
+  expirationDate: integer("expiration_date", { mode: "timestamp" }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Prescriptions (Receitas Médicas)
+export const prescriptions = sqliteTable("prescriptions", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  consultationId: text("consultation_id").references(() => consultations.id),
+  citizenId: text("citizen_id").notNull().references(() => citizens.id),
+  professionalId: text("professional_id").notNull().references(() => professionals.id),
+  medication: text("medication").notNull(),
+  dosage: text("dosage").notNull(),
+  frequency: text("frequency").notNull(),
+  duration: text("duration").notNull(),
+  quantity: integer("quantity").notNull(),
+  instructions: text("instructions"),
+  status: text("status", { enum: ["pending", "dispensed", "cancelled"] }).notNull().default("pending"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// ============================================================================
+// EXAMS AND TFD TABLES
+// ============================================================================
+
+// Exams (Exames)
+export const exams = sqliteTable("exams", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  citizenId: text("citizen_id").notNull().references(() => citizens.id),
+  professionalId: text("professional_id").notNull().references(() => professionals.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  consultationId: text("consultation_id").references(() => consultations.id),
+  examType: text("exam_type").notNull(),
+  requestDate: integer("request_date", { mode: "timestamp" }).notNull(),
+  resultDate: integer("result_date", { mode: "timestamp" }),
+  status: text("status", { enum: ["requested", "scheduled", "completed", "cancelled"] }).notNull().default("requested"),
+  result: text("result"),
+  observations: text("observations"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// TFD Requests (Solicitações de Transporte Intermunicipal)
+export const tfdRequests = sqliteTable("tfd_requests", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  citizenId: text("citizen_id").notNull().references(() => citizens.id),
+  professionalId: text("professional_id").notNull().references(() => professionals.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  requestDate: integer("request_date", { mode: "timestamp" }).notNull(),
+  travelDate: integer("travel_date", { mode: "timestamp" }),
+  destination: text("destination").notNull(),
+  reason: text("reason").notNull(),
+  procedure: text("procedure"),
+  accompaniedBy: text("accompanied_by"),
+  status: text("status", { 
+    enum: ["pending", "approved", "scheduled", "completed", "cancelled", "rejected"] 
+  }).notNull().default("pending"),
+  observations: text("observations"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// ============================================================================
+// TERRITORIAL MANAGEMENT TABLES (e-SUS Território)
+// ============================================================================
+
+// Dwellings (Domicílios)
+export const dwellings = sqliteTable("dwellings", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  microarea: text("microarea").notNull(),
+  address: text("address").notNull(),
+  number: text("number"),
+  complement: text("complement"),
+  neighborhood: text("neighborhood").notNull(),
+  zipCode: text("zip_code"),
+  latitude: real("latitude"),
+  longitude: real("longitude"),
+  dwellingType: text("dwelling_type", { 
+    enum: ["casa", "apartamento", "comodo", "outro"] 
+  }).notNull().default("casa"),
+  sanitation: text("sanitation", { 
+    enum: ["rede_esgoto", "fossa_septica", "ceu_aberto", "outro"] 
+  }),
+  waterSupply: text("water_supply", { 
+    enum: ["rede_publica", "poco", "cisterna", "outro"] 
+  }),
+  hasElectricity: integer("has_electricity", { mode: "boolean" }).default(true),
+  hasAnimals: integer("has_animals", { mode: "boolean" }).default(false),
+  familiesCount: integer("families_count").default(1),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Families (Famílias)
+export const families = sqliteTable("families", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  dwellingId: text("dwelling_id").notNull().references(() => dwellings.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  familyCode: text("family_code").notNull(),
+  headOfFamilyId: text("head_of_family_id").references(() => citizens.id),
+  monthlyIncome: real("monthly_income"),
+  benefitsReceived: text("benefits_received"),
+  membersCount: integer("members_count").default(1),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Home Visits (Visitas Domiciliares)
+export const homeVisits = sqliteTable("home_visits", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  dwellingId: text("dwelling_id").notNull().references(() => dwellings.id),
+  familyId: text("family_id").references(() => families.id),
+  professionalId: text("professional_id").notNull().references(() => professionals.id),
+  visitDate: integer("visit_date", { mode: "timestamp" }).notNull(),
+  visitType: text("visit_type", { 
+    enum: ["rotina", "busca_ativa", "acompanhamento", "urgencia"] 
+  }).notNull(),
+  visitMotive: text("visit_motive", { 
+    enum: ["gestante", "crianca", "idoso", "doenca_cronica", "controle_ambiental", "outro"] 
+  }),
+  findings: text("findings"),
+  actions: text("actions"),
+  referrals: text("referrals"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// ============================================================================
+// e-SUS EXPORT TABLES
+// ============================================================================
+
+// e-SUS Exports (Exportações e-SUS)
+export const esusExports = sqliteTable("esus_exports", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  cnes: text("cnes").notNull(),
+  ine: text("ine"),
+  periodStart: integer("period_start", { mode: "timestamp" }).notNull(),
+  periodEnd: integer("period_end", { mode: "timestamp" }).notNull(),
+  recordsCount: integer("records_count").notNull(),
+  fileSize: integer("file_size").notNull(),
+  status: text("status", { enum: ["processing", "completed", "failed"] }).notNull().default("processing"),
+  errorMessage: text("error_message"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  completedAt: integer("completed_at", { mode: "timestamp" }),
+});
+
+// ============================================================================
+// INSERT SCHEMAS (Zod Validation)
+// ============================================================================
+
 export const insertHealthUnitSchema = createInsertSchema(healthUnits).omit({
   id: true,
   createdAt: true,
@@ -43,13 +308,126 @@ export const insertUserSchema = createInsertSchema(users).omit({
   createdAt: true,
 });
 
+export const insertProfessionalSchema = createInsertSchema(professionals).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCitizenSchema = createInsertSchema(citizens).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAppointmentSchema = createInsertSchema(appointments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAttendanceQueueSchema = createInsertSchema(attendanceQueue).omit({
+  id: true,
+});
+
+export const insertConsultationSchema = createInsertSchema(consultations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertMedicationSchema = createInsertSchema(medications).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertMedicationStockSchema = createInsertSchema(medicationStock).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPrescriptionSchema = createInsertSchema(prescriptions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertExamSchema = createInsertSchema(exams).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTfdRequestSchema = createInsertSchema(tfdRequests).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertDwellingSchema = createInsertSchema(dwellings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertFamilySchema = createInsertSchema(families).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertHomeVisitSchema = createInsertSchema(homeVisits).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const loginSchema = z.object({
   email: z.string().email("Email inválido"),
   password: z.string().min(6, "Senha deve ter no mínimo 6 caracteres"),
 });
 
-// Types
+// ============================================================================
+// TYPES
+// ============================================================================
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
 export type InsertHealthUnit = z.infer<typeof insertHealthUnitSchema>;
 export type HealthUnit = typeof healthUnits.$inferSelect;
+
+export type InsertProfessional = z.infer<typeof insertProfessionalSchema>;
+export type Professional = typeof professionals.$inferSelect;
+
+export type InsertCitizen = z.infer<typeof insertCitizenSchema>;
+export type Citizen = typeof citizens.$inferSelect;
+
+export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
+export type Appointment = typeof appointments.$inferSelect;
+
+export type InsertAttendanceQueue = z.infer<typeof insertAttendanceQueueSchema>;
+export type AttendanceQueue = typeof attendanceQueue.$inferSelect;
+
+export type InsertConsultation = z.infer<typeof insertConsultationSchema>;
+export type Consultation = typeof consultations.$inferSelect;
+
+export type InsertMedication = z.infer<typeof insertMedicationSchema>;
+export type Medication = typeof medications.$inferSelect;
+
+export type InsertMedicationStock = z.infer<typeof insertMedicationStockSchema>;
+export type MedicationStock = typeof medicationStock.$inferSelect;
+
+export type InsertPrescription = z.infer<typeof insertPrescriptionSchema>;
+export type Prescription = typeof prescriptions.$inferSelect;
+
+export type InsertExam = z.infer<typeof insertExamSchema>;
+export type Exam = typeof exams.$inferSelect;
+
+export type InsertTfdRequest = z.infer<typeof insertTfdRequestSchema>;
+export type TfdRequest = typeof tfdRequests.$inferSelect;
+
+export type InsertDwelling = z.infer<typeof insertDwellingSchema>;
+export type Dwelling = typeof dwellings.$inferSelect;
+
+export type InsertFamily = z.infer<typeof insertFamilySchema>;
+export type Family = typeof families.$inferSelect;
+
+export type InsertHomeVisit = z.infer<typeof insertHomeVisitSchema>;
+export type HomeVisit = typeof homeVisits.$inferSelect;
+
+export type EsusExport = typeof esusExports.$inferSelect;
