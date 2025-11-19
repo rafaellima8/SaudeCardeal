@@ -47,8 +47,43 @@ Preferred communication style: Simple, everyday language.
 -   Export module (`server/integrations/esus/`) for Brazilian national healthcare system compliance.
 -   Uses Zod schemas for data conformity and mapping documentation for database-to-e-SUS field transformation (e.g., Citizen data, consultations).
 
+**Territorial Management (Territory Module)**:
+-   **Database Tables** (3 tables):
+    -   `dwellings`: Domicile registry with address, type, sanitation, water supply, geo-coordinates.
+    -   `families`: Family units linked to dwellings with income and benefits tracking.
+    -   `home_visits`: Home visit records with type, motive, findings, and actions taken.
+-   **API Endpoints** (15 RESTful endpoints):
+    -   `/api/dwellings` - CRUD operations for dwelling registration
+    -   `/api/families` - CRUD operations for family management
+    -   `/api/home-visits` - CRUD operations for home visit tracking
+-   **Implementation Status**: Backend and frontend fully functional.
+-   **Frontend Components** (`/territorio` route):
+    -   Complete dwelling registration form with address, infrastructure (sanitation, water, electricity), geo-coordinates
+    -   Home visit registration with date normalization to Unix timestamp
+    -   Dwelling list with search and microarea filters
+    -   Visit history table with type, motive, and findings
+    -   Dashboard cards showing total dwellings, families, and visits
+    -   Zod validation aligned with backend schemas
+    -   TanStack Query integration for data fetching and mutations
+
+**Reports & Indicators Module**:
+-   **API Endpoint**: `/api/reports` with real-time data aggregation
+-   **Backend Implementation** (`storage.getReports`):
+    -   Summary metrics: total patients, new patients, consultations, prescriptions, exams, TFD requests
+    -   Consultations by type (grouped aggregation)
+    -   Top 5 diagnoses (frequency analysis with NULL filtering)
+    -   Top 5 medications (sum of prescribed quantities)
+    -   Age distribution (5 age ranges: 0-17, 18-29, 30-44, 45-59, 60+)
+    -   Period and health unit filters
+-   **Frontend Components** (`/relatorios` route):
+    -   Period selector (7, 30, 90, 365 days)
+    -   Health unit filter
+    -   Summary cards with KPIs
+    -   Tables for consultations by type, diagnoses, medications, age distribution
+    -   Export to PDF (placeholder for future implementation)
+
 **Endemic Disease Surveillance (ACE Module)**:
--   **Database Tables** (4 new tables):
+-   **Database Tables** (4 tables):
     -   `endemic_cycles`: Work cycles for vector control (LIRAa, PVE) with target microareas and status tracking.
     -   `fad_evaluations`: Ficha de Atividade Diária evaluations linked to dwellings and cycles.
     -   `foci`: Vector foci tracking with deposit types (A1, A2, B, C, D1, D2, E) and species identification.
@@ -65,9 +100,8 @@ Preferred communication style: Simple, everyday language.
     -   Foci distribution by deposit type (water storage, planters, trash, etc.)
     -   Treatment distribution by type (focal vs perifocal)
 -   **Implementation Status**: Backend and frontend fully functional and validated.
--   **Frontend Components**:
-    -   `/endemias` route with complete dashboard
-    -   Automatic loading of active cycle indicators on page load
+-   **Frontend Components** (`/endemias` route):
+    -   Complete dashboard with automatic loading of active cycle indicators
     -   5 tabs: Indicadores, Mapa de Calor, Ciclos, FAD, Focos
     -   Visual heatmap with intensity bars (red/orange/yellow/green)
     -   Priority deposit ranking and risk classification
