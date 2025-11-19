@@ -16,6 +16,7 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { generateLogoSvg } from "@/lib/logo-svg";
 
 export default function Prescriptions() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -76,34 +77,40 @@ export default function Prescriptions() {
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
 
-    // ========== CABEÇALHO INSTITUCIONAL ==========
+    // ========== LOGO + CABEÇALHO INSTITUCIONAL ==========
+    // Logo SVG no canto superior esquerdo
+    const logoSvg = generateLogoSvg({ width: 32, height: 32, variant: 'color' });
+    const logoDataUri = `data:image/svg+xml;base64,${btoa(logoSvg)}`;
+    doc.addImage(logoDataUri, 'SVG', 15, 10, 16, 16);
+    
+    // Cabeçalho alinhado à direita do logo
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text("PREFEITURA MUNICIPAL DE CARDEAL DA SILVA", pageWidth / 2, 18, { align: "center" });
+    doc.text("PREFEITURA MUNICIPAL DE CARDEAL DA SILVA", pageWidth / 2, 14, { align: "center" });
     
     doc.setFontSize(12);
     doc.setFont("helvetica", "normal");
-    doc.text("Secretaria Municipal de Saúde", pageWidth / 2, 26, { align: "center" });
+    doc.text("Secretaria Municipal de Saúde", pageWidth / 2, 20, { align: "center" });
     
     doc.setFontSize(9);
-    doc.text("Estado da Bahia - CNPJ: 14.105.349/0001-02", pageWidth / 2, 32, { align: "center" });
+    doc.text("Estado da Bahia - CNPJ: 14.105.349/0001-02", pageWidth / 2, 26, { align: "center" });
     
     doc.setFontSize(8);
     doc.setTextColor(100, 100, 100);
-    doc.text("MuniSaúde Integrado - Sistema de Gestão em Saúde", pageWidth / 2, 36, { align: "center" });
+    doc.text("MuniSaúde Integrado - Sistema de Gestão em Saúde", pageWidth / 2, 30, { align: "center" });
     doc.setTextColor(0, 0, 0);
     
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("RECEITUÁRIO MÉDICO", pageWidth / 2, 40, { align: "center" });
+    doc.text("RECEITUÁRIO MÉDICO", pageWidth / 2, 38, { align: "center" });
 
     // Linha separadora
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.5);
-    doc.line(15, 45, pageWidth - 15, 45);
+    doc.line(15, 42, pageWidth - 15, 42);
 
     // ========== DADOS DO PACIENTE ==========
-    let currentY = 53;
+    let currentY = 50;
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
     doc.text("IDENTIFICAÇÃO DO PACIENTE", 15, currentY);

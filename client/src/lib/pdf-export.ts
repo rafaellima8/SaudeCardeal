@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { generateLogoSvg } from './logo-svg';
 
 interface ReportData {
   summary: {
@@ -33,16 +34,20 @@ export function exportReportToPDF(data: ReportData, options: ExportOptions) {
   const pageWidth = doc.internal.pageSize.getWidth();
   let yPosition = 15;
 
-  doc.setFillColor(0, 120, 215);
+  // ========== CABEÇALHO COM LOGO E IDENTIDADE VISUAL ==========
+  // Faixa verde institucional
+  doc.setFillColor(16, 185, 129); // Verde saúde #10B981
   doc.rect(0, 0, pageWidth, 45, 'F');
 
-  doc.setFillColor(255, 255, 255);
-  doc.circle(20, 22, 8, 'F');
-  
-  doc.setFillColor(0, 120, 215);
-  doc.rect(18, 18, 4, 8, 'F');
-  doc.rect(16, 20, 8, 4, 'F');
+  // Logo SVG no canto superior esquerdo (branco sobre fundo verde)
+  const logoSvg = generateLogoSvg({ width: 32, height: 32, variant: 'color' });
+  const logoDataUri = `data:image/svg+xml;base64,${btoa(logoSvg)}`;
+  // Criar versão invertida do logo para usar sobre fundo verde
+  const logoInverseSvg = generateLogoSvg({ width: 32, height: 32, variant: 'color', primaryColor: '#FFFFFF', secondaryColor: '#E0F2FE' });
+  const logoInverseUri = `data:image/svg+xml;base64,${btoa(logoInverseSvg)}`;
+  doc.addImage(logoInverseUri, 'SVG', 15, 12, 20, 20);
 
+  // Texto do cabeçalho
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(20);
   doc.setFont('helvetica', 'bold');
@@ -76,7 +81,7 @@ export function exportReportToPDF(data: ReportData, options: ExportOptions) {
   doc.text(`Data de geração: ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`, pageWidth / 2, yPosition, { align: 'center' });
   
   yPosition += 8;
-  doc.setDrawColor(0, 120, 215);
+  doc.setDrawColor(16, 185, 129); // Verde institucional
   doc.setLineWidth(0.5);
   doc.line(15, yPosition, pageWidth - 15, yPosition);
 
@@ -103,7 +108,7 @@ export function exportReportToPDF(data: ReportData, options: ExportOptions) {
     theme: 'striped',
     styles: { fontSize: 10, cellPadding: 4, lineColor: [200, 200, 200], lineWidth: 0.1 },
     headStyles: { 
-      fillColor: [0, 120, 215], 
+      fillColor: [16, 185, 129], // Verde institucional
       textColor: 255, 
       fontStyle: 'bold',
       fontSize: 11,
@@ -111,7 +116,7 @@ export function exportReportToPDF(data: ReportData, options: ExportOptions) {
     },
     columnStyles: {
       0: { fontStyle: 'bold', cellWidth: 'auto' },
-      1: { halign: 'center', fontStyle: 'bold', textColor: [0, 120, 215] }
+      1: { halign: 'center', fontStyle: 'bold', textColor: [16, 185, 129] } // Verde institucional
     },
     alternateRowStyles: { fillColor: [245, 247, 250] },
     margin: { left: 15, right: 15 },
