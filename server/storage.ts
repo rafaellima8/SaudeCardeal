@@ -248,7 +248,7 @@ export class DbStorage implements IStorage {
   async updateAppointment(id: string, appointment: Partial<InsertAppointment>): Promise<Appointment | undefined> {
     const [updated] = await db
       .update(schema.appointments)
-      .set({ ...appointment, updatedAt: new Date() })
+      .set(appointment)
       .where(eq(schema.appointments.id, id))
       .returning();
     return updated;
@@ -349,7 +349,7 @@ export class DbStorage implements IStorage {
       conditions.push(
         or(
           like(schema.medications.name, `%${params.search}%`),
-          like(schema.medications.category, `%${params.search}%`)
+          like(schema.medications.genericName, `%${params.search}%`)
         )!
       );
     }
@@ -453,7 +453,7 @@ export class DbStorage implements IStorage {
   async updateTfdRequest(id: string, request: Partial<InsertTfdRequest>): Promise<TfdRequest | undefined> {
     const [updated] = await db
       .update(schema.tfdRequests)
-      .set({ ...request, updatedAt: new Date() })
+      .set(request)
       .where(eq(schema.tfdRequests.id, id))
       .returning();
     return updated;
@@ -485,7 +485,7 @@ export class DbStorage implements IStorage {
 
   async deleteHealthUnit(id: string): Promise<boolean> {
     const result = await db.delete(schema.healthUnits).where(eq(schema.healthUnits.id, id));
-    return result.rowCount !== null && result.rowCount > 0;
+    return result.changes > 0;
   }
 
   // Professionals
@@ -495,7 +495,7 @@ export class DbStorage implements IStorage {
         .from(schema.professionals)
         .where(
           and(
-            eq(schema.professionals.isActive, true),
+            eq(schema.professionals.active, true),
             eq(schema.professionals.unitId, unitId)
           )
         )
@@ -504,7 +504,7 @@ export class DbStorage implements IStorage {
 
     return db.select()
       .from(schema.professionals)
-      .where(eq(schema.professionals.isActive, true))
+      .where(eq(schema.professionals.active, true))
       .orderBy(asc(schema.professionals.name));
   }
 
@@ -529,7 +529,7 @@ export class DbStorage implements IStorage {
 
   async deleteProfessional(id: string): Promise<boolean> {
     const result = await db.delete(schema.professionals).where(eq(schema.professionals.id, id));
-    return result.rowCount !== null && result.rowCount > 0;
+    return result.changes > 0;
   }
 
   // Users
@@ -549,29 +549,161 @@ export class DbStorage implements IStorage {
   }
 
   // Dashboard Stats
-  // TEMPORARY STUB: Returns empty stats while full schema is disabled
   async getDashboardStats(unitId?: string): Promise<any> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Count appointments today
+    let appointmentsQuery = db.select({ count: sql<number>`count(*)` })
+      .from(schema.appointments)
+      .where(
+        and(
+          gte(schema.appointments.appointmentDate, today),
+          lt(schema.appointments.appointmentDate, tomorrow),
+          eq(schema.appointments.status, 'scheduled')
+        )
+      );
+    
+    if (unitId) {
+      appointmentsQuery = appointmentsQuery.where(eq(schema.appointments.unitId, unitId)) as any;
+    }
+    
+    const [{ count: appointmentsToday }] = await appointmentsQuery;
+
+    // Count queue waiting
+    let queueQuery = db.select({ count: sql<number>`count(*)` })
+      .from(schema.attendanceQueue)
+      .where(eq(schema.attendanceQueue.status, 'waiting'));
+    
+    if (unitId) {
+      queueQuery = queueQuery.where(eq(schema.attendanceQueue.unitId, unitId)) as any;
+    }
+    
+    const [{ count: queueWaiting }] = await queueQuery;
+
+    // Count low stock items
+    let stockQuery = db.select({ count: sql<number>`count(*)` })
+      .from(schema.medicationStock)
+      .where(sql`${schema.medicationStock.quantity} < ${schema.medicationStock.minStock}`);
+    
+    if (unitId) {
+      stockQuery = stockQuery.where(eq(schema.medicationStock.unitId, unitId)) as any;
+    }
+    
+    const [{ count: lowStockCount }] = await stockQuery;
+
+    // Count total citizens
+    let citizensQuery = db.select({ count: sql<number>`count(*)` })
+      .from(schema.citizens);
+    
+    if (unitId) {
+      citizensQuery = citizensQuery.where(eq(schema.citizens.unitId, unitId)) as any;
+    }
+    
+    const [{ count: totalCitizens }] = await citizensQuery;
+
     return {
-      appointmentsToday: 0,
-      queueWaiting: 0,
-      lowStockCount: 0,
-      totalCitizens: 0,
+      appointmentsToday: Number(appointmentsToday) || 0,
+      queueWaiting: Number(queueWaiting) || 0,
+      lowStockCount: Number(lowStockCount) || 0,
+      totalCitizens: Number(totalCitizens) || 0,
     };
   }
 
   // Reports
-  // TEMPORARY STUB: Returns empty reports while full schema is disabled
   async getReports(days: number, unitId?: string): Promise<any> {
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    // Total patients
+    let patientsQuery = db.select({ count: sql<number>`count(*)` })
+      .from(schema.citizens);
+    
+    if (unitId) {
+      patientsQuery = patientsQuery.where(eq(schema.citizens.unitId, unitId)) as any;
+    }
+    
+    const [{ count: totalPatients }] = await patientsQuery;
+
+    // New patients in period
+    let newPatientsQuery = db.select({ count: sql<number>`count(*)` })
+      .from(schema.citizens)
+      .where(gte(schema.citizens.createdAt, startDate));
+    
+    if (unitId) {
+      newPatientsQuery = newPatientsQuery.where(eq(schema.citizens.unitId, unitId)) as any;
+    }
+    
+    const [{ count: newPatients }] = await newPatientsQuery;
+
+    // Total consultations in period
+    let consultationsQuery = db.select({ count: sql<number>`count(*)` })
+      .from(schema.consultations)
+      .where(gte(schema.consultations.consultationDate, startDate));
+    
+    if (unitId) {
+      consultationsQuery = consultationsQuery.where(eq(schema.consultations.unitId, unitId)) as any;
+    }
+    
+    const [{ count: totalConsultations }] = await consultationsQuery;
+
+    // Total prescriptions in period
+    let prescriptionsQuery = db.select({ count: sql<number>`count(*)` })
+      .from(schema.prescriptions)
+      .where(gte(schema.prescriptions.createdAt, startDate));
+    
+    const [{ count: totalPrescriptions }] = await prescriptionsQuery;
+
+    // Total exams in period
+    let examsQuery = db.select({ count: sql<number>`count(*)` })
+      .from(schema.exams)
+      .where(gte(schema.exams.requestDate, startDate));
+    
+    if (unitId) {
+      examsQuery = examsQuery.where(eq(schema.exams.unitId, unitId)) as any;
+    }
+    
+    const [{ count: totalExams }] = await examsQuery;
+
+    // TFD requests in period
+    let tfdQuery = db.select({ count: sql<number>`count(*)` })
+      .from(schema.tfdRequests)
+      .where(gte(schema.tfdRequests.requestDate, startDate));
+    
+    if (unitId) {
+      tfdQuery = tfdQuery.where(eq(schema.tfdRequests.unitId, unitId)) as any;
+    }
+    
+    const [{ count: tfdRequests }] = await tfdQuery;
+
+    // Consultations by type
+    let consultationsByTypeQuery = db.select({
+      type: schema.consultations.type,
+      count: sql<number>`count(*)`
+    })
+      .from(schema.consultations)
+      .where(gte(schema.consultations.consultationDate, startDate))
+      .groupBy(schema.consultations.type);
+    
+    if (unitId) {
+      consultationsByTypeQuery = consultationsByTypeQuery.where(eq(schema.consultations.unitId, unitId)) as any;
+    }
+    
+    const consultationsByType = await consultationsByTypeQuery;
+
     return {
       summary: {
-        totalPatients: 0,
-        newPatients: 0,
-        totalConsultations: 0,
-        totalPrescriptions: 0,
-        totalExams: 0,
-        tfdRequests: 0,
+        totalPatients: Number(totalPatients) || 0,
+        newPatients: Number(newPatients) || 0,
+        totalConsultations: Number(totalConsultations) || 0,
+        totalPrescriptions: Number(totalPrescriptions) || 0,
+        totalExams: Number(totalExams) || 0,
+        tfdRequests: Number(tfdRequests) || 0,
       },
-      consultationsByType: [],
+      consultationsByType: consultationsByType.map(c => ({ type: c.type, count: Number(c.count) })),
       topDiagnoses: [],
       medicationUsage: [],
       ageDistribution: [],
@@ -581,47 +713,47 @@ export class DbStorage implements IStorage {
   // Delete methods
   async deleteCitizen(id: string): Promise<boolean> {
     const result = await db.delete(schema.citizens).where(eq(schema.citizens.id, id));
-    return result.rowCount !== null && result.rowCount > 0;
+    return result.changes > 0;
   }
 
   async deleteAppointment(id: string): Promise<boolean> {
     const result = await db.delete(schema.appointments).where(eq(schema.appointments.id, id));
-    return result.rowCount !== null && result.rowCount > 0;
+    return result.changes > 0;
   }
 
   async deleteQueueEntry(id: string): Promise<boolean> {
     const result = await db.delete(schema.attendanceQueue).where(eq(schema.attendanceQueue.id, id));
-    return result.rowCount !== null && result.rowCount > 0;
+    return result.changes > 0;
   }
 
   async deleteConsultation(id: string): Promise<boolean> {
     const result = await db.delete(schema.consultations).where(eq(schema.consultations.id, id));
-    return result.rowCount !== null && result.rowCount > 0;
+    return result.changes > 0;
   }
 
   async deletePrescription(id: string): Promise<boolean> {
     const result = await db.delete(schema.prescriptions).where(eq(schema.prescriptions.id, id));
-    return result.rowCount !== null && result.rowCount > 0;
+    return result.changes > 0;
   }
 
   async deleteMedication(id: string): Promise<boolean> {
     const result = await db.delete(schema.medications).where(eq(schema.medications.id, id));
-    return result.rowCount !== null && result.rowCount > 0;
+    return result.changes > 0;
   }
 
   async deleteMedicationStock(id: string): Promise<boolean> {
     const result = await db.delete(schema.medicationStock).where(eq(schema.medicationStock.id, id));
-    return result.rowCount !== null && result.rowCount > 0;
+    return result.changes > 0;
   }
 
   async deleteExam(id: string): Promise<boolean> {
     const result = await db.delete(schema.exams).where(eq(schema.exams.id, id));
-    return result.rowCount !== null && result.rowCount > 0;
+    return result.changes > 0;
   }
 
   async deleteTfdRequest(id: string): Promise<boolean> {
     const result = await db.delete(schema.tfdRequests).where(eq(schema.tfdRequests.id, id));
-    return result.rowCount !== null && result.rowCount > 0;
+    return result.changes > 0;
   }
 
   // e-SUS Exports
@@ -655,7 +787,7 @@ export class DbStorage implements IStorage {
     if (params.search) {
       conditions.push(
         or(
-          like(schema.dwellings.street, `%${params.search}%`),
+          like(schema.dwellings.address, `%${params.search}%`),
           like(schema.dwellings.neighborhood, `%${params.search}%`),
           like(schema.dwellings.number, `%${params.search}%`)
         )
@@ -693,7 +825,7 @@ export class DbStorage implements IStorage {
 
   async deleteDwelling(id: string): Promise<boolean> {
     const result = await db.delete(schema.dwellings).where(eq(schema.dwellings.id, id));
-    return (result.rowCount ?? 0) > 0;
+    return result.changes > 0;
   }
 
   // Families
@@ -738,19 +870,17 @@ export class DbStorage implements IStorage {
 
   async deleteFamily(id: string): Promise<boolean> {
     const result = await db.delete(schema.families).where(eq(schema.families.id, id));
-    return (result.rowCount ?? 0) > 0;
+    return result.changes > 0;
   }
 
   // Home Visits
-  async getHomeVisits(params: { citizenId?: string; familyId?: string; dwellingId?: string; agentId?: string; unitId?: string; limit?: number; offset?: number }): Promise<HomeVisit[]> {
+  async getHomeVisits(params: { familyId?: string; dwellingId?: string; professionalId?: string; limit?: number; offset?: number }): Promise<HomeVisit[]> {
     let query = db.select().from(schema.homeVisits);
     const conditions: any[] = [];
 
-    if (params.citizenId) conditions.push(eq(schema.homeVisits.citizenId, params.citizenId));
     if (params.familyId) conditions.push(eq(schema.homeVisits.familyId, params.familyId));
     if (params.dwellingId) conditions.push(eq(schema.homeVisits.dwellingId, params.dwellingId));
-    if (params.agentId) conditions.push(eq(schema.homeVisits.agentId, params.agentId));
-    if (params.unitId) conditions.push(eq(schema.homeVisits.unitId, params.unitId));
+    if (params.professionalId) conditions.push(eq(schema.homeVisits.professionalId, params.professionalId));
 
     if (conditions.length > 0) {
       query = query.where(and(...conditions)) as any;
@@ -774,7 +904,7 @@ export class DbStorage implements IStorage {
 
   async deleteHomeVisit(id: string): Promise<boolean> {
     const result = await db.delete(schema.homeVisits).where(eq(schema.homeVisits.id, id));
-    return (result.rowCount ?? 0) > 0;
+    return result.changes > 0;
   }
 }
 
