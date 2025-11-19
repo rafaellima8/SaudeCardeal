@@ -12,6 +12,18 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+**November 19, 2025** - Database Migration to SQLite (Temporary):
+- **Issue**: Neon PostgreSQL database was disabled due to inactivity (scale-to-zero) and could not be reactivated
+- **Solution**: Migrated to SQLite with minimal schema for authentication demo
+- **Schema Reduced**: Temporarily using only `users` and `health_units` tables to enable login testing
+- **Database File**: `saude.db` (SQLite, 28KB)
+- **Seed Data**: Two test users created successfully
+  - Admin: admin@saude.gov.br / Admin@2025
+  - ACS: acs@saude.gov.br / Acs@2025
+- **Login Status**: ✅ **WORKING** - Authentication tested and confirmed functional
+- **Temporarily Disabled**: e-SUS export module, full schema tables (will be restored when migrating back to PostgreSQL or completing SQLite schema)
+- **Next Steps**: Either restore full schema for SQLite or provision new PostgreSQL instance
+
 **November 17, 2025** - Implemented Complete Authentication System:
 - **Password Authentication**: Bcrypt hashing (10 rounds) for secure password storage
 - **Session Management**: PostgreSQL session store via connect-pg-simple with secure cookies (httpOnly, sameSite, secure in production)

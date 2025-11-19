@@ -1,54 +1,12 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCitizenSchema, insertAppointmentSchema, insertConsultationSchema, insertPrescriptionSchema, insertExamSchema, insertTfdRequestSchema, insertAttendanceQueueSchema, insertHealthUnitSchema, insertProfessionalSchema, insertDwellingSchema, insertFamilySchema, insertHomeVisitSchema, loginSchema } from "@shared/schema";
+import { loginSchema, insertHealthUnitSchema, insertUserSchema } from "@shared/schema";
 import { z } from "zod";
 import { generateExport } from "./integrations/esus/exporter";
 import { authenticateUser, requireAuth, requireRole } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // ============================================================================
-  // TEMPORARY SETUP ROUTE - Remove after database is initialized
-  // ============================================================================
-  app.get("/api/_setup", async (req, res) => {
-    try {
-      const { sql: rawSql } = await import("drizzle-orm");
-      const { db } = await import("./db");
-      
-      console.log("🚀 Iniciando setup do banco de dados...");
-      
-      // First, wake up the database with a simple query
-      console.log("⏰ Acordando o banco de dados...");
-      try {
-        await db.execute(rawSql`SELECT 1`);
-        console.log("✅ Banco de dados acordado!");
-      } catch (wakeError: any) {
-        console.log("⚠️ Erro ao acordar:", wakeError.message);
-        // Wait a bit and retry
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        await db.execute(rawSql`SELECT 1`);
-      }
-      
-      // Now run the seed
-      console.log("📦 Criando tabelas e inserindo dados...");
-      const { seed } = await import("./seed");
-      await seed();
-      
-      console.log("✅ Setup concluído!");
-      res.json({ 
-        success: true, 
-        message: "Banco de dados configurado com sucesso! Você pode fazer login agora." 
-      });
-    } catch (error: any) {
-      console.error("❌ Erro no setup:", error);
-      res.status(500).json({ 
-        error: error.message, 
-        stack: error.stack,
-        details: "Tente novamente em alguns segundos - o banco pode estar acordando."
-      });
-    }
-  });
-
   // ============================================================================
   // AUTHENTICATION API - Must be registered BEFORE global protection middleware
   // ============================================================================
