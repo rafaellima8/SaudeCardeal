@@ -13,6 +13,7 @@ import {
   MapPin,
   Activity,
   LogOut,
+  Bug,
 } from "lucide-react";
 import {
   Sidebar,
@@ -42,6 +43,7 @@ const allMenuItems = [
   { title: "Agendamentos", icon: Calendar, url: "/agendamentos" },
   { title: "Território", icon: MapPin, url: "/territorio" },
   { title: "ACE", icon: Activity, url: "/ace" },
+  { title: "Endemias", icon: Bug, url: "/endemias" },
   { title: "Farmácia", icon: Pill, url: "/farmacia" },
   { title: "TFD", icon: Truck, url: "/tfd" },
   { title: "Relatórios", icon: FileText, url: "/relatorios" },
