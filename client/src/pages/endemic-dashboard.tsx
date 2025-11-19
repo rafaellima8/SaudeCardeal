@@ -5,8 +5,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
-import { Bug, Home, AlertTriangle, Droplets, Plus, Calendar, Activity } from "lucide-react";
+import { Bug, Home, AlertTriangle, Droplets, Plus, Calendar, Activity, Pencil, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -62,6 +63,8 @@ interface EndemicStats {
 export default function EndemicDashboard() {
   const [selectedCycleId, setSelectedCycleId] = useState<string | null>(null);
   const [cycleDialogOpen, setCycleDialogOpen] = useState(false);
+  const [editingCycle, setEditingCycle] = useState<EndemicCycle | null>(null);
+  const [deletingCycle, setDeletingCycle] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data: cycles, isLoading: cyclesLoading } = useQuery<EndemicCycle[]>({
@@ -121,8 +124,84 @@ export default function EndemicDashboard() {
     },
   });
 
+  const updateCycleMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<CycleFormData> }) => {
+      const payload = data.targetMicroareas 
+        ? {
+            ...data,
+            targetMicroareas: JSON.parse(`[${data.targetMicroareas.split(',').map(m => `"${m.trim()}"`).join(',')}]`),
+          }
+        : data;
+      return await apiRequest("PATCH", `/api/endemic/cycles/${id}`, payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/endemic/cycles'] });
+      toast({
+        title: "Ciclo atualizado",
+        description: "Ciclo de trabalho atualizado com sucesso.",
+      });
+      setCycleDialogOpen(false);
+      setEditingCycle(null);
+      cycleForm.reset();
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Não foi possível atualizar o ciclo.",
+      });
+    },
+  });
+
+  const deleteCycleMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/endemic/cycles/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/endemic/cycles'] });
+      toast({
+        title: "Ciclo excluído",
+        description: "Ciclo de trabalho excluído com sucesso.",
+      });
+      setDeletingCycle(null);
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Não foi possível excluir o ciclo.",
+      });
+    },
+  });
+
   const onCycleSubmit = (data: CycleFormData) => {
-    createCycleMutation.mutate(data);
+    if (editingCycle) {
+      updateCycleMutation.mutate({ id: editingCycle.id, data });
+    } else {
+      createCycleMutation.mutate(data);
+    }
+  };
+
+  const handleEditCycle = (cycle: EndemicCycle) => {
+    setEditingCycle(cycle);
+    cycleForm.reset({
+      name: cycle.name,
+      cycleType: cycle.cycleType as any,
+      startDate: cycle.startDate,
+      endDate: cycle.endDate,
+      targetMicroareas: Array.isArray(cycle.targetMicroareas) 
+        ? cycle.targetMicroareas.join(', ')
+        : cycle.targetMicroareas,
+      totalDwellings: cycle.totalDwellings,
+      description: "",
+    });
+    setCycleDialogOpen(true);
+  };
+
+  const handleCloseCycleDialog = () => {
+    setCycleDialogOpen(false);
+    setEditingCycle(null);
+    cycleForm.reset();
   };
 
   if (cyclesLoading) {
@@ -151,9 +230,9 @@ export default function EndemicDashboard() {
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Criar Ciclo de Trabalho</DialogTitle>
+              <DialogTitle>{editingCycle ? "Editar Ciclo de Trabalho" : "Criar Ciclo de Trabalho"}</DialogTitle>
               <DialogDescription>
-                Crie um novo ciclo LIRAa ou PVE para controle vetorial
+                {editingCycle ? "Atualize as informações do ciclo" : "Crie um novo ciclo LIRAa ou PVE para controle vetorial"}
               </DialogDescription>
             </DialogHeader>
             <Form {...cycleForm}>
@@ -269,11 +348,17 @@ export default function EndemicDashboard() {
                 />
 
                 <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setCycleDialogOpen(false)} data-testid="button-cancel">
+                  <Button type="button" variant="outline" onClick={handleCloseCycleDialog} data-testid="button-cancel">
                     Cancelar
                   </Button>
-                  <Button type="submit" disabled={createCycleMutation.isPending} data-testid="button-submit-cycle">
-                    {createCycleMutation.isPending ? "Criando..." : "Criar Ciclo"}
+                  <Button 
+                    type="submit" 
+                    disabled={createCycleMutation.isPending || updateCycleMutation.isPending} 
+                    data-testid="button-submit-cycle"
+                  >
+                    {editingCycle
+                      ? (updateCycleMutation.isPending ? "Atualizando..." : "Atualizar")
+                      : (createCycleMutation.isPending ? "Criando..." : "Criar Ciclo")}
                   </Button>
                 </div>
               </form>
@@ -639,14 +724,32 @@ export default function EndemicDashboard() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setSelectedCycleId(cycle.id)}
-                          data-testid={`button-view-stats-${cycle.id}`}
-                        >
-                          Ver Estatísticas
-                        </Button>
+                        <div className="flex gap-1 justify-end">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleEditCycle(cycle)}
+                            data-testid={`button-edit-cycle-${cycle.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setDeletingCycle(cycle.id)}
+                            data-testid={`button-delete-cycle-${cycle.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectedCycleId(cycle.id)}
+                            data-testid={`button-view-stats-${cycle.id}`}
+                          >
+                            Ver Estatísticas
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -720,6 +823,28 @@ export default function EndemicDashboard() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Delete Cycle Confirmation Dialog */}
+      <AlertDialog open={!!deletingCycle} onOpenChange={() => setDeletingCycle(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este ciclo de trabalho? Esta ação não pode ser desfeita e todos os dados associados (FAD, focos, tratamentos) também serão removidos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-cycle">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletingCycle && deleteCycleMutation.mutate(deletingCycle)}
+              className="bg-destructive hover:bg-destructive/90"
+              data-testid="button-confirm-delete-cycle"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

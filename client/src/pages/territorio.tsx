@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Home, Users, Calendar, Plus, MapPin, Search } from "lucide-react";
+import { Home, Users, Calendar, Plus, MapPin, Search, Pencil, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -66,6 +67,10 @@ export default function TerritoryPage() {
   const [visitDialogOpen, setVisitDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMicroarea, setSelectedMicroarea] = useState<string>("all");
+  const [editingDwelling, setEditingDwelling] = useState<Dwelling | null>(null);
+  const [editingVisit, setEditingVisit] = useState<HomeVisit | null>(null);
+  const [deletingDwelling, setDeletingDwelling] = useState<string | null>(null);
+  const [deletingVisit, setDeletingVisit] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data: units = [] } = useQuery<Array<{ id: string; name: string }>>({
@@ -147,6 +152,55 @@ export default function TerritoryPage() {
     },
   });
 
+  const updateDwellingMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<DwellingFormData> }) => {
+      const payload = {
+        ...data,
+        latitude: data.latitude || null,
+        longitude: data.longitude || null,
+      };
+      return await apiRequest("PATCH", `/api/dwellings/${id}`, payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dwellings'] });
+      toast({
+        title: "Domicílio atualizado",
+        description: "Domicílio atualizado com sucesso.",
+      });
+      setDwellingDialogOpen(false);
+      setEditingDwelling(null);
+      dwellingForm.reset();
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Não foi possível atualizar o domicílio.",
+      });
+    },
+  });
+
+  const deleteDwellingMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/dwellings/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dwellings'] });
+      toast({
+        title: "Domicílio excluído",
+        description: "Domicílio excluído com sucesso.",
+      });
+      setDeletingDwelling(null);
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Não foi possível excluir o domicílio.",
+      });
+    },
+  });
+
   const createVisitMutation = useMutation({
     mutationFn: async (data: HomeVisitFormData) => {
       const payload = {
@@ -173,12 +227,118 @@ export default function TerritoryPage() {
     },
   });
 
+  const updateVisitMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<HomeVisitFormData> }) => {
+      const payload = {
+        ...data,
+        visitDate: data.visitDate ? new Date(data.visitDate).getTime() / 1000 : undefined,
+      };
+      return await apiRequest("PATCH", `/api/home-visits/${id}`, payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/home-visits'] });
+      toast({
+        title: "Visita atualizada",
+        description: "Visita atualizada com sucesso.",
+      });
+      setVisitDialogOpen(false);
+      setEditingVisit(null);
+      visitForm.reset();
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Não foi possível atualizar a visita.",
+      });
+    },
+  });
+
+  const deleteVisitMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/home-visits/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/home-visits'] });
+      toast({
+        title: "Visita excluída",
+        description: "Visita excluída com sucesso.",
+      });
+      setDeletingVisit(null);
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Não foi possível excluir a visita.",
+      });
+    },
+  });
+
   const onDwellingSubmit = (data: DwellingFormData) => {
-    createDwellingMutation.mutate(data);
+    if (editingDwelling) {
+      updateDwellingMutation.mutate({ id: editingDwelling.id, data });
+    } else {
+      createDwellingMutation.mutate(data);
+    }
   };
 
   const onVisitSubmit = (data: HomeVisitFormData) => {
-    createVisitMutation.mutate(data);
+    if (editingVisit) {
+      updateVisitMutation.mutate({ id: editingVisit.id, data });
+    } else {
+      createVisitMutation.mutate(data);
+    }
+  };
+
+  const handleEditDwelling = (dwelling: Dwelling) => {
+    setEditingDwelling(dwelling);
+    dwellingForm.reset({
+      unitId: dwelling.unitId,
+      microarea: dwelling.microarea,
+      address: dwelling.address,
+      number: dwelling.number || "",
+      complement: dwelling.complement || "",
+      neighborhood: dwelling.neighborhood,
+      zipCode: dwelling.zipCode || "",
+      dwellingType: dwelling.dwellingType as any,
+      sanitation: dwelling.sanitation as any,
+      waterSupply: dwelling.waterSupply as any,
+      hasElectricity: dwelling.hasElectricity || false,
+      hasAnimals: dwelling.hasAnimals || false,
+      latitude: dwelling.latitude || undefined,
+      longitude: dwelling.longitude || undefined,
+      familiesCount: dwelling.familiesCount,
+    });
+    setDwellingDialogOpen(true);
+  };
+
+  const handleEditVisit = (visit: HomeVisit) => {
+    setEditingVisit(visit);
+    visitForm.reset({
+      dwellingId: visit.dwellingId,
+      familyId: visit.familyId || "",
+      professionalId: visit.professionalId,
+      visitDate: new Date(visit.visitDate).toISOString().split('T')[0],
+      visitType: visit.visitType as any,
+      visitMotive: visit.visitMotive as any,
+      findings: visit.findings || "",
+      actions: visit.actions || "",
+      referrals: visit.referrals || "",
+    });
+    setVisitDialogOpen(true);
+  };
+
+  const handleCloseDwellingDialog = () => {
+    setDwellingDialogOpen(false);
+    setEditingDwelling(null);
+    dwellingForm.reset();
+  };
+
+  const handleCloseVisitDialog = () => {
+    setVisitDialogOpen(false);
+    setEditingVisit(null);
+    visitForm.reset();
   };
 
   const microareas = Array.from(new Set(dwellings?.map(d => d.microarea) || []));
@@ -354,11 +514,17 @@ export default function TerritoryPage() {
                   />
 
                   <div className="flex justify-end gap-2">
-                    <Button type="button" variant="outline" onClick={() => setVisitDialogOpen(false)} data-testid="button-cancel-visit">
+                    <Button type="button" variant="outline" onClick={handleCloseVisitDialog} data-testid="button-cancel-visit">
                       Cancelar
                     </Button>
-                    <Button type="submit" disabled={createVisitMutation.isPending} data-testid="button-submit-visit">
-                      {createVisitMutation.isPending ? "Registrando..." : "Registrar Visita"}
+                    <Button 
+                      type="submit" 
+                      disabled={createVisitMutation.isPending || updateVisitMutation.isPending} 
+                      data-testid="button-submit-visit"
+                    >
+                      {editingVisit
+                        ? (updateVisitMutation.isPending ? "Atualizando..." : "Atualizar")
+                        : (createVisitMutation.isPending ? "Registrando..." : "Registrar Visita")}
                     </Button>
                   </div>
                 </form>
@@ -375,9 +541,9 @@ export default function TerritoryPage() {
             </DialogTrigger>
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Cadastrar Domicílio</DialogTitle>
+                <DialogTitle>{editingDwelling ? "Editar Domicílio" : "Cadastrar Domicílio"}</DialogTitle>
                 <DialogDescription>
-                  Cadastre um novo domicílio no território
+                  {editingDwelling ? "Atualize as informações do domicílio" : "Cadastre um novo domicílio no território"}
                 </DialogDescription>
               </DialogHeader>
               <Form {...dwellingForm}>
@@ -636,11 +802,17 @@ export default function TerritoryPage() {
                   </div>
 
                   <div className="flex justify-end gap-2 pt-4">
-                    <Button type="button" variant="outline" onClick={() => setDwellingDialogOpen(false)} data-testid="button-cancel-dwelling">
+                    <Button type="button" variant="outline" onClick={handleCloseDwellingDialog} data-testid="button-cancel-dwelling">
                       Cancelar
                     </Button>
-                    <Button type="submit" disabled={createDwellingMutation.isPending} data-testid="button-submit-dwelling">
-                      {createDwellingMutation.isPending ? "Cadastrando..." : "Cadastrar"}
+                    <Button 
+                      type="submit" 
+                      disabled={createDwellingMutation.isPending || updateDwellingMutation.isPending} 
+                      data-testid="button-submit-dwelling"
+                    >
+                      {editingDwelling 
+                        ? (updateDwellingMutation.isPending ? "Atualizando..." : "Atualizar") 
+                        : (createDwellingMutation.isPending ? "Cadastrando..." : "Cadastrar")}
                     </Button>
                   </div>
                 </form>
@@ -749,6 +921,7 @@ export default function TerritoryPage() {
                       <TableHead>Tipo</TableHead>
                       <TableHead>Famílias</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="w-24">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -767,6 +940,26 @@ export default function TerritoryPage() {
                           <div className="flex gap-1">
                             {dwelling.hasElectricity && <Badge variant="secondary" className="text-xs">Energia</Badge>}
                             {dwelling.hasAnimals && <Badge variant="secondary" className="text-xs">Animais</Badge>}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleEditDwelling(dwelling)}
+                              data-testid={`button-edit-dwelling-${dwelling.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setDeletingDwelling(dwelling.id)}
+                              data-testid={`button-delete-dwelling-${dwelling.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -806,6 +999,7 @@ export default function TerritoryPage() {
                       <TableHead>Motivo</TableHead>
                       <TableHead>Profissional</TableHead>
                       <TableHead>Observações</TableHead>
+                      <TableHead className="w-24">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -818,6 +1012,26 @@ export default function TerritoryPage() {
                         <TableCell className="capitalize">{visit.visitMotive?.replace('_', ' ') || '-'}</TableCell>
                         <TableCell>{visit.professionalId.substring(0, 8)}...</TableCell>
                         <TableCell className="max-w-xs truncate">{visit.findings || '-'}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleEditVisit(visit)}
+                              data-testid={`button-edit-visit-${visit.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setDeletingVisit(visit.id)}
+                              data-testid={`button-delete-visit-${visit.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -835,6 +1049,50 @@ export default function TerritoryPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Delete Dwelling Confirmation Dialog */}
+      <AlertDialog open={!!deletingDwelling} onOpenChange={() => setDeletingDwelling(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este domicílio? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-dwelling">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletingDwelling && deleteDwellingMutation.mutate(deletingDwelling)}
+              className="bg-destructive hover:bg-destructive/90"
+              data-testid="button-confirm-delete-dwelling"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Visit Confirmation Dialog */}
+      <AlertDialog open={!!deletingVisit} onOpenChange={() => setDeletingVisit(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta visita domiciliar? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-visit">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletingVisit && deleteVisitMutation.mutate(deletingVisit)}
+              className="bg-destructive hover:bg-destructive/90"
+              data-testid="button-confirm-delete-visit"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
