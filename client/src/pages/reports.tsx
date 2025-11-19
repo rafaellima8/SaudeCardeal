@@ -41,7 +41,7 @@ export default function Reports() {
   const [period, setPeriod] = useState("30");
   const [unitId, setUnitId] = useState<string>("all");
 
-  const { data: units = [] } = useQuery({
+  const { data: units = [] } = useQuery<Array<{ id: string; name: string }>>({
     queryKey: ['/api/units'],
   });
 
@@ -105,7 +105,7 @@ export default function Reports() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas as unidades</SelectItem>
-              {units.map((unit: any) => (
+              {units.map((unit) => (
                 <SelectItem key={unit.id} value={unit.id}>
                   {unit.name}
                 </SelectItem>
