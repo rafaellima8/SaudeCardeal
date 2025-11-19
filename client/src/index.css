@@ -60,9 +60,9 @@
 
   --muted-foreground: 210 10% 35%;
 
-  --accent: 210 12% 88%;
+  --accent: 258 90% 66%;
 
-  --accent-foreground: 210 12% 20%;
+  --accent-foreground: 258 90% 98%;
 
   --destructive: 0 84% 60%;
 
@@ -202,9 +202,9 @@
 
   --muted-foreground: 210 10% 68%;
 
-  --accent: 210 12% 18%;
+  --accent: 258 90% 70%;
 
-  --accent-foreground: 210 12% 86%;
+  --accent-foreground: 258 90% 98%;
 
   --destructive: 0 84% 65%;
 
@@ -399,5 +399,77 @@
   .border.active-elevate-2:not(.no-active-interaction-elevate)::after,
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
     inset: -1px;
+  }
+}
+
+/* MuniSaúde Integrado - Custom Styles */
+@layer components {
+  /* Gradientes */
+  .gradient-primary {
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  }
+
+  .gradient-hero {
+    background: linear-gradient(135deg, #10B981 0%, #3B82F6 50%, #8B5CF6 100%);
+  }
+
+  .gradient-soft {
+    background: linear-gradient(135deg, #F9FAFB 0%, #F3F4F6 100%);
+  }
+
+  .gradient-card-subtle {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%);
+  }
+
+  /* Card com efeito hover suave */
+  .card-hover {
+    @apply transition-all duration-300;
+  }
+
+  .card-hover:hover {
+    @apply shadow-lg -translate-y-1;
+  }
+
+  /* Dashboard card com borda esquerda */
+  .dashboard-card {
+    @apply bg-card rounded-2xl p-6 border-l-4 border-primary shadow-sm transition-all duration-300;
+  }
+
+  .dashboard-card:hover {
+    @apply shadow-md -translate-y-0.5;
+  }
+
+  .dashboard-card-icon {
+    @apply w-12 h-12 rounded-xl flex items-center justify-center text-primary;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.2) 100%);
+  }
+
+  /* Tabela com header verde suave */
+  .table-health thead {
+    background: linear-gradient(135deg, #F0FDF4 0%, #ECFDF5 100%);
+  }
+
+  .table-health th {
+    @apply text-emerald-700 font-semibold border-b-2 border-primary;
+  }
+
+  .table-health tbody tr {
+    @apply hover:bg-muted/50 transition-colors;
+  }
+
+  /* Modal com backdrop blur */
+  .modal-overlay {
+    background: rgba(17, 24, 39, 0.7);
+    backdrop-filter: blur(4px);
+  }
+
+  /* Sombra primária (verde) */
+  .shadow-primary {
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+  }
+
+  /* Sidebar gradiente suave */
+  .sidebar-gradient {
+    background: linear-gradient(180deg, #F9FAFB 0%, white 100%);
   }
 }

@@ -1,0 +1,444 @@
+Você é um agente de chat integrado ao Replit. Sua tarefa é APENAS modificar a identidade visual do sistema, mantendo todas as funcionalidades existentes intactas. Não altere lógica de negócio, fluxos de dados, APIs ou comportamentos funcionais.
+
+🎨 Paleta de Cores para Implementar
+Cores Principais
+Copy--primary: #10B981;          /* Verde Saúde - uso principal em botões, links, destaques */
+--primary-dark: #059669;     /* Hover e estados ativos */
+--primary-light: #34D399;    /* Backgrounds suaves e highlights */
+
+--secondary: #3B82F6;        /* Azul Confiança - elementos secundários */
+--secondary-dark: #2563EB;   /* Estados ativos secundários */
+
+--accent: #8B5CF6;           /* Roxo Inovação - chamadas especiais */
+Cores Funcionais
+Copy--success: #10B981;   /* Mensagens de sucesso, confirmações */
+--warning: #F59E0B;   /* Alertas, avisos */
+--error: #EF4444;     /* Erros, validações negativas */
+--info: #3B82F6;      /* Informações, dicas */
+Escala de Neutros
+Copy--neutral-50: #F9FAFB;    /* Backgrounds mais claros */
+--neutral-100: #F3F4F6;   /* Backgrounds de seções */
+--neutral-200: #E5E7EB;   /* Bordas suaves */
+--neutral-300: #D1D5DB;   /* Bordas padrão */
+--neutral-700: #374151;   /* Textos secundários */
+--neutral-800: #1F2937;   /* Textos principais */
+--neutral-900: #111827;   /* Títulos e ênfase máxima */
+🔤 Tipografia
+Fontes
+Fonte Principal: Inter (todo o sistema)
+Fonte Mono: JetBrains Mono (apenas para códigos, IDs, dados técnicos)
+Hierarquia Tipográfica
+Copy/* Títulos */
+h1: font-size: 32px; font-weight: 700; /* bold */
+h2: font-size: 24px; font-weight: 700;
+h3: font-size: 20px; font-weight: 600; /* semibold */
+
+/* Corpo */
+body: font-size: 16px; font-weight: 400; /* regular */
+small: font-size: 14px; font-weight: 400;
+caption: font-size: 12px; font-weight: 400;
+🎯 Logo e Branding
+Implementação do Logo
+Localização: Header/Navbar principal
+
+Estrutura SVG do Logo:
+
+Copy<div className="flex items-center gap-3">
+  {/* Ícone */}
+  <svg width="32" height="32" viewBox="0 0 64 64" fill="none">
+    {/* Círculo de fundo */}
+    <circle cx="32" cy="32" r="30" fill="#10B981" opacity="0.1"/>
+    
+    {/* Cruz médica */}
+    <path d="M32 16V48M16 32H48" 
+          stroke="#10B981" 
+          strokeWidth="6" 
+          strokeLinecap="round"/>
+    
+    {/* Pulso cardíaco integrado */}
+    <path d="M12 32 L18 32 L22 24 L28 40 L34 20 L38 32 L42 32" 
+          stroke="#3B82F6" 
+          strokeWidth="2.5" 
+          strokeLinecap="round" 
+          strokeLinejoin="round" 
+          opacity="0.8" 
+          transform="translate(0, 8)"/>
+  </svg>
+  
+  {/* Texto */}
+  <div className="flex flex-col leading-tight">
+    <span className="font-bold text-base tracking-tight text-gray-900">
+      Muni<span className="text-emerald-500">Saúde</span>
+    </span>
+    <span className="text-xs font-medium text-gray-700">
+      Integrado
+    </span>
+  </div>
+</div>
+🧩 Sistema de Ícones
+Biblioteca: Lucide React
+
+Ícones por Módulo
+Módulo	Ícone	Cor
+Dashboard	<Activity />	--primary
+Pacientes	<Users />	--primary
+Agendamentos	<Calendar />	--primary
+Consultas	<Heart />	--primary
+Farmácia	<Pill />	--primary
+Relatórios	<FileText />	--secondary
+Território	<MapPin />	--secondary
+Endemias	<Bug />	--secondary
+Indicadores	<TrendingUp />	--accent
+Exportar	<Download />	--neutral-700
+Tamanhos de Ícones
+16px: Ícones inline em textos
+20px: Botões pequenos
+24px: Padrão geral (botões, menus)
+32px: Headers de cards
+48px: Elementos destacados
+🎨 Componentes Visuais
+1. Botões
+Copy/* Primário */
+.btn-primary {
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  color: white;
+  border-radius: 0.75rem; /* 12px */
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2);
+  transition: all 0.2s;
+}
+
+.btn-primary:hover {
+  box-shadow: 0 6px 12px rgba(16, 185, 129, 0.3);
+  transform: translateY(-2px);
+}
+
+/* Secundário */
+.btn-secondary {
+  background: white;
+  color: #10B981;
+  border: 2px solid #10B981;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+}
+
+.btn-secondary:hover {
+  background: #F0FDF4;
+}
+2. Cards
+Copy.card {
+  background: white;
+  border-radius: 1rem; /* 16px */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 1.5rem;
+  border: 1px solid #E5E7EB;
+  transition: all 0.3s;
+}
+
+.card:hover {
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  transform: translateY(-4px);
+}
+
+.card-header {
+  border-bottom: 2px solid #E5E7EB;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+}
+3. Inputs e Forms
+Copy.input {
+  border: 2px solid #E5E7EB;
+  border-radius: 0.5rem; /* 8px */
+  padding: 0.75rem 1rem;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+.input:focus {
+  border-color: #10B981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+  outline: none;
+}
+
+.input:invalid {
+  border-color: #EF4444;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+4. Tabelas
+Copy.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.table thead {
+  background: linear-gradient(135deg, #F0FDF4 0%, #ECFDF5 100%);
+}
+
+.table th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #059669;
+  border-bottom: 2px solid #10B981;
+}
+
+.table td {
+  padding: 1rem;
+  border-bottom: 1px solid #E5E7EB;
+}
+
+.table tbody tr:hover {
+  background: #F9FAFB;
+}
+5. Modais
+Copy.modal-overlay {
+  background: rgba(17, 24, 39, 0.7);
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  background: white;
+  border-radius: 1.5rem; /* 24px */
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+  max-width: 600px;
+  padding: 2rem;
+}
+
+.modal-header {
+  border-bottom: 2px solid #E5E7EB;
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+}
+6. Badges e Status
+Copy/* Sucesso */
+.badge-success {
+  background: #D1FAE5;
+  color: #065F46;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Alerta */
+.badge-warning {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+/* Erro */
+.badge-error {
+  background: #FEE2E2;
+  color: #991B1B;
+}
+
+/* Info */
+.badge-info {
+  background: #DBEAFE;
+  color: #1E40AF;
+}
+🌈 Gradientes e Efeitos
+Gradientes de Fundo
+Copy/* Hero sections */
+.gradient-hero {
+  background: linear-gradient(135deg, 
+    #10B981 0%, 
+    #3B82F6 50%, 
+    #8B5CF6 100%);
+}
+
+/* Backgrounds suaves */
+.gradient-soft {
+  background: linear-gradient(135deg, 
+    #F9FAFB 0%, 
+    #F3F4F6 100%);
+}
+
+/* Cards destacados */
+.gradient-card {
+  background: linear-gradient(135deg, 
+    rgba(16, 185, 129, 0.1) 0%, 
+    rgba(59, 130, 246, 0.1) 100%);
+}
+Sombras
+Copy--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+--shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+--shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+--shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15);
+--shadow-primary: 0 4px 14px rgba(16, 185, 129, 0.4);
+📐 Espaçamento e Layout
+Sistema de Espaçamento
+Copy--spacing-xs: 0.25rem;   /* 4px */
+--spacing-sm: 0.5rem;    /* 8px */
+--spacing-md: 1rem;      /* 16px */
+--spacing-lg: 1.5rem;    /* 24px */
+--spacing-xl: 2rem;      /* 32px */
+--spacing-2xl: 3rem;     /* 48px */
+Border Radius
+Copy--radius-sm: 0.375rem;   /* 6px - inputs pequenos */
+--radius-md: 0.5rem;     /* 8px - inputs padrão */
+--radius-lg: 0.75rem;    /* 12px - botões */
+--radius-xl: 1rem;       /* 16px - cards */
+--radius-2xl: 1.5rem;    /* 24px - modais */
+--radius-full: 9999px;   /* badges, avatares */
+🎯 Aplicações Específicas
+Header/Navbar
+Copy.navbar {
+  background: white;
+  border-bottom: 1px solid #E5E7EB;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  padding: 1rem 2rem;
+}
+
+.navbar-link {
+  color: #374151;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s;
+}
+
+.navbar-link:hover {
+  background: #F3F4F6;
+  color: #10B981;
+}
+
+.navbar-link.active {
+  background: #ECFDF5;
+  color: #059669;
+}
+Sidebar
+Copy.sidebar {
+  background: linear-gradient(180deg, #F9FAFB 0%, white 100%);
+  border-right: 1px solid #E5E7EB;
+  padding: 1.5rem;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  color: #374151;
+  transition: all 0.2s;
+}
+
+.sidebar-item:hover {
+  background: white;
+  color: #10B981;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.sidebar-item.active {
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  color: white;
+  box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);
+}
+Dashboard Cards
+Copy.dashboard-card {
+  background: white;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  border-left: 4px solid #10B981;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.dashboard-card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, 
+    rgba(16, 185, 129, 0.1) 0%, 
+    rgba(16, 185, 129, 0.2) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #10B981;
+}
+✅ Checklist de Implementação
+Fase 1: Cores Base
+ Substituir todas as cores primárias por #10B981
+ Aplicar cores secundárias #3B82F6
+ Implementar cores funcionais (sucesso, erro, alerta)
+ Atualizar escala de cinzas/neutros
+Fase 2: Tipografia
+ Importar fonte Inter como padrão
+ Importar JetBrains Mono para código
+ Ajustar tamanhos e pesos conforme hierarquia
+ Garantir legibilidade (contraste mínimo 4.5:1)
+Fase 3: Logo
+ Implementar logo SVG no header
+ Criar versões responsivas (mobile/desktop)
+ Adicionar versão ícone-only para mobile
+Fase 4: Componentes
+ Estilizar botões (primário, secundário, terciário)
+ Atualizar cards e containers
+ Reformular inputs e forms
+ Ajustar tabelas e listas
+ Estilizar modais e overlays
+ Criar badges e status indicators
+Fase 5: Layout
+ Atualizar navbar/header
+ Estilizar sidebar/menu lateral
+ Ajustar grid e espaçamentos
+ Implementar responsividade
+Fase 6: Ícones
+ Substituir ícones por Lucide React
+ Aplicar cores conforme contexto
+ Garantir tamanhos consistentes
+Fase 7: Polimento
+ Adicionar transições suaves
+ Implementar estados hover/active/focus
+ Ajustar sombras e profundidade
+ Testar contraste e acessibilidade
+ Validar responsividade em todos breakpoints
+🚫 O Que NÃO Fazer
+NÃO altere: Lógica de negócio, APIs, rotas, validações
+NÃO remova: Funcionalidades existentes
+NÃO modifique: Estrutura de dados, models, controllers
+NÃO quebre: Fluxos de autenticação, permissões, segurança
+APENAS mude: CSS, classes, cores, fontes, ícones, logos, espaçamentos
+📱 Responsividade
+Breakpoints
+Copy/* Mobile first */
+@media (min-width: 640px)  { /* sm */ }
+@media (min-width: 768px)  { /* md */ }
+@media (min-width: 1024px) { /* lg */ }
+@media (min-width: 1280px) { /* xl */ }
+Ajustes Mobile
+Logo: Versão ícone-only em telas < 768px
+Sidebar: Collapsar para menu hambúrguer
+Cards: Stack vertical em mobile
+Tabelas: Scroll horizontal ou cards em mobile
+Fontes: Reduzir 10-15% em mobile
+🎨 Modo Escuro (Opcional)
+Se o sistema tiver modo escuro:
+
+Copy.dark {
+  --primary: #34D399;
+  --background: #111827;
+  --surface: #1F2937;
+  --text-primary: #F9FAFB;
+  --text-secondary: #D1D5DB;
+  --border: #374151;
+}
+📋 Entrega Final
+Ao concluir, o sistema deve:
+
+✅ Manter 100% das funcionalidades
+✅ Refletir a identidade MuniSaúde Integrado
+✅ Ser responsivo e acessível
+✅ Ter transições suaves e profissionais
+✅ Usar cores, fontes e ícones especificados
+✅ Apresentar o logo corretamente
+Importante: Este é um trabalho puramente visual/CSS. Toda a lógica funcional deve permanecer intocada. Foque em tornar o sistema visualmente alinhado com a identidade MuniSaúde Integrado apresentada no código React fornecido.
