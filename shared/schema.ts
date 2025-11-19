@@ -295,6 +295,101 @@ export const esusExports = sqliteTable("esus_exports", {
 });
 
 // ============================================================================
+// ENDEMIC CONTROL TABLES (Controle de Endemias)
+// ============================================================================
+
+// Endemic Cycles (Ciclos de Trabalho - LIRAa, PVE)
+export const endemicCycles = sqliteTable("endemic_cycles", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  name: text("name").notNull(), // Ex: "LIRAa Outubro 2025"
+  cycleType: text("cycle_type", {
+    enum: ["liraa", "pve", "rotina", "bloqueio"]
+  }).notNull(),
+  startDate: integer("start_date", { mode: "timestamp" }).notNull(),
+  endDate: integer("end_date", { mode: "timestamp" }).notNull(),
+  targetMicroareas: text("target_microareas").notNull(), // JSON array of microarea codes
+  status: text("status", {
+    enum: ["planned", "in_progress", "completed", "cancelled"]
+  }).notNull().default("planned"),
+  totalDwellings: integer("total_dwellings").default(0),
+  visitedDwellings: integer("visited_dwellings").default(0),
+  fociFound: integer("foci_found").default(0),
+  description: text("description"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// FAD - Ficha de Avaliação de Densidade
+export const fadEvaluations = sqliteTable("fad_evaluations", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  cycleId: text("cycle_id").notNull().references(() => endemicCycles.id),
+  dwellingId: text("dwelling_id").notNull().references(() => dwellings.id),
+  professionalId: text("professional_id").notNull().references(() => professionals.id),
+  visitDate: integer("visit_date", { mode: "timestamp" }).notNull(),
+  dwellingInspected: integer("dwelling_inspected", { mode: "boolean" }).notNull().default(true),
+  dwellingClosed: integer("dwelling_closed", { mode: "boolean" }).default(false),
+  dwellingRefused: integer("dwelling_refused", { mode: "boolean" }).default(false),
+  residentsCount: integer("residents_count"),
+  containersInspected: integer("containers_inspected").default(0),
+  containersWithLarvae: integer("containers_with_larvae").default(0),
+  containersEliminated: integer("containers_eliminated").default(0),
+  larvicideApplied: integer("larvicide_applied", { mode: "boolean" }).default(false),
+  larvicideType: text("larvicide_type"), // Ex: "Bti", "Pyriproxyfen"
+  observations: text("observations"),
+  latitude: real("latitude"),
+  longitude: real("longitude"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Foci / Criadouros (Breeding Sites)
+export const foci = sqliteTable("foci", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  fadId: text("fad_id").notNull().references(() => fadEvaluations.id),
+  dwellingId: text("dwelling_id").notNull().references(() => dwellings.id),
+  depositType: text("deposit_type", {
+    enum: ["A1", "A2", "B", "C", "D1", "D2", "E"]
+  }).notNull(),
+  depositDescription: text("deposit_description").notNull(), // Ex: "Caixa d'água", "Pneu"
+  larvaeFound: integer("larvae_found", { mode: "boolean" }).notNull().default(true),
+  pupaeFound: integer("pupae_found", { mode: "boolean" }).default(false),
+  actionTaken: text("action_taken", {
+    enum: ["elimination", "treatment", "protection", "education"]
+  }).notNull(),
+  larvicideApplied: text("larvicide_applied"), // Tipo de larvicida
+  quantity: integer("quantity").default(1), // Quantidade de depósitos
+  latitude: real("latitude"),
+  longitude: real("longitude"),
+  photoUrl: text("photo_url"), // URL da foto do foco
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Focal Treatments (Tratamentos Focais)
+export const focalTreatments = sqliteTable("focal_treatments", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  cycleId: text("cycle_id").references(() => endemicCycles.id),
+  dwellingId: text("dwelling_id").notNull().references(() => dwellings.id),
+  professionalId: text("professional_id").notNull().references(() => professionals.id),
+  treatmentDate: integer("treatment_date", { mode: "timestamp" }).notNull(),
+  treatmentType: text("treatment_type", {
+    enum: ["perifocal", "focal", "nebulizacao", "bloqueio"]
+  }).notNull(),
+  productUsed: text("product_used").notNull(), // Ex: "Malathion", "Deltametrina"
+  dosage: text("dosage"), // Ex: "50ml/m²"
+  targetArea: real("target_area"), // Área tratada em m²
+  containersCount: integer("containers_count").default(0),
+  reinspectionDate: integer("reinspection_date", { mode: "timestamp" }),
+  reinspected: integer("reinspected", { mode: "boolean" }).default(false),
+  effectiveness: text("effectiveness", {
+    enum: ["effective", "partially_effective", "ineffective", "pending"]
+  }).default("pending"),
+  observations: text("observations"),
+  latitude: real("latitude"),
+  longitude: real("longitude"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// ============================================================================
 // INSERT SCHEMAS (Zod Validation)
 // ============================================================================
 
@@ -376,6 +471,28 @@ export const insertHomeVisitSchema = createInsertSchema(homeVisits).omit({
   createdAt: true,
 });
 
+// Endemic Control Insert Schemas
+export const insertEndemicCycleSchema = createInsertSchema(endemicCycles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertFadEvaluationSchema = createInsertSchema(fadEvaluations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertFocusSchema = createInsertSchema(foci).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertFocalTreatmentSchema = createInsertSchema(focalTreatments).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const loginSchema = z.object({
   email: z.string().email("Email inválido"),
   password: z.string().min(6, "Senha deve ter no mínimo 6 caracteres"),
@@ -431,3 +548,16 @@ export type InsertHomeVisit = z.infer<typeof insertHomeVisitSchema>;
 export type HomeVisit = typeof homeVisits.$inferSelect;
 
 export type EsusExport = typeof esusExports.$inferSelect;
+
+// Endemic Control Types
+export type InsertEndemicCycle = z.infer<typeof insertEndemicCycleSchema>;
+export type EndemicCycle = typeof endemicCycles.$inferSelect;
+
+export type InsertFadEvaluation = z.infer<typeof insertFadEvaluationSchema>;
+export type FadEvaluation = typeof fadEvaluations.$inferSelect;
+
+export type InsertFocus = z.infer<typeof insertFocusSchema>;
+export type Focus = typeof foci.$inferSelect;
+
+export type InsertFocalTreatment = z.infer<typeof insertFocalTreatmentSchema>;
+export type FocalTreatment = typeof focalTreatments.$inferSelect;
