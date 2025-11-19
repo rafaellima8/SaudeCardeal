@@ -986,6 +986,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/home-visits/:id", async (req, res) => {
+    try {
+      const visit = await storage.updateHomeVisit(req.params.id, req.body);
+      if (!visit) {
+        return res.status(404).json({ error: "Visita não encontrada" });
+      }
+      res.json(visit);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.delete("/api/home-visits/:id", async (req, res) => {
     try {
       const success = await storage.deleteHomeVisit(req.params.id);

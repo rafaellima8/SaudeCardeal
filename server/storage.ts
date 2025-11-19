@@ -991,6 +991,15 @@ export class DbStorage implements IStorage {
     return created;
   }
 
+  async updateHomeVisit(id: string, visit: Partial<InsertHomeVisit>): Promise<HomeVisit | undefined> {
+    const [updated] = await db
+      .update(schema.homeVisits)
+      .set({ ...visit, updatedAt: new Date() })
+      .where(eq(schema.homeVisits.id, id))
+      .returning();
+    return updated;
+  }
+
   async deleteHomeVisit(id: string): Promise<boolean> {
     const result = await db.delete(schema.homeVisits).where(eq(schema.homeVisits.id, id));
     return result.changes > 0;
