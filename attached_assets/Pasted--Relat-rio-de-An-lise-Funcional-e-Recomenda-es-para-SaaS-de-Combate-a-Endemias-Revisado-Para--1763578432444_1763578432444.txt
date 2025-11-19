@@ -1,0 +1,67 @@
+# Relatório de Análise Funcional e Recomendações para SaaS de Combate a Endemias (Revisado)
+
+**Para:** Secretaria Municipal de Saúde de Cardeal da Silva, Bahia
+**De:** Manus AI
+**Data:** 17 de Novembro de 2025
+**Assunto:** Revisão do Termo de Referência para o SaaS Municipal de Vigilância e Combate a Endemias, com Foco na Interoperabilidade com o e-SUS APS Território.
+
+---
+
+## 1. Introdução e Objetivo
+
+Este relatório revisado integra a análise inicial das funcionalidades do sistema **+ACE (Acompanhamento e Controle de Endemias)** com os requisitos de interoperabilidade e fluxo de trabalho do sistema nacional **e-SUS APS Território**, conforme os documentos fornecidos [1] [2].
+
+O objetivo é garantir que o SaaS desenvolvido para a Secretaria Municipal de Saúde de Cardeal da Silva, Bahia, não apenas otimize o trabalho dos Agentes de Combate às Endemias (ACEs) com recursos avançados (como georreferenciamento e mapas de calor), mas também seja **totalmente compatível** com a lógica de cadastro e sincronização de dados exigida pelo Ministério da Saúde.
+
+## 2. Mapeamento de Funcionalidades: ACE e e-SUS Território
+
+As funcionalidades do +ACE (foco em endemias) e do e-SUS Território (foco em cadastro e visita domiciliar) são complementares. O SaaS deve atuar como uma plataforma que incorpora a **estrutura de dados do e-SUS** com a **inteligência de campo do ACE**.
+
+### Tabela 1: Mapeamento e Integração de Funcionalidades
+
+| Funcionalidade (ACE) | Requisito (e-SUS Território) | Requisito Integrado para o SaaS |
+| :--- | :--- | :--- |
+| **Aplicativo Móvel (MAS+ ACE)** | **Aplicativo Móvel (ACS/ACE/AAS)** | **App Mobile Unificado:** Deve atender tanto ao fluxo de endemias (ACE) quanto ao fluxo de cadastro/visita (ACS), utilizando a mesma arquitetura. |
+| **Registro Offline** | **Arquitetura Offline-First** | **Sincronização Bidirecional:** Deve suportar a sincronização de dados de cadastro (Imóvel, Família, Indivíduo) no formato e-SUS e a sincronização de dados de endemias (focos, tratamento) para o *backend* do SaaS. |
+| **Georreferenciamento** | **Geolocalização do Imóvel** | **Geolocalização Detalhada:** Captura obrigatória de coordenadas GPS para **Imóveis** (padrão e-SUS) e para **Focos/Criadouros** (padrão ACE), permitindo a visualização em mapas de calor. |
+| **Coleta de Dados Diversos (Endemias)** | **Registro de Visita Domiciliar/Territorial** | **Formulários Modulares:** O registro de visita deve ser modular. Se for uma visita de rotina, segue o fluxo e-SUS (acompanhamento, busca ativa). Se for uma visita de endemias, aciona o formulário específico de **Ficha de Avaliação de Densidade (FAD)** e **Tratamento Focal**. |
+| **Controle de Produtividade** | **Relatórios Gerenciais** | **Dashboard Integrado:** Painel de gestão que monitora a produtividade (visitas/dia) e os indicadores epidemiológicos (IIP, IB), utilizando os dados estruturados pelo padrão e-SUS. |
+| **Programação de Ciclos (LIRa, PVE)** | **Gestão Territorial** | **Planejamento de Endemias:** Funcionalidade para criar e distribuir microáreas de trabalho e ciclos de LIRAa/PVE, vinculando-os aos cadastros de imóveis do e-SUS. |
+
+## 3. Requisitos Técnicos e de Interoperabilidade (Foco e-SUS)
+
+A principal adaptação do SaaS deve ser a garantia de que os dados coletados possam ser, no mínimo, **exportados** em um formato que permita a importação para o e-SUS APS PEC ou sistemas de informação em saúde subsequentes (SINAN).
+
+### 3.1. Estrutura de Dados e Cadastros
+
+O SaaS deve adotar a estrutura hierárquica de dados do e-SUS Território:
+
+1.  **Cadastro Domiciliar e Territorial:** O sistema deve registrar as características sociossanitárias do imóvel (tipo, condições de moradia, saneamento) e a geolocalização, conforme a Ficha de Cadastro Domiciliar e Territorial do e-SUS.
+2.  **Cadastro Individual:** O registro de cada cidadão deve seguir o padrão e-SUS (dados pessoais, condições de saúde, situação de saúde), permitindo o vínculo com o **Cartão Nacional de Saúde (CNS)** e o **CPF**.
+3.  **Vínculo ACE-Território:** A autenticação do ACE deve ser baseada em CPF/CNS, e seu acesso deve ser restrito à sua microárea de atuação, conforme a lógica de gestão territorial do e-SUS.
+
+### 3.2. Requisitos de Sincronização e Integração
+
+O SaaS deve ser projetado para minimizar o retrabalho e garantir a integridade dos dados:
+
+*   **API de Sincronização:** Desenvolver uma API robusta que gerencie a troca de dados entre o aplicativo móvel e o *backend* do SaaS. Embora a integração direta com o PEC de terceiros seja complexa, o SaaS deve ser capaz de **gerar arquivos de exportação (XML ou outro formato padrão)** que possam ser processados pelo e-SUS ou sistemas de vigilância em saúde.
+*   **Identificadores Únicos:** Utilizar os identificadores únicos do e-SUS (ex: código do domicílio, código da família) para manter a rastreabilidade dos dados.
+*   **Módulo de Endemias (FAD/Tratamento):** As informações específicas de endemias (focos, larvicida, tipo de depósito) devem ser registradas em um módulo complementar, mas **vinculadas** ao registro de visita e ao imóvel do e-SUS.
+
+## 4. Recomendações Finais para Cardeal da Silva, BA
+
+O sucesso do SaaS dependerá da sua capacidade de ser uma ferramenta de trabalho superior ao e-SUS Território para o ACE, mas que não crie barreiras para a comunicação com o sistema nacional.
+
+1.  **Foco na Usabilidade do ACE:** O aplicativo móvel deve ser mais intuitivo e rápido que o e-SUS Território, especialmente na coleta de dados de endemias (ex: uso de *dropdowns* e *checkboxes* otimizados para o campo).
+2.  **Inteligência Geográfica:** Utilizar o georreferenciamento para criar rotas otimizadas para os ACEs e para gerar mapas de calor que permitam à Secretaria de Cardeal da Silva tomar decisões baseadas em dados concretos.
+3.  **Conformidade Legal:** Reforçar a necessidade de conformidade com a **LGPD** e as diretrizes do Ministério da Saúde, especialmente no que tange à segurança e ao sigilo dos dados de saúde.
+
+Este documento serve como um guia detalhado para o desenvolvimento do seu SaaS, garantindo que ele atenda tanto às necessidades operacionais de combate a endemias quanto aos requisitos de interoperabilidade do sistema de saúde brasileiro.
+
+---
+
+## Referências
+
+[1] Ministério da Saúde. **Manual de Uso do Aplicativo e-SUS Território**.
+[2] Documento de Análise e Mapeamento de Funcionalidades do Aplicativo e-SUS Território.
+[3] Portal MAS. **+ACE | Portal MAS**. Disponível em: [https://www.portalmas.com.br/ace](https://www.portalmas.com.br/ace).
