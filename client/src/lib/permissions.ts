@@ -21,6 +21,7 @@ export const menuPermissions = {
   agendamentos: ["admin", "medico", "enfermeiro", "recepcao"] as UserRole[],
   territorio: ["admin", "acs", "enfermeiro", "gestor"] as UserRole[],
   ace: ["admin", "acs", "gestor"] as UserRole[],
+  endemias: ["admin", "acs", "gestor"] as UserRole[],
   farmacia: ["admin", "farmaceutico", "gestor"] as UserRole[],
   tfd: ["admin", "gestor", "recepcao"] as UserRole[],
   relatorios: ["admin", "medico", "gestor"] as UserRole[],
@@ -45,6 +46,11 @@ export function filterMenuByRole<T extends { title: string }>(
 ): T[] {
   return items.filter((item) => {
     const featureKey = item.title.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") as keyof typeof menuPermissions;
+    // Check if the feature key exists in menuPermissions
+    if (!menuPermissions[featureKey]) {
+      console.warn(`Permission key "${featureKey}" not found for menu item "${item.title}"`);
+      return false;
+    }
     return hasPermission(userRole, featureKey);
   });
 }
