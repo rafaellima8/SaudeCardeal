@@ -12,16 +12,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
   app.get("/api/_setup", async (req, res) => {
     try {
+      const { sql: rawSql } = await import("drizzle-orm");
       const { db } = await import("./db");
-      const { migrate } = await import("drizzle-orm/neon-http/migrator");
-      const { seed } = await import("./seed");
       
       console.log("🚀 Iniciando setup do banco de dados...");
       
-      // Try to create tables using the schema
-      console.log("📦 Aplicando schema...");
+      // First, wake up the database with a simple query
+      console.log("⏰ Acordando o banco de dados...");
+      try {
+        await db.execute(rawSql`SELECT 1`);
+        console.log("✅ Banco de dados acordado!");
+      } catch (wakeError: any) {
+        console.log("⚠️ Erro ao acordar:", wakeError.message);
+        // Wait a bit and retry
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        await db.execute(rawSql`SELECT 1`);
+      }
       
-      // Run seed which will create tables if they don't exist
+      // Now run the seed
+      console.log("📦 Criando tabelas e inserindo dados...");
+      const { seed } = await import("./seed");
       await seed();
       
       console.log("✅ Setup concluído!");
@@ -31,7 +41,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("❌ Erro no setup:", error);
-      res.status(500).json({ error: error.message, stack: error.stack });
+      res.status(500).json({ 
+        error: error.message, 
+        stack: error.stack,
+        details: "Tente novamente em alguns segundos - o banco pode estar acordando."
+      });
     }
   });
 
