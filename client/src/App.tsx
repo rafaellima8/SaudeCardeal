@@ -18,6 +18,7 @@ import PatientDetail from "@/pages/patient-detail";
 import Appointments from "@/pages/appointments";
 import AttendanceQueue from "@/pages/attendance-queue";
 import Consultations from "@/pages/consultations";
+import Prescriptions from "@/pages/prescriptions";
 import Pharmacy from "@/pages/pharmacy";
 import TFD from "@/pages/tfd";
 import Reports from "@/pages/reports";
@@ -42,6 +43,7 @@ function ProtectedRoutes() {
       <Route path="/agendamentos" component={Appointments} />
       <Route path="/fila-atendimento" component={AttendanceQueue} />
       <Route path="/atendimentos" component={Consultations} />
+      <Route path="/prescricoes" component={Prescriptions} />
       <Route path="/farmacia" component={Pharmacy} />
       <Route path="/tfd" component={TFD} />
       <Route path="/relatorios" component={Reports} />

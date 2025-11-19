@@ -16,6 +16,7 @@ import {
   Bug,
   Stethoscope,
   ListChecks,
+  FileCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -45,6 +46,7 @@ const allMenuItems = [
   { title: "Agendamentos", icon: Calendar, url: "/agendamentos" },
   { title: "Fila de Atendimento", icon: ListChecks, url: "/fila-atendimento" },
   { title: "Atendimentos", icon: Stethoscope, url: "/atendimentos" },
+  { title: "Prescrições", icon: FileCheck, url: "/prescricoes" },
   { title: "Território", icon: MapPin, url: "/territorio" },
   { title: "ACE", icon: Activity, url: "/ace" },
   { title: "Endemias", icon: Bug, url: "/endemias" },

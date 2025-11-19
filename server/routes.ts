@@ -358,10 +358,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Prescriptions API
   app.get("/api/prescriptions", async (req, res) => {
     try {
-      const { citizenId, consultationId } = req.query;
+      const { citizenId, consultationId, professionalId, startDate, endDate } = req.query;
       const prescriptions = await storage.getPrescriptions({
         citizenId: citizenId as string,
         consultationId: consultationId as string,
+        professionalId: professionalId as string,
+        startDate: startDate as string,
+        endDate: endDate as string,
       });
       res.json(prescriptions);
     } catch (error: any) {

@@ -74,7 +74,13 @@ export interface IStorage {
   deleteConsultation(id: string): Promise<boolean>;
 
   // Prescriptions
-  getPrescriptions(params: { citizenId?: string; consultationId?: string }): Promise<Prescription[]>;
+  getPrescriptions(params: { 
+    citizenId?: string; 
+    consultationId?: string; 
+    professionalId?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<any[]>;
   createPrescription(prescription: InsertPrescription): Promise<Prescription>;
   updatePrescription(id: string, prescription: Partial<InsertPrescription>): Promise<Prescription | undefined>;
   deletePrescription(id: string): Promise<boolean>;
@@ -422,13 +428,67 @@ export class DbStorage implements IStorage {
   }
 
   // Prescriptions
-  async getPrescriptions(params: { citizenId?: string; consultationId?: string }): Promise<Prescription[]> {
-    let query = db.select().from(schema.prescriptions);
-
+  async getPrescriptions(params: { 
+    citizenId?: string; 
+    consultationId?: string; 
+    professionalId?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<any[]> {
+    const conditions = [];
+    
     if (params.citizenId) {
-      query = query.where(eq(schema.prescriptions.citizenId, params.citizenId)) as any;
-    } else if (params.consultationId) {
-      query = query.where(eq(schema.prescriptions.consultationId, params.consultationId)) as any;
+      conditions.push(eq(schema.prescriptions.citizenId, params.citizenId));
+    }
+    if (params.consultationId) {
+      conditions.push(eq(schema.prescriptions.consultationId, params.consultationId));
+    }
+    if (params.professionalId) {
+      conditions.push(eq(schema.prescriptions.professionalId, params.professionalId));
+    }
+    if (params.startDate) {
+      conditions.push(sql`${schema.prescriptions.createdAt} >= ${params.startDate}`);
+    }
+    if (params.endDate) {
+      conditions.push(sql`${schema.prescriptions.createdAt} <= ${params.endDate}`);
+    }
+
+    let query = db.select({
+      id: schema.prescriptions.id,
+      consultationId: schema.prescriptions.consultationId,
+      citizenId: schema.prescriptions.citizenId,
+      professionalId: schema.prescriptions.professionalId,
+      medication: schema.prescriptions.medication,
+      dosage: schema.prescriptions.dosage,
+      frequency: schema.prescriptions.frequency,
+      duration: schema.prescriptions.duration,
+      quantity: schema.prescriptions.quantity,
+      instructions: schema.prescriptions.instructions,
+      createdAt: schema.prescriptions.createdAt,
+      citizen: {
+        name: schema.citizens.name,
+        cns: schema.citizens.cns,
+        birthDate: schema.citizens.birthDate,
+      },
+      professional: {
+        name: schema.professionals.name,
+        role: schema.professionals.role,
+        registrationNumber: schema.professionals.registrationNumber,
+        registrationType: schema.professionals.registrationType,
+      },
+      consultation: {
+        consultationDate: schema.consultations.consultationDate,
+        type: schema.consultations.type,
+      },
+    })
+      .from(schema.prescriptions)
+      .leftJoin(schema.citizens, eq(schema.prescriptions.citizenId, schema.citizens.id))
+      .leftJoin(schema.professionals, eq(schema.prescriptions.professionalId, schema.professionals.id))
+      .leftJoin(schema.consultations, eq(schema.prescriptions.consultationId, schema.consultations.id))
+      .$dynamic();
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
     }
 
     return query.orderBy(desc(schema.prescriptions.createdAt));
