@@ -314,6 +314,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint transacional para criar consulta + prescrições atomicamente
+  app.post("/api/consultations-with-prescriptions", async (req, res) => {
+    try {
+      const { consultation, prescriptions } = req.body;
+      
+      // Validar consulta
+      const validatedConsultation = insertConsultationSchema.parse(consultation);
+      
+      // Validar prescrições (parcialmente, sem consultationId/citizenId/professionalId)
+      const validatedPrescriptions = prescriptions.map((p: any) =>
+        insertPrescriptionSchema
+          .omit({ consultationId: true, citizenId: true, professionalId: true })
+          .parse(p)
+      );
+      
+      const result = await storage.createConsultationWithPrescriptions(
+        validatedConsultation,
+        validatedPrescriptions
+      );
+      
+      res.status(201).json(result);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.delete("/api/consultations/:id", async (req, res) => {
     try {
       const success = await storage.deleteConsultation(req.params.id);

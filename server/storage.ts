@@ -67,6 +67,10 @@ export interface IStorage {
   getConsultations(params?: { citizenId?: string; professionalId?: string; limit?: number }): Promise<Consultation[]>;
   getConsultationById(id: string): Promise<Consultation | undefined>;
   createConsultation(consultation: InsertConsultation): Promise<Consultation>;
+  createConsultationWithPrescriptions(
+    consultation: InsertConsultation, 
+    prescriptions: Omit<InsertPrescription, 'consultationId' | 'citizenId' | 'professionalId'>[]
+  ): Promise<{ consultation: Consultation; prescriptions: Prescription[] }>;
   deleteConsultation(id: string): Promise<boolean>;
 
   // Prescriptions
@@ -379,6 +383,42 @@ export class DbStorage implements IStorage {
   async createConsultation(consultation: InsertConsultation): Promise<Consultation> {
     const [created] = await db.insert(schema.consultations).values(consultation).returning();
     return created;
+  }
+
+  async createConsultationWithPrescriptions(
+    consultation: InsertConsultation,
+    prescriptions: Omit<InsertPrescription, 'consultationId' | 'citizenId' | 'professionalId'>[]
+  ): Promise<{ consultation: Consultation; prescriptions: Prescription[] }> {
+    return await db.transaction(async (tx) => {
+      // 1. Criar consulta
+      const [createdConsultation] = await tx
+        .insert(schema.consultations)
+        .values(consultation)
+        .returning();
+
+      // 2. Criar prescrições vinculadas
+      const createdPrescriptions: Prescription[] = [];
+      
+      if (prescriptions.length > 0) {
+        for (const prescription of prescriptions) {
+          const [created] = await tx
+            .insert(schema.prescriptions)
+            .values({
+              ...prescription,
+              consultationId: createdConsultation.id,
+              citizenId: consultation.citizenId,
+              professionalId: consultation.professionalId,
+            })
+            .returning();
+          createdPrescriptions.push(created);
+        }
+      }
+
+      return {
+        consultation: createdConsultation,
+        prescriptions: createdPrescriptions,
+      };
+    });
   }
 
   // Prescriptions

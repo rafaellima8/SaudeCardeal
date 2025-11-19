@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,9 +15,228 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, FileText, User, Activity, Stethoscope, ClipboardList } from "lucide-react";
+import { Plus, FileText, User, Activity, Stethoscope, ClipboardList, Pill, Trash2, Edit } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+
+// Tipo para prescrição temporária (antes de salvar)
+interface PrescriptionDraft {
+  id: string; // ID temporário
+  medication: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  quantity: number;
+  instructions?: string;
+}
+
+// Schema de validação para prescrição
+const prescriptionSchema = z.object({
+  medication: z.string().min(1, "Nome do medicamento é obrigatório"),
+  dosage: z.string().min(1, "Posologia é obrigatória"),
+  frequency: z.string().min(1, "Frequência é obrigatória"),
+  duration: z.string().min(1, "Duração do tratamento é obrigatória"),
+  quantity: z.coerce.number().min(1, "Quantidade deve ser maior que 0"),
+  instructions: z.string().optional(),
+});
+
+type PrescriptionFormData = z.infer<typeof prescriptionSchema>;
+
+// Componente de Dialog para Adicionar/Editar Prescrição
+function PrescriptionDialog({
+  open,
+  onOpenChange,
+  prescription,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  prescription: PrescriptionDraft | null;
+  onSave: (data: Omit<PrescriptionDraft, 'id'>) => void;
+}) {
+  const form = useForm<PrescriptionFormData>({
+    resolver: zodResolver(prescriptionSchema),
+    defaultValues: {
+      medication: "",
+      dosage: "",
+      frequency: "",
+      duration: "",
+      quantity: 1,
+      instructions: "",
+    },
+  });
+
+  // Atualizar valores do form quando a prescrição ou dialog mudar (useEffect evita re-renders)
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        medication: prescription?.medication || "",
+        dosage: prescription?.dosage || "",
+        frequency: prescription?.frequency || "",
+        duration: prescription?.duration || "",
+        quantity: prescription?.quantity || 1,
+        instructions: prescription?.instructions || "",
+      });
+    }
+  }, [prescription, open, form]);
+
+  const onSubmit = (data: PrescriptionFormData) => {
+    onSave(data);
+    form.reset();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>
+            {prescription ? "Editar Prescrição" : "Nova Prescrição"}
+          </DialogTitle>
+          <DialogDescription>
+            Preencha os dados da prescrição médica
+          </DialogDescription>
+        </DialogHeader>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="medication"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Medicamento</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Ex: Losartana Potássica 50mg"
+                      {...field}
+                      data-testid="input-medication"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="dosage"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Posologia</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Ex: 1 comprimido"
+                        {...field}
+                        data-testid="input-dosage"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="frequency"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Frequência</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Ex: 1x ao dia, 8/8h, 2x ao dia"
+                        {...field}
+                        data-testid="input-frequency"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="duration"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Duração do Tratamento</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Ex: 30 dias, Uso contínuo"
+                        {...field}
+                        data-testid="input-duration"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="quantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quantidade</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="1"
+                        placeholder="Ex: 30"
+                        {...field}
+                        data-testid="input-quantity"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="instructions"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Instruções Adicionais (Opcional)</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Ex: Tomar em jejum, Evitar exposição ao sol, etc."
+                      className="min-h-[80px]"
+                      {...field}
+                      data-testid="textarea-instructions"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="flex justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  form.reset();
+                  onOpenChange(false);
+                }}
+                data-testid="button-cancel-prescription"
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" data-testid="button-save-prescription">
+                {prescription ? "Atualizar" : "Adicionar"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 const vitalSignsSchema = z.object({
   bloodPressureSystolic: z.coerce.number().min(0).optional(),
@@ -115,6 +334,10 @@ export default function ConsultationsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedCiap2, setSelectedCiap2] = useState<string[]>([]);
   const [selectedCid10, setSelectedCid10] = useState<string[]>([]);
+  const [prescriptions, setPrescriptions] = useState<PrescriptionDraft[]>([]);
+  const [prescriptionDialogOpen, setPrescriptionDialogOpen] = useState(false);
+  const [editingPrescription, setEditingPrescription] = useState<PrescriptionDraft | null>(null);
+  const [deletingPrescription, setDeletingPrescription] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data: citizens = [] } = useQuery<Array<{ id: string; name: string; cns?: string }>>({
@@ -165,29 +388,50 @@ export default function ConsultationsPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: ConsultationFormData) => {
+      // Preparar payload com consulta + prescrições (endpoint transacional)
       const payload = {
-        ...data,
-        consultationDate: new Date(data.consultationDate).toISOString(),
-        ciap2Codes: selectedCiap2,
-        cid10Codes: selectedCid10,
+        consultation: {
+          ...data,
+          consultationDate: new Date(data.consultationDate).toISOString(),
+          ciap2Codes: selectedCiap2,
+          cid10Codes: selectedCid10,
+        },
+        prescriptions: prescriptions.map(p => ({
+          medication: p.medication,
+          dosage: p.dosage,
+          frequency: p.frequency,
+          duration: p.duration,
+          quantity: p.quantity,
+          instructions: p.instructions || "",
+        })),
       };
-      return await apiRequest('POST', '/api/consultations', payload);
+
+      // Chamar endpoint transacional que garante atomicidade
+      const result: any = await apiRequest('POST', '/api/consultations-with-prescriptions', payload);
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['/api/consultations'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/prescriptions'] });
       setDialogOpen(false);
       form.reset();
       setSelectedCiap2([]);
       setSelectedCid10([]);
+      setPrescriptions([]);
+      
+      const prescriptionCount = result.prescriptions?.length || 0;
       toast({
         title: "Atendimento registrado",
-        description: "A consulta foi registrada com sucesso.",
+        description: prescriptionCount > 0 
+          ? `Consulta salva com sucesso com ${prescriptionCount} prescrição(ões).`
+          : "Consulta salva com sucesso.",
       });
     },
     onError: (error: Error) => {
+      // Não limpar prescrições em caso de erro - permitir retry
       toast({
         title: "Erro ao registrar atendimento",
-        description: error.message,
+        description: error.message || "Ocorreu um erro ao salvar. Por favor, tente novamente.",
         variant: "destructive",
       });
     },
@@ -207,6 +451,41 @@ export default function ConsultationsPage() {
     setSelectedCid10(prev =>
       prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code]
     );
+  };
+
+  const addPrescription = (prescription: Omit<PrescriptionDraft, 'id'>) => {
+    const newPrescription: PrescriptionDraft = {
+      ...prescription,
+      id: `temp-${Date.now()}-${Math.random()}`, // ID temporário
+    };
+    setPrescriptions(prev => [...prev, newPrescription]);
+    setPrescriptionDialogOpen(false);
+    setEditingPrescription(null);
+    toast({
+      title: "Prescrição adicionada",
+      description: "A prescrição será salva junto com o atendimento.",
+    });
+  };
+
+  const updatePrescription = (id: string, updated: Omit<PrescriptionDraft, 'id'>) => {
+    setPrescriptions(prev =>
+      prev.map(p => (p.id === id ? { ...updated, id } : p))
+    );
+    setPrescriptionDialogOpen(false);
+    setEditingPrescription(null);
+    toast({
+      title: "Prescrição atualizada",
+      description: "As alterações foram salvas.",
+    });
+  };
+
+  const deletePrescription = (id: string) => {
+    setPrescriptions(prev => prev.filter(p => p.id !== id));
+    setDeletingPrescription(null);
+    toast({
+      title: "Prescrição removida",
+      description: "A prescrição foi removida da lista.",
+    });
   };
 
   const getConsultationTypeBadge = (type: string) => {
@@ -665,6 +944,95 @@ export default function ConsultationsPage() {
                         </FormItem>
                       )}
                     />
+
+                    {/* Seção de Prescrições */}
+                    <div className="border rounded-lg p-4 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Pill className="h-5 w-5 text-primary" />
+                          <h3 className="font-semibold">Prescrições Médicas</h3>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => {
+                            setEditingPrescription(null);
+                            setPrescriptionDialogOpen(true);
+                          }}
+                          data-testid="button-add-prescription"
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          Adicionar Prescrição
+                        </Button>
+                      </div>
+
+                      {prescriptions.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Pill className="mx-auto h-12 w-12 mb-2 opacity-50" />
+                          <p className="text-sm">Nenhuma prescrição adicionada</p>
+                          <p className="text-xs">Clique em "Adicionar Prescrição" para prescrever medicamentos</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {prescriptions.map((prescription) => (
+                            <Card key={prescription.id} className="p-4" data-testid={`prescription-card-${prescription.id}`}>
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1 space-y-1">
+                                  <div className="font-semibold text-base">{prescription.medication}</div>
+                                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                                    <div>
+                                      <span className="text-muted-foreground">Posologia:</span>{" "}
+                                      <span className="font-medium">{prescription.dosage}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Frequência:</span>{" "}
+                                      <span className="font-medium">{prescription.frequency}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Duração:</span>{" "}
+                                      <span className="font-medium">{prescription.duration}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Quantidade:</span>{" "}
+                                      <span className="font-medium">{prescription.quantity}</span>
+                                    </div>
+                                  </div>
+                                  {prescription.instructions && (
+                                    <div className="text-sm pt-1">
+                                      <span className="text-muted-foreground">Instruções:</span>{" "}
+                                      <span className="italic">{prescription.instructions}</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex gap-1 ml-4">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => {
+                                      setEditingPrescription(prescription);
+                                      setPrescriptionDialogOpen(true);
+                                    }}
+                                    data-testid={`button-edit-prescription-${prescription.id}`}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setDeletingPrescription(prescription.id)}
+                                    data-testid={`button-delete-prescription-${prescription.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </TabsContent>
                 </Tabs>
 
@@ -689,6 +1057,41 @@ export default function ConsultationsPage() {
             </Form>
           </DialogContent>
         </Dialog>
+
+        {/* Dialog de Prescrição */}
+        <PrescriptionDialog
+          open={prescriptionDialogOpen}
+          onOpenChange={setPrescriptionDialogOpen}
+          prescription={editingPrescription}
+          onSave={(data) => {
+            if (editingPrescription) {
+              updatePrescription(editingPrescription.id, data);
+            } else {
+              addPrescription(data);
+            }
+          }}
+        />
+
+        {/* Alert Dialog de Confirmação de Exclusão */}
+        <AlertDialog open={!!deletingPrescription} onOpenChange={() => setDeletingPrescription(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja remover esta prescrição? Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-delete">Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deletingPrescription && deletePrescription(deletingPrescription)}
+                data-testid="button-confirm-delete"
+              >
+                Confirmar Exclusão
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       {/* Listagem de Consultas */}
