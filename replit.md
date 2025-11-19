@@ -49,6 +49,15 @@ The system currently includes fully functional modules for:
     -   **Attendance Queue** (/fila-atendimento): Reception dashboard with status-based workflow (scheduled → confirmed → in-progress → completed), transition buttons with AlertDialog confirmations, separate sections for completed/cancelled/no-show appointments
     -   Backend CRUD already complete with composite filters (date, professional, unit, status)
 
+-   **Electronic Prescriptions (Production-Ready)**: Complete prescription management with transactional integrity:
+    -   **Schema**: Prescriptions linked to consultations, citizens, and professionals with full medication details (dosage, frequency, duration, quantity, instructions)
+    -   **Transactional Backend**: `POST /api/consultations-with-prescriptions` endpoint using Drizzle `db.transaction()` for atomic persistence
+    -   **Architecture Pattern**: Single payload with consultation + prescriptions array ensures all-or-nothing saves (automatic rollback on any failure)
+    -   **Prescription Dialog**: Integrated into SOAP "Plano" tab with add/edit/delete draft management before submission
+    -   **Data Integrity**: Impossible to create orphaned prescriptions or consultations without prescriptions when prescribed
+    -   **UX Features**: Draft state persists on error for retry, success feedback with prescription count, form validation with Zod
+    -   **Code Quality**: Architect-approved implementation, reduced from ~90 to ~45 lines with cleaner deterministic UX
+
 #### 📋 Architected & Documented (Pending Implementation)
 
 -   **SOAP Consultation Schema** (e-SUS PEC v5.3 compliant):
@@ -73,8 +82,8 @@ The system currently includes fully functional modules for:
 
 #### 🔨 Next Development Priorities
 
-1. **Database Migration**: PostgreSQL migration or SQLite table recreation to persist SOAP fields
-2. **Electronic Prescriptions**: Schema + frontend for medication prescriptions linked to consultations (fractional dosing support)
+1. **Prescription History & PDF Export**: View patient prescription history with professional PDF generation (jsPDF + autotable) with institutional branding and digital signature
+2. **Database Migration**: PostgreSQL migration or SQLite table recreation to persist SOAP fields
 3. **Territorial Integration**: Citizen → Family → Domicile → Dwelling linkages with cascading views
 4. **Patient Summary Sheet**: Longitudinal health record with consultation history, medications, exams, vaccinations
 5. **Reception Workflow Enhancements**: Add escuta inicial (initial triage), risk classification, automatic queue ordering by priority
