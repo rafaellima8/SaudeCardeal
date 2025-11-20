@@ -65,6 +65,13 @@ interface Professional {
   id: string;
   name: string;
   specialty: string;
+  unitId: string;
+}
+
+interface HealthUnit {
+  id: string;
+  name: string;
+  cnes: string;
 }
 
 const statusConfig = {
@@ -113,6 +120,16 @@ export default function TFD() {
     queryFn: async () => {
       const response = await fetch('/api/professionals');
       if (!response.ok) throw new Error('Erro ao carregar profissionais');
+      return response.json();
+    },
+  });
+
+  // Fetch health units for the form
+  const { data: units = [] } = useQuery<HealthUnit[]>({
+    queryKey: ['/api/units'],
+    queryFn: async () => {
+      const response = await fetch('/api/units');
+      if (!response.ok) throw new Error('Erro ao carregar unidades');
       return response.json();
     },
   });
@@ -463,6 +480,22 @@ export default function TFD() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="unitId">Unidade de Saúde *</Label>
+                <Select name="unitId" required>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a unidade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {units.map((unit) => (
+                      <SelectItem key={unit.id} value={unit.id}>
+                        {unit.name} - CNES: {unit.cnes}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="notes">Observações</Label>
                 <Textarea
                   id="notes"
@@ -471,8 +504,6 @@ export default function TFD() {
                   rows={2}
                 />
               </div>
-
-              <input type="hidden" name="unitId" value={professionals[0]?.unitId || ''} />
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsNewRequestOpen(false)}>
