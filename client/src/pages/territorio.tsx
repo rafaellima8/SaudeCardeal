@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Home, Users, Calendar, Plus, MapPin, Search, Pencil, Trash2 } from "lucide-react";
+import { Home, Users, Calendar, Plus, MapPin, Search, Pencil, Trash2, UserPlus, ArrowRightLeft, BarChart3, Filter, UserCheck, UserMinus } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -18,7 +18,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
-import { insertDwellingSchema, insertHomeVisitSchema } from "@shared/schema";
+import { insertDwellingSchema, insertHomeVisitSchema, insertFamilyMemberSchema } from "@shared/schema";
 
 const dwellingFormSchema = insertDwellingSchema.extend({
   latitude: z.coerce.number().optional(),
@@ -38,28 +38,89 @@ const homeVisitFormSchema = z.object({
   referrals: z.string().optional(),
 });
 
+const familyMemberFormSchema = insertFamilyMemberSchema.extend({
+  citizenId: z.string().min(1, "Selecione um cidadão"),
+  relationshipType: z.enum(["responsavel_familiar", "conjuge", "filho", "neto", "pai_mae", "avo", "irmao", "outro"]),
+  isHeadOfFamily: z.boolean().default(false),
+  notes: z.string().optional(),
+});
+
+const transferMemberSchema = z.object({
+  memberId: z.string().min(1),
+  newFamilyId: z.string().min(1, "Selecione a família de destino"),
+  relationshipType: z.enum(["responsavel_familiar", "conjuge", "filho", "neto", "pai_mae", "avo", "irmao", "outro"]),
+  notes: z.string().optional(),
+});
+
 type DwellingFormData = z.infer<typeof dwellingFormSchema>;
 type HomeVisitFormData = z.infer<typeof homeVisitFormSchema>;
+type FamilyMemberFormData = z.infer<typeof familyMemberFormSchema>;
+type TransferMemberFormData = z.infer<typeof transferMemberSchema>;
 
 interface Dwelling {
   id: string;
+  unitId: string;
   microarea: string;
   address: string;
-  number?: string;
+  number?: string | null;
+  complement?: string | null;
   neighborhood: string;
+  zipCode?: string | null;
   dwellingType: string;
+  sanitation?: string | null;
+  waterSupply?: string | null;
   familiesCount: number;
-  hasElectricity: boolean;
-  hasAnimals: boolean;
+  hasElectricity?: boolean | null;
+  hasAnimals?: boolean | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 interface HomeVisit {
   id: string;
+  dwellingId: string;
+  familyId?: string | null;
   visitDate: string;
   visitType: string;
   visitMotive?: string;
   professionalId: string;
   findings?: string;
+  actions?: string | null;
+  referrals?: string | null;
+}
+
+interface Family {
+  id: string;
+  name: string;
+  dwellingId: string;
+  membersCount: number;
+  isRegistered: boolean;
+}
+
+interface Citizen {
+  id: string;
+  name: string;
+  cpf?: string;
+  birthDate?: string;
+  gender?: string;
+}
+
+interface FamilyMember {
+  id: string;
+  familyId: string;
+  citizenId: string;
+  relationshipType: string;
+  isHeadOfFamily: boolean;
+  joinedAt: Date;
+  leftAt?: Date;
+  notes?: string;
+  citizen?: Citizen;
+}
+
+interface FamilyHierarchy {
+  family: Family;
+  dwelling: Dwelling | null;
+  members: FamilyMember[];
 }
 
 export default function TerritoryPage() {
@@ -71,6 +132,16 @@ export default function TerritoryPage() {
   const [editingVisit, setEditingVisit] = useState<HomeVisit | null>(null);
   const [deletingDwelling, setDeletingDwelling] = useState<string | null>(null);
   const [deletingVisit, setDeletingVisit] = useState<string | null>(null);
+  
+  // Family management states
+  const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null);
+  const [memberDialogOpen, setMemberDialogOpen] = useState(false);
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
+  const [deletingMember, setDeletingMember] = useState<string | null>(null);
+  const [relationshipFilter, setRelationshipFilter] = useState<string>("all");
+  const [showStats, setShowStats] = useState(false);
+  
   const { toast } = useToast();
 
   const { data: units = [] } = useQuery<Array<{ id: string; name: string }>>({
@@ -340,6 +411,238 @@ export default function TerritoryPage() {
     setEditingVisit(null);
     visitForm.reset();
   };
+
+  // Family Management Queries and Mutations
+  const { data: families = [] } = useQuery<Family[]>({
+    queryKey: ['/api/families'],
+  });
+
+  const { data: citizens = [] } = useQuery<Citizen[]>({
+    queryKey: ['/api/citizens'],
+  });
+
+  const { data: familyHierarchy, isLoading: hierarchyLoading } = useQuery<FamilyHierarchy>({
+    queryKey: ['/api/families', selectedFamilyId, 'hierarchy'],
+    queryFn: async () => {
+      if (!selectedFamilyId) return null;
+      const response = await fetch(`/api/families/${selectedFamilyId}/hierarchy`);
+      if (!response.ok) throw new Error("Failed to fetch hierarchy");
+      return response.json();
+    },
+    enabled: !!selectedFamilyId,
+  });
+
+  const memberForm = useForm<FamilyMemberFormData>({
+    resolver: zodResolver(familyMemberFormSchema),
+    defaultValues: {
+      familyId: "",
+      citizenId: "",
+      relationshipType: "outro",
+      isHeadOfFamily: false,
+      notes: "",
+    },
+  });
+
+  const transferForm = useForm<TransferMemberFormData>({
+    resolver: zodResolver(transferMemberSchema),
+    defaultValues: {
+      memberId: "",
+      newFamilyId: "",
+      relationshipType: "outro",
+      notes: "",
+    },
+  });
+
+  const addMemberMutation = useMutation({
+    mutationFn: async (data: FamilyMemberFormData) => {
+      return await apiRequest("POST", `/api/families/${data.familyId}/members`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/families'] });
+      if (selectedFamilyId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/families', selectedFamilyId, 'hierarchy'] });
+      }
+      toast({
+        title: "Membro adicionado",
+        description: "Membro adicionado à família com sucesso.",
+      });
+      setMemberDialogOpen(false);
+      memberForm.reset();
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Não foi possível adicionar o membro.",
+      });
+    },
+  });
+
+  const updateMemberMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<FamilyMemberFormData> }) => {
+      return await apiRequest("PATCH", `/api/family-members/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/families'] });
+      if (selectedFamilyId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/families', selectedFamilyId, 'hierarchy'] });
+      }
+      toast({
+        title: "Membro atualizado",
+        description: "Dados do membro atualizados com sucesso.",
+      });
+      setMemberDialogOpen(false);
+      setEditingMember(null);
+      memberForm.reset();
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Não foi possível atualizar o membro.",
+      });
+    },
+  });
+
+  const removeMemberMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/family-members/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/families'] });
+      if (selectedFamilyId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/families', selectedFamilyId, 'hierarchy'] });
+      }
+      toast({
+        title: "Membro removido",
+        description: "Membro removido da família com sucesso.",
+      });
+      setDeletingMember(null);
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Não foi possível remover o membro.",
+      });
+    },
+  });
+
+  const transferMemberMutation = useMutation({
+    mutationFn: async (data: TransferMemberFormData) => {
+      if (!editingMember?.citizenId) {
+        throw new Error("Cidadão não identificado");
+      }
+      
+      // Prepare transfer notes preserving history
+      const transferNotes = [
+        editingMember.notes,
+        data.notes,
+        `Transferido de ${familyHierarchy?.family.name || 'outra família'} em ${new Date().toLocaleDateString('pt-BR')}`
+      ].filter(Boolean).join(' | ');
+      
+      // First, create member in new family preserving metadata
+      const newMember = await apiRequest("POST", `/api/families/${data.newFamilyId}/members`, {
+        familyId: data.newFamilyId,
+        citizenId: editingMember.citizenId,
+        relationshipType: data.relationshipType,
+        isHeadOfFamily: editingMember.isHeadOfFamily,
+        notes: transferNotes,
+      });
+      
+      // Only delete from old family if creation succeeded
+      await apiRequest("DELETE", `/api/family-members/${data.memberId}`);
+      
+      return newMember;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/families'] });
+      if (selectedFamilyId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/families', selectedFamilyId, 'hierarchy'] });
+      }
+      // Also invalidate the destination family's hierarchy
+      const destFamilyId = transferForm.getValues('newFamilyId');
+      if (destFamilyId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/families', destFamilyId, 'hierarchy'] });
+      }
+      toast({
+        title: "Transferência realizada",
+        description: "Membro transferido para nova família com sucesso.",
+      });
+      setTransferDialogOpen(false);
+      setEditingMember(null);
+      transferForm.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: error.message || "Não foi possível transferir o membro.",
+      });
+    },
+  });
+
+  const onMemberSubmit = (data: FamilyMemberFormData) => {
+    if (!selectedFamilyId && !editingMember) {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Selecione uma família primeiro.",
+      });
+      return;
+    }
+    
+    if (editingMember) {
+      updateMemberMutation.mutate({ id: editingMember.id, data });
+    } else {
+      addMemberMutation.mutate({ ...data, familyId: selectedFamilyId! });
+    }
+  };
+
+  const onTransferSubmit = (data: TransferMemberFormData) => {
+    transferMemberMutation.mutate(data);
+  };
+
+  const handleEditMember = (member: FamilyMember) => {
+    setEditingMember(member);
+    memberForm.reset({
+      familyId: member.familyId,
+      citizenId: member.citizenId,
+      relationshipType: member.relationshipType as any,
+      isHeadOfFamily: member.isHeadOfFamily,
+      notes: member.notes || "",
+    });
+    setMemberDialogOpen(true);
+  };
+
+  const handleTransferMember = (member: FamilyMember) => {
+    setEditingMember(member);
+    transferForm.reset({
+      memberId: member.id,
+      newFamilyId: "",
+      relationshipType: member.relationshipType as any,
+      notes: "",
+    });
+    setTransferDialogOpen(true);
+  };
+
+  const getRelationshipLabel = (type: string): string => {
+    const labels: Record<string, string> = {
+      responsavel_familiar: "Responsável Familiar",
+      conjuge: "Cônjuge",
+      filho: "Filho(a)",
+      neto: "Neto(a)",
+      pai_mae: "Pai/Mãe",
+      avo: "Avô/Avó",
+      irmao: "Irmão/Irmã",
+      outro: "Outro",
+    };
+    return labels[type] || type;
+  };
+
+  const filteredMembers = familyHierarchy?.members.filter((member) =>
+    relationshipFilter === "all" || member.relationshipType === relationshipFilter
+  ) || [];
 
   const microareas = Array.from(new Set(dwellings?.map(d => d.microarea) || []));
 
@@ -981,28 +1284,547 @@ export default function TerritoryPage() {
         </TabsContent>
 
         <TabsContent value="families">
-          <Card>
-            <CardHeader>
-              <CardTitle>Hierarquia Familiar</CardTitle>
-              <CardDescription>Visualize e gerencie a composição das famílias cadastradas</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <p className="text-muted-foreground text-sm">
-                  Selecione uma família para ver sua hierarquia completa (Moradia → Família → Membros)
-                </p>
-                
-                {/* TODO: Implementar interface de hierarquia familiar */}
-                <div className="border rounded-lg p-8 text-center text-muted-foreground">
-                  <Users className="h-16 w-16 mx-auto mb-4 opacity-20" />
-                  <p className="text-lg font-medium mb-2">Interface de Hierarquia Familiar</p>
-                  <p className="text-sm">
-                    Funcionalidade em desenvolvimento - visualização e gerenciamento de membros familiares
-                  </p>
+          <div className="space-y-4">
+            {/* Family Selector and Actions */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <CardTitle>Hierarquia Familiar</CardTitle>
+                    <CardDescription>Visualize e gerencie a composição das famílias cadastradas</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowStats(!showStats)}
+                      data-testid="button-toggle-stats"
+                    >
+                      <BarChart3 className="h-4 w-4 mr-2" />
+                      {showStats ? "Ocultar" : "Estatísticas"}
+                    </Button>
+                    {selectedFamilyId && (
+                      <Button
+                        onClick={() => {
+                          memberForm.reset({ familyId: selectedFamilyId, citizenId: "", relationshipType: "outro", isHeadOfFamily: false, notes: "" });
+                          setEditingMember(null);
+                          setMemberDialogOpen(true);
+                        }}
+                        data-testid="button-add-member"
+                      >
+                        <UserPlus className="h-4 w-4 mr-2" />
+                        Adicionar Membro
+                      </Button>
+                    )}
+                  </div>
                 </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Select value={selectedFamilyId || ""} onValueChange={setSelectedFamilyId}>
+                      <SelectTrigger className="flex-1" data-testid="select-family">
+                        <SelectValue placeholder="Selecione uma família" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {families.map((family) => (
+                          <SelectItem key={family.id} value={family.id}>
+                            {family.name} ({family.membersCount} {family.membersCount === 1 ? "membro" : "membros"})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedFamilyId && (
+                      <Select value={relationshipFilter} onValueChange={setRelationshipFilter}>
+                        <SelectTrigger className="w-48" data-testid="select-filter-relationship">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">
+                            <div className="flex items-center gap-2">
+                              <Filter className="h-4 w-4" />
+                              <span>Todos</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="responsavel_familiar">Responsável Familiar</SelectItem>
+                          <SelectItem value="conjuge">Cônjuge</SelectItem>
+                          <SelectItem value="filho">Filho(a)</SelectItem>
+                          <SelectItem value="neto">Neto(a)</SelectItem>
+                          <SelectItem value="pai_mae">Pai/Mãe</SelectItem>
+                          <SelectItem value="avo">Avô/Avó</SelectItem>
+                          <SelectItem value="irmao">Irmão/Irmã</SelectItem>
+                          <SelectItem value="outro">Outro</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Statistics Dashboard */}
+            {showStats && selectedFamilyId && familyHierarchy && (
+              <div className="grid gap-4 md:grid-cols-4">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Membros</CardTitle>
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{familyHierarchy.members.length}</div>
+                    <p className="text-xs text-muted-foreground">Membros cadastrados</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Responsável</CardTitle>
+                    <UserCheck className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {familyHierarchy.members.filter(m => m.isHeadOfFamily).length}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Chefe de família</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Ativos</CardTitle>
+                    <UserCheck className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {familyHierarchy.members.filter(m => !m.leftAt).length}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Membros ativos</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Inativos</CardTitle>
+                    <UserMinus className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {familyHierarchy.members.filter(m => m.leftAt).length}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Saíram da família</p>
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
+            )}
+
+            {/* Family Hierarchy Visualization */}
+            {selectedFamilyId && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Estrutura Familiar</CardTitle>
+                  <CardDescription>
+                    {familyHierarchy?.dwelling && `${familyHierarchy.dwelling.address}, ${familyHierarchy.dwelling.neighborhood}`}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {hierarchyLoading ? (
+                    <div className="text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                    </div>
+                  ) : familyHierarchy && filteredMembers.length > 0 ? (
+                    <div className="space-y-3">
+                      {filteredMembers.map((member) => (
+                        <Card key={member.id} className={member.leftAt ? "opacity-60" : ""} data-testid={`card-member-${member.id}`}>
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1 space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-semibold text-lg">
+                                    {member.citizen?.name || "Nome não disponível"}
+                                  </h4>
+                                  {member.isHeadOfFamily && (
+                                    <Badge variant="default">
+                                      <UserCheck className="h-3 w-3 mr-1" />
+                                      Responsável
+                                    </Badge>
+                                  )}
+                                  <Badge variant="secondary">
+                                    {getRelationshipLabel(member.relationshipType)}
+                                  </Badge>
+                                  {member.leftAt && (
+                                    <Badge variant="outline" className="text-destructive">
+                                      <UserMinus className="h-3 w-3 mr-1" />
+                                      Inativo
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+                                  {member.citizen?.cpf && (
+                                    <div>
+                                      <span className="font-medium">CPF:</span> {member.citizen.cpf}
+                                    </div>
+                                  )}
+                                  {member.citizen?.birthDate && (
+                                    <div>
+                                      <span className="font-medium">Nascimento:</span>{" "}
+                                      {new Date(member.citizen.birthDate).toLocaleDateString('pt-BR')}
+                                    </div>
+                                  )}
+                                  {member.citizen?.gender && (
+                                    <div>
+                                      <span className="font-medium">Sexo:</span>{" "}
+                                      {member.citizen.gender === 'M' ? 'Masculino' : member.citizen.gender === 'F' ? 'Feminino' : 'Outro'}
+                                    </div>
+                                  )}
+                                  <div>
+                                    <span className="font-medium">Desde:</span>{" "}
+                                    {new Date(member.joinedAt).toLocaleDateString('pt-BR')}
+                                  </div>
+                                </div>
+                                {member.notes && (
+                                  <p className="text-sm text-muted-foreground">
+                                    <span className="font-medium">Observações:</span> {member.notes}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex gap-1">
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => handleEditMember(member)}
+                                  data-testid={`button-edit-member-${member.id}`}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => handleTransferMember(member)}
+                                  data-testid={`button-transfer-member-${member.id}`}
+                                >
+                                  <ArrowRightLeft className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => setDeletingMember(member.id)}
+                                  data-testid={`button-delete-member-${member.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <Users className="h-16 w-16 mx-auto mb-4 opacity-20" />
+                      <p className="text-lg font-medium mb-2">Nenhum membro encontrado</p>
+                      <p className="text-sm mb-4">
+                        {relationshipFilter !== "all" 
+                          ? "Nenhum membro com este tipo de relacionamento"
+                          : "Adicione membros à família para começar"}
+                      </p>
+                      {relationshipFilter === "all" && (
+                        <Button onClick={() => {
+                          memberForm.reset({ familyId: selectedFamilyId, citizenId: "", relationshipType: "outro", isHeadOfFamily: false, notes: "" });
+                          setEditingMember(null);
+                          setMemberDialogOpen(true);
+                        }}>
+                          <UserPlus className="h-4 w-4 mr-2" />
+                          Adicionar Primeiro Membro
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {!selectedFamilyId && (
+              <Card>
+                <CardContent className="pt-12 pb-12">
+                  <div className="text-center text-muted-foreground">
+                    <Users className="h-16 w-16 mx-auto mb-4 opacity-20" />
+                    <p className="text-lg font-medium mb-2">Selecione uma Família</p>
+                    <p className="text-sm">
+                      Escolha uma família acima para visualizar sua hierarquia e gerenciar membros
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Add/Edit Member Dialog */}
+          <Dialog open={memberDialogOpen} onOpenChange={(open) => {
+            setMemberDialogOpen(open);
+            if (!open) {
+              setEditingMember(null);
+              memberForm.reset();
+            }
+          }}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>{editingMember ? "Editar Membro" : "Adicionar Membro à Família"}</DialogTitle>
+                <DialogDescription>
+                  {editingMember ? "Atualize as informações do membro" : "Vincule um cidadão a esta família"}
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...memberForm}>
+                <form onSubmit={memberForm.handleSubmit(onMemberSubmit)} className="space-y-4">
+                  <FormField
+                    control={memberForm.control}
+                    name="citizenId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cidadão</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={!!editingMember}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-citizen">
+                              <SelectValue placeholder="Selecione o cidadão" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {citizens.map((citizen) => (
+                              <SelectItem key={citizen.id} value={citizen.id}>
+                                {citizen.name} {citizen.cpf && `- CPF: ${citizen.cpf}`}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={memberForm.control}
+                    name="relationshipType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tipo de Relacionamento</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-relationship">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="responsavel_familiar">Responsável Familiar</SelectItem>
+                            <SelectItem value="conjuge">Cônjuge</SelectItem>
+                            <SelectItem value="filho">Filho(a)</SelectItem>
+                            <SelectItem value="neto">Neto(a)</SelectItem>
+                            <SelectItem value="pai_mae">Pai/Mãe</SelectItem>
+                            <SelectItem value="avo">Avô/Avó</SelectItem>
+                            <SelectItem value="irmao">Irmão/Irmã</SelectItem>
+                            <SelectItem value="outro">Outro</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={memberForm.control}
+                    name="isHeadOfFamily"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center gap-2 space-y-0">
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-head-of-family"
+                          />
+                        </FormControl>
+                        <FormLabel className="!mt-0">Responsável pela Família (Chefe de Família)</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={memberForm.control}
+                    name="notes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Observações (opcional)</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            {...field}
+                            placeholder="Informações adicionais sobre o membro"
+                            rows={3}
+                            data-testid="input-notes"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setMemberDialogOpen(false);
+                        setEditingMember(null);
+                        memberForm.reset();
+                      }}
+                      data-testid="button-cancel-member"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      disabled={addMemberMutation.isPending || updateMemberMutation.isPending}
+                      data-testid="button-submit-member"
+                    >
+                      {editingMember
+                        ? (updateMemberMutation.isPending ? "Atualizando..." : "Atualizar")
+                        : (addMemberMutation.isPending ? "Adicionando..." : "Adicionar")}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+
+          {/* Transfer Member Dialog */}
+          <Dialog open={transferDialogOpen} onOpenChange={(open) => {
+            setTransferDialogOpen(open);
+            if (!open) {
+              setEditingMember(null);
+              transferForm.reset();
+            }
+          }}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Transferir Membro para Outra Família</DialogTitle>
+                <DialogDescription>
+                  Remova {editingMember?.citizen?.name} desta família e adicione a outra
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...transferForm}>
+                <form onSubmit={transferForm.handleSubmit(onTransferSubmit)} className="space-y-4">
+                  <FormField
+                    control={transferForm.control}
+                    name="newFamilyId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Família de Destino</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-new-family">
+                              <SelectValue placeholder="Selecione a família" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {families.filter(f => f.id !== selectedFamilyId).map((family) => (
+                              <SelectItem key={family.id} value={family.id}>
+                                {family.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={transferForm.control}
+                    name="relationshipType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Novo Relacionamento</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-new-relationship">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="responsavel_familiar">Responsável Familiar</SelectItem>
+                            <SelectItem value="conjuge">Cônjuge</SelectItem>
+                            <SelectItem value="filho">Filho(a)</SelectItem>
+                            <SelectItem value="neto">Neto(a)</SelectItem>
+                            <SelectItem value="pai_mae">Pai/Mãe</SelectItem>
+                            <SelectItem value="avo">Avô/Avó</SelectItem>
+                            <SelectItem value="irmao">Irmão/Irmã</SelectItem>
+                            <SelectItem value="outro">Outro</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={transferForm.control}
+                    name="notes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Motivo da Transferência (opcional)</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            {...field}
+                            placeholder="Justificativa ou observações"
+                            rows={2}
+                            data-testid="input-transfer-notes"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setTransferDialogOpen(false);
+                        setEditingMember(null);
+                        transferForm.reset();
+                      }}
+                      data-testid="button-cancel-transfer"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      disabled={transferMemberMutation.isPending}
+                      data-testid="button-submit-transfer"
+                    >
+                      {transferMemberMutation.isPending ? "Transferindo..." : "Transferir"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+
+          {/* Delete Member Confirmation */}
+          <AlertDialog open={!!deletingMember} onOpenChange={(open) => !open && setDeletingMember(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirmar Remoção</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Tem certeza que deseja remover este membro da família? Esta ação não pode ser desfeita.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel data-testid="button-cancel-delete-member">Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => deletingMember && removeMemberMutation.mutate(deletingMember)}
+                  className="bg-destructive text-destructive-foreground hover-elevate active-elevate-2"
+                  data-testid="button-confirm-delete-member"
+                >
+                  {removeMemberMutation.isPending ? "Removendo..." : "Remover"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </TabsContent>
 
         <TabsContent value="visits">
