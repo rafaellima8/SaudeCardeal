@@ -1255,7 +1255,19 @@ export class DbStorage implements IStorage {
         throw new Error(`Não é possível transferir entre famílias de domicílios diferentes`);
       }
       
-      // 4. Execute transfer atomically
+      // 4. Check for duplicate active membership in destination family
+      const existingMember = await tx.select().from(schema.familyMembers).where(
+        and(
+          eq(schema.familyMembers.familyId, newFamilyId),
+          eq(schema.familyMembers.citizenId, citizenId),
+          isNull(schema.familyMembers.leftAt)
+        )
+      ).limit(1);
+      if (existingMember[0]) {
+        throw new Error(`Cidadão já é membro ativo da família de destino`);
+      }
+      
+      // 5. Execute transfer atomically
       // Mark as left from old family (only if not already set)
       await tx
         .update(schema.familyMembers)

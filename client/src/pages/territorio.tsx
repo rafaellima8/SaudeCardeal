@@ -145,7 +145,7 @@ export default function TerritoryPage() {
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null);
   
   // Territorial hierarchy state
-  const [selectedDwellingForHierarchy, setSelectedDwellingForHierarchy] = useState<string>("");
+  const [selectedDwellingForHierarchy, setSelectedDwellingForHierarchy] = useState<string | undefined>(undefined);
   const [memberDialogOpen, setMemberDialogOpen] = useState(false);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
@@ -188,8 +188,8 @@ export default function TerritoryPage() {
       neighborhood: "",
       zipCode: "",
       dwellingType: "casa",
-      sanitation: "rede_esgoto",
-      waterSupply: "rede_publica",
+      sanitation: undefined,
+      waterSupply: undefined,
       hasElectricity: true,
       hasAnimals: false,
       latitude: undefined,

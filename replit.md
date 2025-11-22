@@ -26,6 +26,11 @@ MuniSaúde Integrado is a comprehensive municipal health management system desig
 -   **Drizzle Schemas**: Regenerados `insertEsusExportSchema`, `InsertEsusExport` e `EsusExport` types; sincronizados com banco via `npm run db:push --force`
 -   **Refinamentos**: Corrigidos valores null em formulários usando `??` (nullish coalescing), queryKey com array segments para invalidação correta, transação atômica em transferFamilyMember
 
+### Melhorias Futuras (Refinamentos Pendentes)
+1. **transferFamilyMember**: Atualmente usa insert direto; poderia reutilizar addFamilyMember para garantir consistência total de metadados (joinedAt, notes padrão, auditoria)
+2. **Hierarchy Query**: Funciona com `enabled` flag; poderia adicionar queryFn explícito com guard e botão "Limpar seleção" para resetar estado para undefined (atualmente Select não pode emitir undefined)
+3. **Form Null Preservation**: Formulário usa `value ?? ""` em alguns inputs; poderia usar `field.value` diretamente com `?? null` no submit para preservar nulls de forma mais consistente
+
 ### Correções Anteriores
 -   **Schema Enhancement**: Added `batchId`, `jsonPath`, and `xmlPath` fields to `esusExports` table for future e-SUS export functionality.
 -   **Code Quality**: Resolved all 12 TypeScript LSP errors in `server/routes.ts`, including CNS validation null-safety guard and proper handling of disabled e-SUS export endpoint.
