@@ -35,7 +35,7 @@ The system features a modern UI with dark mode support. Typography uses Inter fo
 #### Fully Implemented & Operational
 
 -   **Territorial Management CRUD**: Complete CRUD for Dwellings and Home Visits.
--   **Family Hierarchy System (Backend Complete ✅)**: Territorial integration linking Citizens → Families → Dwellings with comprehensive member management:
+-   **Family Hierarchy System (✅ COMPLETO - Backend + Frontend)**: Territorial integration linking Citizens → Families → Dwellings with comprehensive member management:
     -   **Database Schema** (`shared/schema.ts`): `family_members` junction table with fields: family_id, citizen_id, relationship_type (responsavel_familiar/conjuge/filho/neto/pai_mae/avo/irmao/outro), is_head_of_family, joined_at, left_at, notes
     -   **API Endpoints** (`server/routes.ts`): 6 RESTful endpoints for family member CRUD:
         - `GET /api/families/:familyId/members` - List all members of a family
@@ -46,7 +46,17 @@ The system features a modern UI with dark mode support. Typography uses Inter fo
         - `GET /api/families/:familyId/hierarchy` - Get complete hierarchy (Dwelling → Family → Members with citizen data)
     -   **Storage Layer** (`server/storage.ts`): 6 methods including `getFamilyHierarchy()` with SQL joins to fetch complete family tree, auto-updates family member count on add/remove
     -   **Type Safety**: Full Zod validation schemas (`insertFamilyMemberSchema`) and TypeScript types (`FamilyMember`, `InsertFamilyMember`) exported from shared schema
-    -   **Frontend UI** (`client/src/pages/territorio.tsx`): New "Famílias" tab added (placeholder - full implementation pending)
+    -   **Frontend UI** (`client/src/pages/territorio.tsx`) - **"Famílias" Tab COMPLETA**:
+        * **Family Selector**: Dropdown com lista de famílias e contagem de membros
+        * **Visual Hierarchy Tree**: Cards mostrando Moradia → Família → Membros com dados completos
+        * **Member Cards**: Exibição rica com badges de relacionamento (8 tipos), status ativo/inativo, dados do cidadão (nome, CPF, nascimento, sexo), observações
+        * **CRUD Operations**: Formulários completos para adicionar, editar e remover membros com validação Zod
+        * **Transfer System**: Dialog dedicado para transferência entre famílias com preservação de metadados (isHeadOfFamily, notas históricas com rastreamento de mudança)
+        * **Filters**: Sistema de filtro por tipo de relacionamento (responsável familiar, cônjuge, filho, neto, pai/mãe, avô, irmão, outro)
+        * **Statistics Dashboard**: 4 cards com métricas (Total de Membros, Responsável Familiar, Membros Ativos, Membros Inativos) com toggle show/hide
+        * **TanStack Query Integration**: Custom queryFn para endpoint de hierarquia, invalidação de cache em todas mutations, estados loading/error
+        * **UX Enhancements**: Estados vazios informativos, toasts de sucesso/erro, confirmação de remoção com AlertDialog, data-testid em elementos interativos
+        * **Data Integrity**: Transferências usam padrão create-then-delete (reduz risco de órfãos), preservação de isHeadOfFamily e notas históricas com metadado de transferência
 -   **Endemic Disease Surveillance (ACE) CRUD**: Complete CRUD for work cycles, including dashboards with IIP/IB indicators.
 -   **Reports & Indicators**: Aggregated health indicators with professional PDF export and customizable filters.
 -   **Appointment Scheduling System**: Complete scheduling and queue management with weekly calendar, day/week views, and attendance queue.
