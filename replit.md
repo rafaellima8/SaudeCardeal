@@ -2,7 +2,7 @@
 
 ## Overview
 
-MuniSaúde Integrado é um sistema abrangente de gestão em saúde municipal desenvolvido para a Secretaria Municipal de Saúde de Cardeal da Silva, Bahia, Brasil. Seu propósito principal é integrar e otimizar os serviços de atenção primária à saúde, incluindo prontuário eletrônico (PEC), agendamentos, gestão de farmácia, transporte inter-municipal de pacientes (TFD) e relatórios robustos, tudo em conformidade com os padrões e-SUS APS. O sistema suporta diversos perfis de usuários como administradores, médicos, enfermeiros, agentes comunitários de saúde, farmacêuticos, gestores e recepcionistas, fornecendo interfaces personalizadas para melhorar a prestação de serviços de saúde, eficiência administrativa e supervisão de saúde pública. A visão de negócio é modernizar a gestão municipal de saúde, melhorar a coordenação do cuidado ao paciente e fornecer dados valiosos para iniciativas de saúde pública.
+MuniSaúde Integrado is a comprehensive municipal health management system designed for Cardeal da Silva, Bahia, Brazil. Its primary purpose is to integrate and optimize primary healthcare services, including electronic health records (PEC), scheduling, pharmacy management, inter-municipal patient transport (TFD), and robust reporting, all in compliance with e-SUS APS standards. The system supports various user profiles (administrators, doctors, nurses, community health agents, pharmacists, managers, receptionists) with tailored interfaces to enhance healthcare delivery, administrative efficiency, and public health oversight. The business vision is to modernize municipal health management, improve patient care coordination, and provide valuable data for public health initiatives.
 
 ## User Preferences
 
@@ -12,130 +12,94 @@ Preferred communication style: Simple, everyday language.
 
 ### Frontend Architecture
 
-The frontend is built with React 18+ and TypeScript, utilizing Vite for development and optimized builds, and Wouter for client-side routing. State management relies on TanStack Query v5 for server state and data caching, complemented by React hooks for local component state. The UI is developed using shadcn/ui with Radix UI primitives, adhering to Material Design 3 principles and styled with Tailwind CSS, including dark mode support. The design system incorporates the Inter font for UI and JetBrains Mono for code, with responsive grids, sidebar navigation, and max-width containers. Data visualization for dashboards and analytics is handled by Recharts.
+The frontend is built with React 18+ and TypeScript, using Vite for development and Wouter for client-side routing. State management uses TanStack Query v5 for server state and React hooks for local component state. The UI is developed with shadcn/ui and Radix UI primitives, adhering to Material Design 3 principles and styled with Tailwind CSS, including dark mode support. Data visualization for dashboards is handled by Recharts.
 
 ### Backend Architecture
 
-The backend is developed with Express.js and TypeScript on Node.js, implementing a RESTful API with JSON responses. Middleware is used for logging, JSON parsing, and error handling. PostgreSQL is the primary database (with SQLite for temporary local use), managed with Drizzle ORM for type-safe queries and migrations, following a schema-first design with Zod validation. A repository pattern with an interface-based storage abstraction layer (`server/storage.ts`) is employed for data access. API endpoints are resource-based, covering citizens, appointments, consultations, prescriptions, medications, exams, TFD, queues, health units, professionals, reports, territorial management (dwellings, families, home visits), and endemic disease surveillance. Security features include password-based authentication with bcrypt and session management via `express-session`, alongside Role-Based Access Control (RBAC) supporting 7 distinct user roles with dynamic menu filtering and a permission matrix.
-
-### Development & Deployment
-
-The development workflow includes Hot Module Replacement via Vite, TypeScript compilation, and ESM. The build process packages the frontend with Vite to `dist/public` and the backend with esbuild to `dist/index.js`. The application is optimized for Replit hosting on port 5000. Session management currently uses `MemoryStore`, with a future migration to a PostgreSQL session store planned.
+The backend uses Express.js and TypeScript on Node.js, implementing a RESTful API with JSON responses. PostgreSQL is the primary database (with SQLite for local use), managed with Drizzle ORM for type-safe queries and migrations. A repository pattern abstracts data access. API endpoints cover citizens, appointments, consultations, prescriptions, medications, exams, TFD, queues, health units, professionals, reports, territorial management, and endemic disease surveillance. Security includes password-based authentication with bcrypt, session management, and Role-Based Access Control (RBAC) supporting 7 distinct user roles.
 
 ### UI/UX Decisions
 
-The system incorporates a modern UI with a clean aesthetic, supporting dark mode. Typography uses Inter for readability and JetBrains Mono for code elements. Components are designed for accessibility, including ARIA labels, keyboard navigation, and screen reader compatibility. Dashboards feature summary cards, tables, and Recharts-powered graphs for data visualization. PDF exports are professionally styled with institutional branding and data representation consistent with the UI.
+The system features a modern UI with dark mode support. Typography uses Inter for readability and JetBrains Mono for code. Components are designed for accessibility. Dashboards include summary cards, tables, and Recharts-powered graphs. PDF exports are professionally styled with institutional branding.
 
-### Brand Identity System (COMPLETE ✅)
+### Brand Identity System
 
--   **Logo Component** (`client/src/components/Logo.tsx`): Professional React component with:
-    -   **4 Sizes**: `sm` (24px), `md` (32px), `lg` (48px), `xl` (64px)
-    -   **3 Color Schemes**: `color` (default #10B981), `monochrome` (current text color), `inverse` (for dark backgrounds)
-    -   **2 Variants**: Full logo with text "MuniSaúde Integrado" + icon-only variant
-    -   Applied in: login page, sidebar navigation, PDF headers
-    
--   **SVG Logo Utilities** (`client/src/lib/logo-svg.ts`): Helper functions for PDF generation
-    -   `getLogoSVG()`: Full logo with text for headers
-    -   `getLogoIconSVG()`: Icon-only for compact spaces
-    -   Embedded in jsPDF using data URIs with institutional #10B981 palette
-    
--   **Professional PDFs** (jsPDF + autoTable):
-    -   **Prescription PDFs**: Institutional header with embedded SVG logo, patient data, medication table, digital signature with professional registration
-    -   **Report PDFs**: Logo header, aggregated indicators, data tables with grid theme, footer with institutional address
-    -   Typography: Helvetica bold for headers, regular for body, monospace for data
-    
--   **Favicon** (`client/public/favicon.svg`): SVG icon version of the logo for browser tabs
-    
--   **Functional Color Palette** (`client/src/index.css`): Complete semantic color system
-    -   **Success**: `#10B981` (emerald) with auto-computed borders for light/dark themes
-    -   **Warning**: `#F59E0B` (amber) with auto-computed borders
-    -   **Info**: `#3B82F6` (blue) with auto-computed borders
-    -   **Destructive**: `#EF4444` (red) with auto-computed borders
-    -   All colors include matching foreground colors and auto-elevated border variants using CSS `hsl(from ...)` syntax
-    -   Fully compatible with light/dark mode switching
+-   **Logo Component**: React component with 4 sizes, 3 color schemes, and 2 variants (full and icon-only), applied in login, sidebar, and PDF headers.
+-   **SVG Logo Utilities**: Helper functions for PDF generation (`getLogoSVG()`, `getLogoIconSVG()`) embedded via data URIs.
+-   **Professional PDFs**: jsPDF + autoTable for prescriptions and reports, including institutional headers, patient data, medication tables, digital signatures, and aggregated indicators.
+-   **Favicon**: SVG icon version of the logo.
+-   **Functional Color Palette**: Semantic color system for success, warning, info, and destructive states, with light/dark mode compatibility.
 
 ### Feature Specifications
 
-The system currently includes fully functional modules for:
+#### Fully Implemented & Operational
 
-#### ✅ Fully Implemented & Operational
+-   **Territorial Management CRUD**: Complete CRUD for Dwellings and Home Visits.
+-   **Endemic Disease Surveillance (ACE) CRUD**: Complete CRUD for work cycles, including dashboards with IIP/IB indicators.
+-   **Reports & Indicators**: Aggregated health indicators with professional PDF export and customizable filters.
+-   **Appointment Scheduling System**: Complete scheduling and queue management with weekly calendar, day/week views, and attendance queue.
+-   **Electronic Prescriptions**: Complete prescription management with transactional integrity, integrated into consultations, and robust PDF export with filtering capabilities.
 
--   **Territorial Management CRUD**: Complete create/read/update/delete operations for:
-    -   **Dwellings** (Imóveis): Edit/delete buttons, dynamic forms, mutation handlers, AlertDialog confirmations
-    -   **Home Visits** (Visitas Domiciliares): Full CRUD with backend PATCH/DELETE routes, form reuse, confirmation dialogs
-    -   **Families** (Famílias): Backend CRUD complete (`updateFamily`, `deleteFamily` in storage + routes), frontend UI pending
-    
--   **Endemic Disease Surveillance (ACE) CRUD**: Complete CRUD for work cycles:
-    -   **Cycles** (Ciclos): Edit/delete buttons, mutations, dynamic dialog (create/edit modes), AlertDialog confirmations
-    -   **FAD/Foci/Treatments**: Backend routes ready (PATCH/DELETE), can replicate same pattern from cycles
-    -   Dashboards: IIP/IB indicators, heatmaps, charts with Recharts
-    
--   **Reports & Indicators**: Aggregated health indicators with professional PDF export (jsPDF + autotable), customizable filters (period, health unit), detailed breakdowns of consultations, diagnoses, medications, and age distribution
+-   **AI Medical Assistant (Production-Ready ✅)**: OpenAI GPT-5 powered diagnostic and prescription safety system with complete validation, error handling, and medical compliance safeguards:
+    -   **Integration**: Replit AI Integrations for OpenAI (no API key required, charges to Replit credits)
+    -   **Model**: `gpt-5` (latest OpenAI model released August 2025 with best medical knowledge)
+    -   **Services** (`server/services/medical-ai.ts`):
+        - **Diagnosis Suggestion**: Suggests up to 3 differential diagnoses with CIAP-2 and CID-10 codes based on SOAP data and vital signs, with confidence levels (high/medium/low)
+        - **Drug Interaction Check**: Analyzes medication combinations for critical/major/moderate/minor interactions with mechanistic explanations
+        - **Prescription Validation**: Validates dosages, checks contraindications, suggests adjustments based on age/weight/comorbidities with severity classification
+        - **Care Plan Generation**: Auto-generates SOAP "Plan" section based on Subjective/Objective/Assessment data (max 200 words)
+    -   **API Endpoints** (`server/routes-ai.ts`):
+        - `POST /api/ai/diagnose` - Diagnosis suggestions (requires subjective, optional objective/vitalSigns)
+        - `POST /api/ai/check-interactions` - Drug interaction analysis (requires medications array with min 2 items)
+        - `POST /api/ai/validate-prescription` - Prescription safety validation (requires medication/dosage/frequency)
+        - `POST /api/ai/generate-plan` - Auto-generate care plan (requires subjective/objective/assessment)
+    -   **Input/Output Validation** (`shared/ai-schemas.ts`):
+        - **Zod Schemas**: Strict validation for all request payloads (vital signs types, medication objects, required fields)
+        - **Response Validation**: AI outputs are validated against schemas before being returned to clients
+        - **Type Safety**: Full TypeScript types exported for frontend integration
+    -   **Error Handling & Reliability**:
+        - **Structured Error Logging**: Correlation IDs, timestamps, operation context for debugging
+        - **Safe JSON Parsing**: Try/catch guards prevent exceptions from malformed AI responses
+        - **Graceful Degradation**: Returns success/error objects with actionable messages when AI fails
+        - **Status 503**: AI failures return "Service Unavailable" with clear client feedback
+    -   **Medical Compliance & Safety**:
+        - **Explicit Disclaimers**: All prompts and responses include warnings that AI is advisory only
+        - **Professional Decision Authority**: Clearly states final decision is ALWAYS with licensed professional
+        - **Conservative Approach**: AI instructed to be cautious, prioritize primary care diagnoses, avoid suggesting severe conditions without evidence
+        - **Evidence-Based**: Prompts require AI to follow Brazilian e-SUS APS protocols and recognized clinical guidelines
+    -   **Security & Access Control**:
+        - **RBAC Enforcement**: Only doctors and nurses can access AI endpoints (via `requireRole(["doctor", "nurse"])` middleware)
+        - **Authentication**: All endpoints protected by session authentication
+        - **Audit Trail**: Structured logging captures all AI interactions with user context
+        - **Rate Limiting**: 10 requests/minute per user (in-memory, single-instance deployment required)
+        - **Input Limits**: Max 2000 chars for text fields, max 15 medications, max 20 comorbidities
+        - **Durable Audit Logs**: All 4 endpoints save logs to `ai_audit_logs` table (userId, operation, latency, error tracking)
+    -   **Limitations**:
+        - **Single-Instance Required**: Rate limiter uses in-memory state, requires single-instance deployment or Redis upgrade
+    -   **Frontend Integration**: Ready for integration in SOAP consultation forms (Avaliação/Plano tabs) with full type safety
 
--   **Appointment Scheduling System**: Complete scheduling and queue management solution:
-    -   **Appointments Page** (/agendamentos): Weekly calendar grid, day/week view toggle, appointment creation dialog, filters by professional/unit, detailed daily schedule with colored status badges
-    -   **Attendance Queue** (/fila-atendimento): Reception dashboard with status-based workflow (scheduled → confirmed → in-progress → completed), transition buttons with AlertDialog confirmations, separate sections for completed/cancelled/no-show appointments
-    -   Backend CRUD already complete with composite filters (date, professional, unit, status)
+#### Architected & Documented (Pending Implementation)
 
--   **Electronic Prescriptions (Production-Ready)**: Complete prescription management with transactional integrity:
-    -   **Schema**: Prescriptions linked to consultations, citizens, and professionals with full medication details (dosage, frequency, duration, quantity, instructions)
-    -   **Transactional Backend**: `POST /api/consultations-with-prescriptions` endpoint using Drizzle `db.transaction()` for atomic persistence
-    -   **Architecture Pattern**: Single payload with consultation + prescriptions array ensures all-or-nothing saves (automatic rollback on any failure)
-    -   **Prescription Dialog**: Integrated into SOAP "Plano" tab with add/edit/delete draft management before submission
-    -   **Data Integrity**: Impossible to create orphaned prescriptions or consultations without prescriptions when prescribed
-    -   **UX Features**: Draft state persists on error for retry, success feedback with prescription count, form validation with Zod
-    -   **Code Quality**: Architect-approved implementation, reduced from ~90 to ~45 lines with cleaner deterministic UX
-    
--   **Prescription History & PDF Export (Production-Ready)**: Complete prescription tracking and professional PDF generation:
-    -   **Page**: `/prescricoes` with comprehensive filtering interface (4-column grid layout)
-    -   **Server-Side Filtering**: GET `/api/prescriptions` with citizenId, professionalId, consultationId, startDate, endDate filters
-    -   **UI Filters**: Text search (patient/medication/professional), select dropdowns (patient, professional), date range picker (Popover + dual Calendar)
-    -   **Data Display**: Table with date, patient, medication, dosage (Badge), professional, PDF download button
-    -   **PDF Generation**: Professional jsPDF + autoTable layout with:
-        - Institutional header: Prefeitura + Secretaria + State + CNPJ
-        - Patient identification: name, CNS, birthDate/age, consultation date
-        - Prescription table: medication, dosage, frequency, duration, quantity, instructions (grid theme)
-        - Digital signature: professional name + registration (CRM/COREN/etc) + role
-        - Footer: institutional data + full address + CEP + emission timestamp
-    -   **IStorage Interface**: Updated with all filter parameters (citizenId, consultationId, professionalId, startDate, endDate)
-    -   **Test Coverage**: 100% data-testid attributes on interactive elements (buttons, inputs, table rows, select options)
+-   **SOAP Consultation Schema**: e-SUS PEC v5.3 compliant schema for Subjective, Objective, Assessment, and Plan, including vital signs, CIAP-2, and CID-10 codes.
 
-#### 📋 Architected & Documented (Pending Implementation)
+#### Partially Implemented (Awaiting Database Migration)
 
--   **SOAP Consultation Schema** (e-SUS PEC v5.3 compliant):
-    -   **S** (Subjective): Patient complaints, history, anamnesis  
-    -   **O** (Objective): Physical exam, vital signs (BP, HR, temp, SpO2, weight, height, BMI, abdominal circumference)
-    -   **A** (Assessment): Diagnoses with CIAP-2 and CID-10 codes (JSON arrays)
-    -   **P** (Plan): Treatment plan, prescriptions, referrals, guidance
-    -   Appointment linkage, consultation type enum (scheduled, spontaneous demand, urgency, home visit)
-    -   **Status**: Schema designed, SQLite migration deferred due to ALTER TABLE constraints (requires table recreation strategy)
+-   **SOAP Consultation UI (Frontend Complete)**: Full consultation form with 4 SOAP tabs and vital signs inputs. Backend API routes are updated, but SOAP fields are not yet persisted due to SQLite limitations.
 
-#### 🚧 Partially Implemented (Awaiting Database Migration)
+#### Next Development Priorities
 
--   **SOAP Consultation UI (Frontend Complete)**:
-    -   ✅ Full consultation form with 4 SOAP tabs (Subjetivo, Objetivo, Avaliação, Plano)
-    -   ✅ 9 vital signs inputs (PA, FC, temp, FR, SpO2, peso, altura, circ. abdominal)
-    -   ✅ CIAP-2 selector with 15 common codes + CID-10 selector with 14 common codes
-    -   ✅ Consultation listing with patient/professional join
-    -   ✅ Backend API routes updated with proper filtering (`and()` composite conditions)
-    -   ❌ **SOAP fields NOT persisted**: subjective/objective/assessment/plan, vitalSigns JSON, ciap2Codes/cid10Codes arrays are collected but dropped (SQLite limitation)
-    -   ⚠️ **Workaround**: Legacy fields still functional (chiefComplaint, diagnosis, treatmentPlan, notes)
-    -   📌 **Next**: Migrate to PostgreSQL or recreate SQLite table with SOAP schema
-
-#### 🔨 Next Development Priorities
-
-1. **Database Migration**: PostgreSQL migration or SQLite table recreation to persist SOAP fields (subjective, objective, assessment, plan, vitalSigns, ciap2Codes, cid10Codes)
-2. **Territorial Integration**: Citizen → Family → Domicile → Dwelling linkages with cascading views
-3. **Patient Summary Sheet**: Longitudinal health record with consultation history, medications, exams, vaccinations
-4. **Medication Stock Management**: Pharmacy inventory control with batch tracking, expiration alerts, and automated reorder points
-5. **Reception Workflow Enhancements**: Add escuta inicial (initial triage), risk classification, automatic queue ordering by priority
+1.  **Database Migration**: Migrate to PostgreSQL or recreate SQLite table for SOAP field persistence.
+2.  **Territorial Integration**: Link Citizen → Family → Domicile → Dwelling.
+3.  **Patient Summary Sheet**: Longitudinal health record.
+4.  **Medication Stock Management**: Pharmacy inventory control.
+5.  **Reception Workflow Enhancements**: Add initial triage and risk classification.
 
 ## External Dependencies
 
 ### Third-Party Services
 
--   **Database**: SQLite (local, temporary, `saude.db`) and PostgreSQL (primary).
--   **e-SUS APS Integration**: An export module (`server/integrations/esus/`) is in place for compliance with the Brazilian national healthcare system, utilizing Zod schemas for data conformity and mapping documentation.
+-   **Database**: SQLite (local) and PostgreSQL (primary).
+-   **e-SUS APS Integration**: Export module (`server/integrations/esus/`) for compliance with Brazilian national healthcare standards.
 
 ### Key NPM Packages
 

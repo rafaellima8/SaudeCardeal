@@ -423,6 +423,26 @@ export const focalTreatments = sqliteTable("focal_treatments", {
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
+// AI Audit Logs (Registros de Auditoria de IA para Compliance Médico)
+export const aiAuditLogs = sqliteTable("ai_audit_logs", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  userId: text("user_id").notNull().references(() => users.id),
+  userName: text("user_name").notNull(),
+  userRole: text("user_role").notNull(),
+  operation: text("operation", {
+    enum: ["diagnose", "drug_interactions", "validate_prescription", "generate_care_plan"]
+  }).notNull(),
+  inputData: text("input_data", { mode: "json" }), // Dados de entrada (JSON)
+  success: integer("success", { mode: "boolean" }).notNull(),
+  errorCode: text("error_code"), // ID de correlação de erro
+  errorMessage: text("error_message"), // Mensagem de erro (se houver)
+  completionTokens: integer("completion_tokens"), // Tokens usados pela IA
+  latencyMs: integer("latency_ms"), // Latência em milissegundos
+  citizenId: text("citizen_id"), // ID do cidadão (se aplicável)
+  consultationId: text("consultation_id"), // ID da consulta (se aplicável)
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
 // ============================================================================
 // INSERT SCHEMAS (Zod Validation)
 // ============================================================================
@@ -593,3 +613,10 @@ export type Focus = typeof foci.$inferSelect;
 
 export type InsertFocalTreatment = z.infer<typeof insertFocalTreatmentSchema>;
 export type FocalTreatment = typeof focalTreatments.$inferSelect;
+
+export const insertAiAuditLogSchema = createInsertSchema(aiAuditLogs).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAiAuditLog = z.infer<typeof insertAiAuditLogSchema>;
+export type AiAuditLog = typeof aiAuditLogs.$inferSelect;

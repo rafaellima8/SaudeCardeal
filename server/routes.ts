@@ -24,6 +24,7 @@ import {
 import { z } from "zod";
 import { generateExport } from "./integrations/esus/exporter";
 import { authenticateUser, requireAuth, requireRole } from "./auth";
+import aiRoutes from "./routes-ai";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
@@ -82,6 +83,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
   // PROTECTED API ROUTES - All routes below require authentication
   // ============================================================================
+
+  // ============================================================================
+  // AI MEDICAL ASSISTANT ROUTES
+  // ============================================================================
+  app.use("/api/ai", aiRoutes);
 
   // Citizens API
   app.get("/api/citizens", async (req, res) => {
