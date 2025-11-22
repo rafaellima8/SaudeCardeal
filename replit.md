@@ -76,7 +76,17 @@ The system features a modern UI with dark mode support. Typography uses Inter fo
         - **Durable Audit Logs**: All 4 endpoints save logs to `ai_audit_logs` table (userId, operation, latency, error tracking)
     -   **Limitations**:
         - **Single-Instance Required**: Rate limiter uses in-memory state, requires single-instance deployment or Redis upgrade
-    -   **Frontend Integration**: Ready for integration in SOAP consultation forms (Avaliação/Plano tabs) with full type safety
+    -   **Frontend Integration (✅ COMPLETA)**:
+        - **Hooks** (`client/src/hooks/use-ai-assistant.ts`): 4 custom hooks com TanStack Query para todos os endpoints
+        - **UI Component** (`client/src/components/AIAssistantButton.tsx`): Botão reutilizável com ícone Sparkles e estados loading
+        - **SOAP Forms** (`client/src/pages/consultations.tsx`):
+          * **Aba Assessment**: Botão "Sugerir Diagnósticos com IA" - exibe até 3 hipóteses diagnósticas com CIAP-2/CID-10, badges de confiança (Alta/Média/Baixa), raciocínio clínico, e botão "Aplicar" para adicionar códigos aos seletores
+          * **Aba Plan**: Botão "Gerar Plano com IA" - gera plano terapêutico baseado em S.O.A. e insere no textarea do Plano
+          * **Prescrições Individuais**: Botão "Validar com IA" em cada card de prescrição - valida dosagem, detecta contraindicações, exibe alertas com badges de severidade (ERRO/CONTRAINDICAÇÃO/ATENÇÃO/INFO)
+          * **Prescrições Múltiplas**: Botão "Verificar Interações com IA" (aparece quando >= 2 prescrições) - detecta interações medicamentosas com severidade (CRÍTICA/MAIOR/MODERADA/MENOR) e recomendações
+        - **Validação Robusta**: Campos obrigatórios com mínimo 10 caracteres antes de chamar IA
+        - **Disclaimers Destacados**: Avisos em amarelo em TODAS as respostas de IA alertando que a decisão final é do profissional
+        - **UX/UI**: Loading states, toasts de sucesso/erro, cards coloridos por tipo de alerta, badges de severidade/confiança
 
 #### Architected & Documented (Pending Implementation)
 

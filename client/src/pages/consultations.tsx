@@ -15,10 +15,20 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, FileText, User, Activity, Stethoscope, ClipboardList, Pill, Trash2, Edit } from "lucide-react";
+import { Plus, FileText, User, Activity, Stethoscope, ClipboardList, Pill, Trash2, Edit, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AIAssistantButton } from "@/components/AIAssistantButton";
+import { 
+  useAIDiagnosis, 
+  useAIGeneratePlan, 
+  useAIDrugInteractions, 
+  useAIValidatePrescription,
+  type DiagnosisSuggestion,
+  type DrugInteraction,
+  type DosageAlert
+} from "@/hooks/use-ai-assistant";
 
 // Tipo para prescrição temporária (antes de salvar)
 interface PrescriptionDraft {
@@ -338,7 +348,15 @@ export default function ConsultationsPage() {
   const [prescriptionDialogOpen, setPrescriptionDialogOpen] = useState(false);
   const [editingPrescription, setEditingPrescription] = useState<PrescriptionDraft | null>(null);
   const [deletingPrescription, setDeletingPrescription] = useState<string | null>(null);
+  const [aiSuggestions, setAiSuggestions] = useState<DiagnosisSuggestion[]>([]);
+  const [aiInteractions, setAiInteractions] = useState<DrugInteraction[]>([]);
+  const [aiAlerts, setAiAlerts] = useState<DosageAlert[]>([]);
   const { toast } = useToast();
+  
+  const diagnosisMutation = useAIDiagnosis();
+  const generatePlanMutation = useAIGeneratePlan();
+  const interactionsMutation = useAIDrugInteractions();
+  const validatePrescriptionMutation = useAIValidatePrescription();
 
   const { data: citizens = [] } = useQuery<Array<{ id: string; name: string; cns?: string }>>({
     queryKey: ['/api/citizens'],
@@ -856,6 +874,135 @@ export default function ConsultationsPage() {
                       )}
                     />
 
+                    {/* Botão de IA para Sugestão de Diagnósticos */}
+                    <div className="flex items-center gap-2">
+                      <AIAssistantButton
+                        onClick={() => {
+                          const subjective = form.getValues("subjective");
+                          const objective = form.getValues("objective");
+                          const vitalSigns = form.getValues("vitalSigns");
+                          
+                          if (!subjective || subjective.trim().length < 10) {
+                            toast({
+                              variant: "destructive",
+                              title: "Dados Insuficientes",
+                              description: "O campo Subjetivo precisa ter pelo menos 10 caracteres.",
+                            });
+                            return;
+                          }
+
+                          diagnosisMutation.mutate(
+                            {
+                              subjective,
+                              objective: objective || undefined,
+                              vitalSigns: {
+                                heartRate: vitalSigns?.heartRate ? Number(vitalSigns.heartRate) : undefined,
+                                temperature: vitalSigns?.temperature ? Number(vitalSigns.temperature) : undefined,
+                                respiratoryRate: vitalSigns?.respiratoryRate ? Number(vitalSigns.respiratoryRate) : undefined,
+                                oxygenSaturation: vitalSigns?.oxygenSaturation ? Number(vitalSigns.oxygenSaturation) : undefined,
+                                weight: vitalSigns?.weight ? Number(vitalSigns.weight) : undefined,
+                                height: vitalSigns?.height ? Number(vitalSigns.height) : undefined,
+                              },
+                            },
+                            {
+                              onSuccess: (data) => {
+                                if (data.success && data.suggestions) {
+                                  setAiSuggestions(data.suggestions);
+                                  toast({
+                                    title: "Sugestões Geradas",
+                                    description: `${data.suggestions.length} hipótese(s) diagnóstica(s) sugerida(s) pela IA.`,
+                                  });
+                                }
+                              },
+                              onError: (error: Error) => {
+                                toast({
+                                  variant: "destructive",
+                                  title: "Erro na IA",
+                                  description: error.message || "Não foi possível gerar sugestões.",
+                                });
+                              },
+                            }
+                          );
+                        }}
+                        loading={diagnosisMutation.isPending}
+                        data-testid="button-ai-diagnose"
+                      >
+                        Sugerir Diagnósticos com IA
+                      </AIAssistantButton>
+                      {diagnosisMutation.isPending && (
+                        <span className="text-sm text-muted-foreground">Analisando dados clínicos...</span>
+                      )}
+                    </div>
+
+                    {/* Exibição das Sugestões de IA */}
+                    {aiSuggestions.length > 0 && (
+                      <div className="border rounded-lg p-4 space-y-3 bg-blue-50 dark:bg-blue-950/20">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="h-5 w-5 text-blue-600" />
+                          <h3 className="font-semibold">Sugestões de Diagnóstico (IA)</h3>
+                        </div>
+                        <div className="space-y-2">
+                          {aiSuggestions.map((suggestion, idx) => {
+                            const alreadyApplied = selectedCiap2.includes(suggestion.ciap2Code) && selectedCid10.includes(suggestion.cid10Code);
+                            return (
+                              <Card key={idx} className="p-3">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex-1 space-y-1">
+                                    <div className="flex items-center gap-2">
+                                      <Badge variant={
+                                        suggestion.confidence === "high" ? "default" :
+                                        suggestion.confidence === "medium" ? "secondary" : "outline"
+                                      }>
+                                        {suggestion.confidence === "high" ? "Alta" : 
+                                         suggestion.confidence === "medium" ? "Média" : "Baixa"}
+                                      </Badge>
+                                      <span className="font-semibold text-sm">
+                                        {suggestion.ciap2Code} / {suggestion.cid10Code}
+                                      </span>
+                                    </div>
+                                    <p className="text-sm">{suggestion.ciap2Description}</p>
+                                    <p className="text-xs text-muted-foreground italic">{suggestion.reasoning}</p>
+                                  </div>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant={alreadyApplied ? "secondary" : "outline"}
+                                      disabled={alreadyApplied}
+                                      onClick={() => {
+                                        const newCiap2 = selectedCiap2.includes(suggestion.ciap2Code) 
+                                          ? selectedCiap2 
+                                          : [...selectedCiap2, suggestion.ciap2Code];
+                                        const newCid10 = selectedCid10.includes(suggestion.cid10Code)
+                                          ? selectedCid10
+                                          : [...selectedCid10, suggestion.cid10Code];
+                                        
+                                        setSelectedCiap2(newCiap2);
+                                        setSelectedCid10(newCid10);
+                                        toast({
+                                          title: "Códigos Aplicados",
+                                          description: `${suggestion.ciap2Code} e ${suggestion.cid10Code} adicionados.`,
+                                        });
+                                      }}
+                                      data-testid={`button-apply-suggestion-${idx}`}
+                                    >
+                                      {alreadyApplied ? "Aplicado" : "Aplicar"}
+                                    </Button>
+                                  </div>
+                                </div>
+                              </Card>
+                            );
+                          })}
+                        </div>
+                        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-3">
+                          <p className="text-xs text-yellow-800 dark:text-yellow-200 font-semibold">
+                            ⚠️ AVISO IMPORTANTE: As sugestões da IA são apenas auxiliares para apoio à decisão clínica. 
+                            A responsabilidade pelo diagnóstico e tratamento é exclusivamente do profissional de saúde.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* CIAP-2 */}
                     <div className="border rounded-lg p-4 space-y-3">
                       <div className="flex items-center justify-between">
@@ -926,6 +1073,57 @@ export default function ConsultationsPage() {
                       )}
                     />
 
+                    {/* Botão de IA para Gerar Plano */}
+                    <div className="flex items-center gap-2">
+                      <AIAssistantButton
+                        onClick={() => {
+                          const subjective = form.getValues("subjective") || "";
+                          const objective = form.getValues("objective") || "";
+                          const assessment = form.getValues("assessment") || "";
+                          
+                          if (subjective.trim().length < 10 || objective.trim().length < 10 || assessment.trim().length < 10) {
+                            toast({
+                              variant: "destructive",
+                              title: "Dados Insuficientes",
+                              description: "Preencha Subjetivo, Objetivo e Avaliação (mínimo 10 caracteres cada).",
+                            });
+                            return;
+                          }
+
+                          generatePlanMutation.mutate(
+                            { subjective, objective, assessment },
+                            {
+                              onSuccess: (data) => {
+                                if (data.success && data.plan) {
+                                  const currentPlan = form.getValues("plan") || "";
+                                  const separator = currentPlan.trim() ? "\n\n---\n\n" : "";
+                                  form.setValue("plan", currentPlan + separator + data.plan, { shouldValidate: true });
+                                  toast({
+                                    title: "Plano Gerado pela IA",
+                                    description: "Revise o texto gerado antes de salvar a consulta.",
+                                  });
+                                }
+                              },
+                              onError: (error: Error) => {
+                                toast({
+                                  variant: "destructive",
+                                  title: "Erro ao Gerar Plano",
+                                  description: error.message || "Não foi possível conectar ao serviço de IA.",
+                                });
+                              },
+                            }
+                          );
+                        }}
+                        loading={generatePlanMutation.isPending}
+                        data-testid="button-ai-generate-plan"
+                      >
+                        Gerar Plano com IA
+                      </AIAssistantButton>
+                      {generatePlanMutation.isPending && (
+                        <span className="text-sm text-muted-foreground">Gerando plano terapêutico...</span>
+                      )}
+                    </div>
+
                     <FormField
                       control={form.control}
                       name="notes"
@@ -973,63 +1171,236 @@ export default function ConsultationsPage() {
                           <p className="text-xs">Clique em "Adicionar Prescrição" para prescrever medicamentos</p>
                         </div>
                       ) : (
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           {prescriptions.map((prescription) => (
-                            <Card key={prescription.id} className="p-4" data-testid={`prescription-card-${prescription.id}`}>
-                              <div className="flex items-start justify-between">
-                                <div className="flex-1 space-y-1">
-                                  <div className="font-semibold text-base">{prescription.medication}</div>
-                                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                                    <div>
-                                      <span className="text-muted-foreground">Posologia:</span>{" "}
-                                      <span className="font-medium">{prescription.dosage}</span>
+                            <div key={prescription.id} className="space-y-2">
+                              <Card className="p-4" data-testid={`prescription-card-${prescription.id}`}>
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1 space-y-1">
+                                    <div className="font-semibold text-base">{prescription.medication}</div>
+                                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                                      <div>
+                                        <span className="text-muted-foreground">Posologia:</span>{" "}
+                                        <span className="font-medium">{prescription.dosage}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-muted-foreground">Frequência:</span>{" "}
+                                        <span className="font-medium">{prescription.frequency}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-muted-foreground">Duração:</span>{" "}
+                                        <span className="font-medium">{prescription.duration}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-muted-foreground">Quantidade:</span>{" "}
+                                        <span className="font-medium">{prescription.quantity}</span>
+                                      </div>
                                     </div>
-                                    <div>
-                                      <span className="text-muted-foreground">Frequência:</span>{" "}
-                                      <span className="font-medium">{prescription.frequency}</span>
+                                    {prescription.instructions && (
+                                      <div className="text-sm pt-1">
+                                        <span className="text-muted-foreground">Instruções:</span>{" "}
+                                        <span className="italic">{prescription.instructions}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex gap-1 ml-4">
+                                    <AIAssistantButton
+                                      variant="secondary"
+                                      size="sm"
+                                      onClick={() => {
+                                        const vitalSigns = form.getValues("vitalSigns");
+                                        validatePrescriptionMutation.mutate(
+                                          {
+                                            medication: prescription.medication,
+                                            dosage: prescription.dosage,
+                                            frequency: prescription.frequency,
+                                            patientWeight: vitalSigns?.weight ? Number(vitalSigns.weight) : undefined,
+                                          },
+                                          {
+                                            onSuccess: (data) => {
+                                              if (data.success) {
+                                                setAiAlerts(data.alerts || []);
+                                                toast({
+                                                  title: data.alerts && data.alerts.length > 0
+                                                    ? `${data.alerts.length} alerta(s) encontrado(s)`
+                                                    : "Prescrição validada",
+                                                  description: data.alerts && data.alerts.length > 0 
+                                                    ? "Revise os alertas abaixo." 
+                                                    : "Nenhum problema detectado.",
+                                                });
+                                              }
+                                            },
+                                            onError: (error: Error) => {
+                                              toast({
+                                                variant: "destructive",
+                                                title: "Erro ao Validar",
+                                                description: error.message || "Não foi possível validar a prescrição.",
+                                              });
+                                            },
+                                          }
+                                        );
+                                      }}
+                                      loading={validatePrescriptionMutation.isPending}
+                                      data-testid={`button-validate-prescription-${prescription.id}`}
+                                    >
+                                      Validar com IA
+                                    </AIAssistantButton>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => {
+                                        setEditingPrescription(prescription);
+                                        setPrescriptionDialogOpen(true);
+                                      }}
+                                      data-testid={`button-edit-prescription-${prescription.id}`}
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => setDeletingPrescription(prescription.id)}
+                                      data-testid={`button-delete-prescription-${prescription.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </Card>
+                              
+                              {/* Alertas de Validação Individual */}
+                              {aiAlerts.length > 0 && validatePrescriptionMutation.isSuccess && (
+                                <div className="border rounded-lg p-3 space-y-2 bg-red-50 dark:bg-red-950/20 ml-4">
+                                  <div className="flex items-center gap-2">
+                                    <Sparkles className="h-4 w-4 text-red-600" />
+                                    <h5 className="font-semibold text-sm">Alertas de Segurança</h5>
+                                  </div>
+                                  {aiAlerts.map((alert, idx) => (
+                                    <div key={idx} className="border-l-4 pl-2 py-1" style={{
+                                      borderColor:
+                                        alert.type === "dosage_error" ? "#dc2626" :
+                                        alert.type === "contraindication" ? "#ea580c" :
+                                        alert.type === "warning" ? "#f59e0b" : "#3b82f6"
+                                    }}>
+                                      <div className="flex items-start gap-2">
+                                        <Badge variant={
+                                          alert.type === "dosage_error" ? "destructive" :
+                                          alert.type === "contraindication" ? "destructive" :
+                                          alert.type === "warning" ? "secondary" : "outline"
+                                        } className="text-xs">
+                                          {alert.type === "dosage_error" ? "ERRO DOSAGEM" :
+                                           alert.type === "contraindication" ? "CONTRAINDICAÇÃO" :
+                                           alert.type === "warning" ? "ATENÇÃO" : "INFO"}
+                                        </Badge>
+                                        <div className="flex-1 text-xs">
+                                          <p className="font-semibold">{alert.medication}</p>
+                                          <p className="text-muted-foreground">{alert.message}</p>
+                                          {alert.suggestion && (
+                                            <p className="italic mt-1">💡 {alert.suggestion}</p>
+                                          )}
+                                        </div>
+                                      </div>
                                     </div>
-                                    <div>
-                                      <span className="text-muted-foreground">Duração:</span>{" "}
-                                      <span className="font-medium">{prescription.duration}</span>
-                                    </div>
-                                    <div>
-                                      <span className="text-muted-foreground">Quantidade:</span>{" "}
-                                      <span className="font-medium">{prescription.quantity}</span>
+                                  ))}
+                                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-2">
+                                    <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                                      ⚠️ Alertas são sugestões. Sempre use seu julgamento clínico.
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Botões de IA para Prescrições */}
+                      {prescriptions.length >= 2 && (
+                        <div className="pt-2 space-y-3">
+                          <div className="flex items-center gap-2">
+                            <AIAssistantButton
+                              onClick={() => {
+                                const medications = prescriptions.map(p => ({
+                                  medication: p.medication,
+                                  dosage: p.dosage,
+                                  frequency: p.frequency,
+                                }));
+
+                                interactionsMutation.mutate(
+                                  { medications },
+                                  {
+                                    onSuccess: (data) => {
+                                      if (data.success) {
+                                        setAiInteractions(data.interactions || []);
+                                        toast({
+                                          title: data.interactions && data.interactions.length > 0 
+                                            ? `${data.interactions.length} interação(ões) detectada(s)` 
+                                            : "Nenhuma interação detectada",
+                                          description: "Revise as interações abaixo.",
+                                        });
+                                      }
+                                    },
+                                    onError: (error: Error) => {
+                                      toast({
+                                        variant: "destructive",
+                                        title: "Erro ao Verificar Interações",
+                                        description: error.message || "Não foi possível conectar à IA.",
+                                      });
+                                    },
+                                  }
+                                );
+                              }}
+                              loading={interactionsMutation.isPending}
+                              data-testid="button-ai-check-interactions"
+                            >
+                              Verificar Interações com IA
+                            </AIAssistantButton>
+                            {interactionsMutation.isPending && (
+                              <span className="text-sm text-muted-foreground">Analisando combinações...</span>
+                            )}
+                          </div>
+
+                          {/* Exibição de Interações */}
+                          {aiInteractions.length > 0 && (
+                            <div className="border rounded-lg p-3 space-y-2 bg-orange-50 dark:bg-orange-950/20">
+                              <div className="flex items-center gap-2">
+                                <Sparkles className="h-5 w-5 text-orange-600" />
+                                <h4 className="font-semibold text-sm">Interações Detectadas</h4>
+                              </div>
+                              {aiInteractions.map((interaction, idx) => (
+                                <div key={idx} className="border-l-4 pl-3 py-2" style={{
+                                  borderColor: 
+                                    interaction.severity === "critical" ? "#dc2626" :
+                                    interaction.severity === "major" ? "#ea580c" :
+                                    interaction.severity === "moderate" ? "#f59e0b" : "#84cc16"
+                                }}>
+                                  <div className="flex items-start gap-2">
+                                    <Badge variant={
+                                      interaction.severity === "critical" ? "destructive" :
+                                      interaction.severity === "major" ? "destructive" :
+                                      interaction.severity === "moderate" ? "secondary" : "outline"
+                                    }>
+                                      {interaction.severity === "critical" ? "CRÍTICA" :
+                                       interaction.severity === "major" ? "MAIOR" :
+                                       interaction.severity === "moderate" ? "MODERADA" : "MENOR"}
+                                    </Badge>
+                                    <div className="flex-1 text-sm">
+                                      <p className="font-semibold">{interaction.drug1} + {interaction.drug2}</p>
+                                      <p className="text-muted-foreground">{interaction.interaction}</p>
+                                      <p className="text-xs italic mt-1">💡 {interaction.recommendation}</p>
                                     </div>
                                   </div>
-                                  {prescription.instructions && (
-                                    <div className="text-sm pt-1">
-                                      <span className="text-muted-foreground">Instruções:</span>{" "}
-                                      <span className="italic">{prescription.instructions}</span>
-                                    </div>
-                                  )}
                                 </div>
-                                <div className="flex gap-1 ml-4">
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => {
-                                      setEditingPrescription(prescription);
-                                      setPrescriptionDialogOpen(true);
-                                    }}
-                                    data-testid={`button-edit-prescription-${prescription.id}`}
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => setDeletingPrescription(prescription.id)}
-                                    data-testid={`button-delete-prescription-${prescription.id}`}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
-                                </div>
+                              ))}
+                              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-2 mt-2">
+                                <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                                  ⚠️ As interações são sugestões. Sempre verifique em fontes confiáveis.
+                                </p>
                               </div>
-                            </Card>
-                          ))}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
