@@ -35,6 +35,18 @@ The system features a modern UI with dark mode support. Typography uses Inter fo
 #### Fully Implemented & Operational
 
 -   **Territorial Management CRUD**: Complete CRUD for Dwellings and Home Visits.
+-   **Family Hierarchy System (Backend Complete ✅)**: Territorial integration linking Citizens → Families → Dwellings with comprehensive member management:
+    -   **Database Schema** (`shared/schema.ts`): `family_members` junction table with fields: family_id, citizen_id, relationship_type (responsavel_familiar/conjuge/filho/neto/pai_mae/avo/irmao/outro), is_head_of_family, joined_at, left_at, notes
+    -   **API Endpoints** (`server/routes.ts`): 6 RESTful endpoints for family member CRUD:
+        - `GET /api/families/:familyId/members` - List all members of a family
+        - `GET /api/citizens/:citizenId/family` - Get citizen's current family membership
+        - `POST /api/families/:familyId/members` - Add member to family
+        - `PATCH /api/family-members/:id` - Update relationship type/notes
+        - `DELETE /api/family-members/:id` - Remove member from family
+        - `GET /api/families/:familyId/hierarchy` - Get complete hierarchy (Dwelling → Family → Members with citizen data)
+    -   **Storage Layer** (`server/storage.ts`): 6 methods including `getFamilyHierarchy()` with SQL joins to fetch complete family tree, auto-updates family member count on add/remove
+    -   **Type Safety**: Full Zod validation schemas (`insertFamilyMemberSchema`) and TypeScript types (`FamilyMember`, `InsertFamilyMember`) exported from shared schema
+    -   **Frontend UI** (`client/src/pages/territorio.tsx`): New "Famílias" tab added (placeholder - full implementation pending)
 -   **Endemic Disease Surveillance (ACE) CRUD**: Complete CRUD for work cycles, including dashboards with IIP/IB indicators.
 -   **Reports & Indicators**: Aggregated health indicators with professional PDF export and customizable filters.
 -   **Appointment Scheduling System**: Complete scheduling and queue management with weekly calendar, day/week views, and attendance queue.

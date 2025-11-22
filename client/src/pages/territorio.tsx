@@ -872,6 +872,7 @@ export default function TerritoryPage() {
       <Tabs defaultValue="dwellings" className="space-y-4">
         <TabsList>
           <TabsTrigger value="dwellings" data-testid="tab-dwellings">Domicílios</TabsTrigger>
+          <TabsTrigger value="families" data-testid="tab-families">Famílias</TabsTrigger>
           <TabsTrigger value="visits" data-testid="tab-visits">Visitas</TabsTrigger>
         </TabsList>
 
@@ -975,6 +976,31 @@ export default function TerritoryPage() {
                   </p>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="families">
+          <Card>
+            <CardHeader>
+              <CardTitle>Hierarquia Familiar</CardTitle>
+              <CardDescription>Visualize e gerencie a composição das famílias cadastradas</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <p className="text-muted-foreground text-sm">
+                  Selecione uma família para ver sua hierarquia completa (Moradia → Família → Membros)
+                </p>
+                
+                {/* TODO: Implementar interface de hierarquia familiar */}
+                <div className="border rounded-lg p-8 text-center text-muted-foreground">
+                  <Users className="h-16 w-16 mx-auto mb-4 opacity-20" />
+                  <p className="text-lg font-medium mb-2">Interface de Hierarquia Familiar</p>
+                  <p className="text-sm">
+                    Funcionalidade em desenvolvimento - visualização e gerenciamento de membros familiares
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
