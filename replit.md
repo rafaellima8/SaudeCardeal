@@ -4,6 +4,13 @@
 
 MuniSaúde Integrado is a comprehensive municipal health management system designed to integrate and optimize primary healthcare services for Cardeal da Silva, Bahia, Brazil. It encompasses electronic health records (PEC), scheduling, pharmacy management, inter-municipal patient transport (TFD), and robust reporting, all compliant with e-SUS APS standards. The system supports diverse user profiles (administrators, doctors, nurses, community health agents, pharmacists, managers, receptionists) with tailored interfaces to enhance healthcare delivery, administrative efficiency, and public health oversight. The business vision is to modernize municipal health management, improve patient care coordination, and provide valuable data for public health initiatives.
 
+## Recent Changes (November 22, 2025)
+
+-   **Schema Enhancement**: Added `batchId`, `jsonPath`, and `xmlPath` fields to `esusExports` table for future e-SUS export functionality.
+-   **Code Quality**: Resolved all 12 TypeScript LSP errors in `server/routes.ts`, including CNS validation null-safety guard and proper handling of disabled e-SUS export endpoint.
+-   **Database Migration**: Successfully synchronized schema changes to SQLite database via `npm run db:push`.
+-   **e-SUS Export Status**: Temporarily disabled generateExport endpoint (returns 503 status) pending full e-SUS PEC schema implementation.
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
