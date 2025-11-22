@@ -127,9 +127,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "CPF já cadastrado" });
       }
       
-      const existingCns = await storage.getCitizenByCns(data.cns);
-      if (existingCns) {
-        return res.status(400).json({ error: "CNS já cadastrado" });
+      if (data.cns) {
+        const existingCns = await storage.getCitizenByCns(data.cns);
+        if (existingCns) {
+          return res.status(400).json({ error: "CNS já cadastrado" });
+        }
       }
 
       const citizen = await storage.createCitizen(data);
@@ -757,24 +759,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[API] e-SUS export requested: ${from} to ${to}`);
       
-      // Gerar exportação
-      const result = await generateExport({
-        from: from as string,
-        to: to as string,
-        healthUnitCNES: (cnes as string) || defaultCNES,
-        limit: limit ? parseInt(limit as string) : undefined,
-      });
-      
-      res.json({
-        success: true,
-        message: "Exportação e-SUS gerada com sucesso",
-        batchId: result.batchId,
-        files: {
-          json: result.jsonPath,
-          xml: result.xmlPath,
-        },
-        totalRegistros: result.totalRegistros,
-        totalRecords: Object.values(result.totalRegistros).reduce((a, b) => a + b, 0),
+      // TODO: Re-enable e-SUS export when full schema is implemented
+      return res.status(503).json({
+        error: "Exportação e-SUS temporariamente desabilitada",
+        message: "A funcionalidade será reativada após implementação completa do schema e-SUS PEC",
+        hint: "Entre em contato com o suporte para mais informações"
       });
       
     } catch (error: any) {

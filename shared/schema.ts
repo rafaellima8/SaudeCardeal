@@ -330,12 +330,15 @@ export const homeVisits = sqliteTable("home_visits", {
 // e-SUS Exports (Exportações e-SUS)
 export const esusExports = sqliteTable("esus_exports", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
+  batchId: text("batch_id"),
   cnes: text("cnes").notNull(),
   ine: text("ine"),
   periodStart: integer("period_start", { mode: "timestamp" }).notNull(),
   periodEnd: integer("period_end", { mode: "timestamp" }).notNull(),
   recordsCount: integer("records_count").notNull(),
   fileSize: integer("file_size").notNull(),
+  jsonPath: text("json_path"),
+  xmlPath: text("xml_path"),
   status: text("status", { enum: ["processing", "completed", "failed"] }).notNull().default("processing"),
   errorMessage: text("error_message"),
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
