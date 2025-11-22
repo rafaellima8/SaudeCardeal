@@ -109,20 +109,47 @@ export const attendanceQueue = sqliteTable("attendance_queue", {
   completedAt: integer("completed_at", { mode: "timestamp" }),
 });
 
-// Consultations (Consultas Médicas)
+// Consultations (Consultas Médicas) - COM CAMPOS SOAP COMPLETOS ✅
 export const consultations = sqliteTable("consultations", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   citizenId: text("citizen_id").notNull().references(() => citizens.id),
   professionalId: text("professional_id").notNull().references(() => professionals.id),
   unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  appointmentId: text("appointment_id").references(() => appointments.id),
   consultationDate: integer("consultation_date", { mode: "timestamp" }).notNull(),
   type: text("type").notNull(),
+  
+  // SOAP Fields (e-SUS PEC v5.3 compliant) ✅
+  subjective: text("subjective"), // S - Subjetivo (queixa, história)
+  objective: text("objective"), // O - Objetivo (exame físico)
+  assessment: text("assessment"), // A - Avaliação (diagnóstico)
+  plan: text("plan"), // P - Plano (conduta)
+  
+  // Vital Signs (JSON as TEXT in SQLite) ✅
+  vitalSigns: text("vital_signs", { mode: "json" }).$type<{
+    bloodPressure?: string; // PA
+    heartRate?: number; // FC
+    temperature?: number; // Temperatura
+    respiratoryRate?: number; // FR
+    oxygenSaturation?: number; // SpO2
+    weight?: number; // Peso
+    height?: number; // Altura
+    bmi?: number; // IMC
+    abdominalCircumference?: number; // Circunferência abdominal
+  }>(),
+  
+  // Diagnosis Codes (JSON Arrays as TEXT in SQLite) ✅
+  ciap2Codes: text("ciap2_codes", { mode: "json" }).$type<string[]>(), // Códigos CIAP-2
+  cid10Codes: text("cid10_codes", { mode: "json" }).$type<string[]>(), // Códigos CID-10
+  
+  // Legacy fields (mantidos para compatibilidade)
   chiefComplaint: text("chief_complaint"),
   historyOfPresentIllness: text("history_of_present_illness"),
   physicalExam: text("physical_exam"),
   diagnosis: text("diagnosis"),
   treatmentPlan: text("treatment_plan"),
   notes: text("notes"),
+  
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
@@ -199,15 +226,22 @@ export const tfdRequests = sqliteTable("tfd_requests", {
   unitId: text("unit_id").notNull().references(() => healthUnits.id),
   requestDate: integer("request_date", { mode: "timestamp" }).notNull(),
   travelDate: integer("travel_date", { mode: "timestamp" }),
+  returnDate: integer("return_date", { mode: "timestamp" }),
   destination: text("destination").notNull(),
   reason: text("reason").notNull(),
   procedure: text("procedure"),
   accompaniedBy: text("accompanied_by"),
+  companion: integer("companion", { mode: "boolean" }).default(false),
+  transportType: text("transport_type"),
+  justification: text("justification"),
   status: text("status", { 
     enum: ["pending", "approved", "scheduled", "completed", "cancelled", "rejected"] 
   }).notNull().default("pending"),
   observations: text("observations"),
+  approvedBy: text("approved_by"),
+  approvedAt: integer("approved_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
 // ============================================================================
@@ -452,6 +486,7 @@ export const insertExamSchema = createInsertSchema(exams).omit({
 export const insertTfdRequestSchema = createInsertSchema(tfdRequests).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 });
 
 export const insertDwellingSchema = createInsertSchema(dwellings).omit({
@@ -547,9 +582,6 @@ export type Family = typeof families.$inferSelect;
 export type InsertHomeVisit = z.infer<typeof insertHomeVisitSchema>;
 export type HomeVisit = typeof homeVisits.$inferSelect;
 
-export type EsusExport = typeof esusExports.$inferSelect;
-
-// Endemic Control Types
 export type InsertEndemicCycle = z.infer<typeof insertEndemicCycleSchema>;
 export type EndemicCycle = typeof endemicCycles.$inferSelect;
 

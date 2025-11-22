@@ -144,8 +144,8 @@ export interface IStorage {
   getDashboardStats(unitId?: string): Promise<any>;
 
   // e-SUS Exports
-  getEsusExports(params: { limit?: number; offset?: number }): Promise<schema.EsusExport[]>;
-  getEsusExportById(id: string): Promise<schema.EsusExport | undefined>;
+  getEsusExports(params: { limit?: number; offset?: number }): Promise<(typeof schema.esusExports.$inferSelect)[]>;
+  getEsusExportById(id: string): Promise<typeof schema.esusExports.$inferSelect | undefined>;
 
   // Territorial Management - Dwellings
   getDwellings(params: { unitId?: string; microarea?: string; search?: string; limit?: number; offset?: number }): Promise<Dwelling[]>;
@@ -336,7 +336,7 @@ export class DbStorage implements IStorage {
   }
 
   // Consultations
-  async getConsultations(params?: { citizenId?: string; professionalId?: string; limit?: number }): Promise<Consultation[]> {
+  async getConsultations(params?: { citizenId?: string; professionalId?: string; limit?: number }): Promise<any[]> {
     const conditions = [];
     
     if (params?.citizenId) {
@@ -351,10 +351,25 @@ export class DbStorage implements IStorage {
       citizenId: schema.consultations.citizenId,
       professionalId: schema.consultations.professionalId,
       unitId: schema.consultations.unitId,
+      appointmentId: schema.consultations.appointmentId,
       consultationDate: schema.consultations.consultationDate,
       type: schema.consultations.type,
+      // SOAP fields ✅
+      subjective: schema.consultations.subjective,
+      objective: schema.consultations.objective,
+      assessment: schema.consultations.assessment,
+      plan: schema.consultations.plan,
+      vitalSigns: schema.consultations.vitalSigns,
+      ciap2Codes: schema.consultations.ciap2Codes,
+      cid10Codes: schema.consultations.cid10Codes,
+      // Legacy fields
       chiefComplaint: schema.consultations.chiefComplaint,
+      historyOfPresentIllness: schema.consultations.historyOfPresentIllness,
+      physicalExam: schema.consultations.physicalExam,
       diagnosis: schema.consultations.diagnosis,
+      treatmentPlan: schema.consultations.treatmentPlan,
+      notes: schema.consultations.notes,
+      createdAt: schema.consultations.createdAt,
       citizen: {
         name: schema.citizens.name,
         cns: schema.citizens.cns,
@@ -472,9 +487,9 @@ export class DbStorage implements IStorage {
       },
       professional: {
         name: schema.professionals.name,
-        role: schema.professionals.role,
-        registrationNumber: schema.professionals.registrationNumber,
-        registrationType: schema.professionals.registrationType,
+        specialty: schema.professionals.specialty,
+        councilType: schema.professionals.councilType,
+        councilNumber: schema.professionals.councilNumber,
       },
       consultation: {
         consultationDate: schema.consultations.consultationDate,
@@ -984,7 +999,7 @@ export class DbStorage implements IStorage {
   }
 
   // e-SUS Exports
-  async getEsusExports(params: { limit?: number; offset?: number }): Promise<schema.EsusExport[]> {
+  async getEsusExports(params: { limit?: number; offset?: number }): Promise<(typeof schema.esusExports.$inferSelect)[]> {
     const limit = params.limit || 50;
     const offset = params.offset || 0;
     
@@ -995,7 +1010,7 @@ export class DbStorage implements IStorage {
       .offset(offset);
   }
 
-  async getEsusExportById(id: string): Promise<schema.EsusExport | undefined> {
+  async getEsusExportById(id: string): Promise<typeof schema.esusExports.$inferSelect | undefined> {
     const results = await db.select()
       .from(schema.esusExports)
       .where(eq(schema.esusExports.id, id))
@@ -1132,7 +1147,7 @@ export class DbStorage implements IStorage {
   async updateHomeVisit(id: string, visit: Partial<InsertHomeVisit>): Promise<HomeVisit | undefined> {
     const [updated] = await db
       .update(schema.homeVisits)
-      .set({ ...visit, updatedAt: new Date() })
+      .set(visit)
       .where(eq(schema.homeVisits.id, id))
       .returning();
     return updated;
