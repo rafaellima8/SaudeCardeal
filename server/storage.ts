@@ -162,6 +162,21 @@ export interface IStorage {
   createFamily(family: InsertFamily): Promise<Family>;
   updateFamily(id: string, family: Partial<InsertFamily>): Promise<Family | undefined>;
   deleteFamily(id: string): Promise<boolean>;
+  
+  // Family Members
+  getFamilyMembers(familyId: string): Promise<FamilyMember[]>;
+  createFamilyMember(member: InsertFamilyMember): Promise<FamilyMember>;
+  updateFamilyMember(id: string, member: Partial<InsertFamilyMember>): Promise<FamilyMember | undefined>;
+  deleteFamilyMember(id: string): Promise<boolean>;
+  transferFamilyMember(memberId: string, newFamilyId: string): Promise<FamilyMember | undefined>;
+  
+  // Territorial Hierarchy (Complete Integration)
+  getDwellingWithFamilies(dwellingId: string): Promise<{ dwelling: Dwelling; families: Array<Family & { members: Citizen[] }> }>;
+  getFamilyWithMembers(familyId: string): Promise<{ family: Family; members: Citizen[]; dwelling: Dwelling }>;
+  getTerritorialHierarchy(dwellingId: string): Promise<{ 
+    dwelling: Dwelling; 
+    families: Array<{ family: Family; members: Citizen[] }> 
+  }>;
 
   // Home Visits
   getHomeVisits(params: { familyId?: string; dwellingId?: string; professionalId?: string; limit?: number; offset?: number }): Promise<HomeVisit[]>;
@@ -1199,6 +1214,152 @@ export class DbStorage implements IStorage {
       family,
       dwelling,
       members,
+    };
+  }
+  
+  // Alias methods for interface compatibility
+  async createFamilyMember(member: InsertFamilyMember): Promise<FamilyMember> {
+    return this.addFamilyMember(member);
+  }
+  
+  async deleteFamilyMember(id: string): Promise<boolean> {
+    return this.removeFamilyMember(id);
+  }
+  
+  // Transfer citizen from one family to another
+  async transferFamilyMember(memberId: string, newFamilyId: string): Promise<FamilyMember | undefined> {
+    const member = await db.select().from(schema.familyMembers).where(eq(schema.familyMembers.id, memberId)).limit(1);
+    if (!member[0]) return undefined;
+    
+    const oldFamilyId = member[0].familyId;
+    
+    // Mark as left from old family
+    await db
+      .update(schema.familyMembers)
+      .set({ leftAt: new Date() })
+      .where(eq(schema.familyMembers.id, memberId));
+    
+    // Create new membership in new family
+    const newMember = await this.addFamilyMember({
+      familyId: newFamilyId,
+      citizenId: member[0].citizenId,
+      relationshipType: member[0].relationshipType,
+      isHeadOfFamily: false,
+      notes: `Transferido da família ${oldFamilyId}`
+    });
+    
+    return newMember;
+  }
+  
+  // Territorial Hierarchy Integration Methods
+  async getDwellingWithFamilies(dwellingId: string): Promise<{ dwelling: Dwelling; families: Array<Family & { members: Citizen[] }> }> {
+    const dwelling = await this.getDwellingById(dwellingId);
+    if (!dwelling) {
+      throw new Error(`Dwelling ${dwellingId} not found`);
+    }
+    
+    const families = await db
+      .select()
+      .from(schema.families)
+      .where(eq(schema.families.dwellingId, dwellingId))
+      .orderBy(schema.families.familyCode);
+    
+    const familiesWithMembers = await Promise.all(
+      families.map(async (family) => {
+        const members = await db
+          .select()
+          .from(schema.citizens)
+          .innerJoin(schema.familyMembers, eq(schema.citizens.id, schema.familyMembers.citizenId))
+          .where(
+            and(
+              eq(schema.familyMembers.familyId, family.id),
+              isNull(schema.familyMembers.leftAt)
+            )
+          )
+          .orderBy(desc(schema.familyMembers.isHeadOfFamily));
+        
+        return {
+          ...family,
+          members: members.map(m => m.citizens)
+        };
+      })
+    );
+    
+    return {
+      dwelling,
+      families: familiesWithMembers
+    };
+  }
+  
+  async getFamilyWithMembers(familyId: string): Promise<{ family: Family; members: Citizen[]; dwelling: Dwelling }> {
+    const family = await this.getFamilyById(familyId);
+    if (!family) {
+      throw new Error(`Family ${familyId} not found`);
+    }
+    
+    const members = await db
+      .select()
+      .from(schema.citizens)
+      .innerJoin(schema.familyMembers, eq(schema.citizens.id, schema.familyMembers.citizenId))
+      .where(
+        and(
+          eq(schema.familyMembers.familyId, familyId),
+          isNull(schema.familyMembers.leftAt)
+        )
+      )
+      .orderBy(desc(schema.familyMembers.isHeadOfFamily));
+    
+    const dwelling = await this.getDwellingById(family.dwellingId);
+    if (!dwelling) {
+      throw new Error(`Dwelling ${family.dwellingId} not found`);
+    }
+    
+    return {
+      family,
+      members: members.map(m => m.citizens),
+      dwelling
+    };
+  }
+  
+  async getTerritorialHierarchy(dwellingId: string): Promise<{ 
+    dwelling: Dwelling; 
+    families: Array<{ family: Family; members: Citizen[] }> 
+  }> {
+    const dwelling = await this.getDwellingById(dwellingId);
+    if (!dwelling) {
+      throw new Error(`Dwelling ${dwellingId} not found`);
+    }
+    
+    const families = await db
+      .select()
+      .from(schema.families)
+      .where(eq(schema.families.dwellingId, dwellingId))
+      .orderBy(schema.families.familyCode);
+    
+    const familiesWithMembers = await Promise.all(
+      families.map(async (family) => {
+        const members = await db
+          .select()
+          .from(schema.citizens)
+          .innerJoin(schema.familyMembers, eq(schema.citizens.id, schema.familyMembers.citizenId))
+          .where(
+            and(
+              eq(schema.familyMembers.familyId, family.id),
+              isNull(schema.familyMembers.leftAt)
+            )
+          )
+          .orderBy(desc(schema.familyMembers.isHeadOfFamily));
+        
+        return {
+          family,
+          members: members.map(m => m.citizens)
+        };
+      })
+    );
+    
+    return {
+      dwelling,
+      families: familiesWithMembers
     };
   }
 

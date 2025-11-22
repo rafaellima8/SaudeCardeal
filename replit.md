@@ -6,6 +6,21 @@ MuniSaúde Integrado is a comprehensive municipal health management system desig
 
 ## Recent Changes (November 22, 2025)
 
+### Integração Territorial Completa
+-   **Schema**: Adicionado campo opcional `familyId` em `citizens` para vinculação direta à família principal
+-   **Storage Layer**: Implementados métodos de hierarquia territorial:
+    - `getTerritorialHierarchy(dwellingId)`: Busca hierarquia completa Domicílio → Famílias → Cidadãos
+    - `getDwellingWithFamilies(dwellingId)`: Busca domicílio com todas as famílias e membros
+    - `getFamilyWithMembers(familyId)`: Busca família com todos os membros e informações do domicílio
+    - `transferFamilyMember(memberId, newFamilyId)`: Transfere membro entre famílias
+-   **API Routes**: Novos endpoints RESTful:
+    - GET `/api/dwellings/:id/hierarchy` - Hierarquia territorial completa
+    - GET `/api/families/:id/with-members` - Família com membros
+    - GET `/api/dwellings/:id/with-families` - Domicílio com famílias
+    - POST `/api/family-members/:id/transfer` - Transferência de membros
+-   **UI**: Nova aba "Hierarquia Territorial" em Território exibindo visualização completa Domicílio → Famílias → Cidadãos com seletor de domicílios
+
+### Correções Anteriores
 -   **Schema Enhancement**: Added `batchId`, `jsonPath`, and `xmlPath` fields to `esusExports` table for future e-SUS export functionality.
 -   **Code Quality**: Resolved all 12 TypeScript LSP errors in `server/routes.ts`, including CNS validation null-safety guard and proper handling of disabled e-SUS export endpoint.
 -   **Database Migration**: Successfully synchronized schema changes to SQLite database via `npm run db:push`.

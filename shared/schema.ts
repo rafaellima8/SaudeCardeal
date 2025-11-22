@@ -71,6 +71,7 @@ export const citizens = sqliteTable("citizens", {
   city: text("city").notNull().default("Cardeal da Silva"),
   state: text("state").notNull().default("BA"),
   zipCode: text("zip_code"),
+  familyId: text("family_id").references(() => families.id),
   unitId: text("unit_id").notNull().references(() => healthUnits.id),
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),

@@ -123,6 +123,14 @@ interface FamilyHierarchy {
   members: FamilyMember[];
 }
 
+interface TerritorialHierarchy {
+  dwelling: Dwelling;
+  families: Array<{
+    family: Family;
+    members: Citizen[];
+  }>;
+}
+
 export default function TerritoryPage() {
   const [dwellingDialogOpen, setDwellingDialogOpen] = useState(false);
   const [visitDialogOpen, setVisitDialogOpen] = useState(false);
@@ -135,6 +143,9 @@ export default function TerritoryPage() {
   
   // Family management states
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null);
+  
+  // Territorial hierarchy state
+  const [selectedDwellingForHierarchy, setSelectedDwellingForHierarchy] = useState<string>("");
   const [memberDialogOpen, setMemberDialogOpen] = useState(false);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
@@ -158,6 +169,12 @@ export default function TerritoryPage() {
 
   const { data: homeVisits, isLoading: visitsLoading } = useQuery<HomeVisit[]>({
     queryKey: ['/api/home-visits'],
+  });
+  
+  // Territorial hierarchy query
+  const { data: hierarchyData, isLoading: territorialHierarchyLoading } = useQuery<TerritorialHierarchy>({
+    queryKey: [`/api/dwellings/${selectedDwellingForHierarchy}/hierarchy`, selectedDwellingForHierarchy],
+    enabled: !!selectedDwellingForHierarchy,
   });
 
   const dwellingForm = useForm<DwellingFormData>({
@@ -1177,6 +1194,7 @@ export default function TerritoryPage() {
           <TabsTrigger value="dwellings" data-testid="tab-dwellings">Domicílios</TabsTrigger>
           <TabsTrigger value="families" data-testid="tab-families">Famílias</TabsTrigger>
           <TabsTrigger value="visits" data-testid="tab-visits">Visitas</TabsTrigger>
+          <TabsTrigger value="hierarchy" data-testid="tab-hierarchy">Hierarquia Territorial</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dwellings">
@@ -1893,6 +1911,143 @@ export default function TerritoryPage() {
                   </p>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="hierarchy">
+          <Card>
+            <CardHeader>
+              <CardTitle>Hierarquia Territorial</CardTitle>
+              <CardDescription>
+                Visualize a hierarquia completa: Domicílio → Famílias → Cidadãos
+              </CardDescription>
+              <div className="flex gap-2 pt-4">
+                <Select value={selectedDwellingForHierarchy} onValueChange={setSelectedDwellingForHierarchy}>
+                  <SelectTrigger className="w-full max-w-md" data-testid="select-dwelling-hierarchy">
+                    <SelectValue placeholder="Selecione um domicílio" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {dwellings && dwellings.map((dwelling) => (
+                      <SelectItem key={dwelling.id} value={dwelling.id}>
+                        {dwelling.address}, {dwelling.number || "S/N"} - {dwelling.neighborhood} (Microárea {dwelling.microarea})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {!selectedDwellingForHierarchy ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Home className="h-16 w-16 mx-auto mb-4 opacity-20" />
+                  <p className="text-lg font-medium mb-2">Selecione um domicílio</p>
+                  <p className="text-sm">
+                    Escolha um domicílio acima para visualizar sua hierarquia territorial completa
+                  </p>
+                </div>
+              ) : territorialHierarchyLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  <p className="text-sm text-muted-foreground mt-4">Carregando hierarquia...</p>
+                </div>
+              ) : hierarchyData ? (
+                <div className="space-y-6">
+                  <Card className="bg-muted/50">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center gap-2">
+                        <Home className="h-5 w-5 text-primary" />
+                        <CardTitle className="text-lg">Domicílio</CardTitle>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="font-medium">Endereço:</span> {hierarchyData.dwelling.address}, {hierarchyData.dwelling.number || "S/N"}
+                        </div>
+                        <div>
+                          <span className="font-medium">Bairro:</span> {hierarchyData.dwelling.neighborhood}
+                        </div>
+                        <div>
+                          <span className="font-medium">Microárea:</span> {hierarchyData.dwelling.microarea}
+                        </div>
+                        <div>
+                          <span className="font-medium">Tipo:</span> {hierarchyData.dwelling.dwellingType}
+                        </div>
+                        <div>
+                          <span className="font-medium">Famílias:</span> {hierarchyData.families.length}
+                        </div>
+                        <div>
+                          <span className="font-medium">Total Membros:</span> {hierarchyData.families.reduce((sum, f) => sum + f.members.length, 0)}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  {hierarchyData.families.length > 0 ? (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <Users className="h-5 w-5 text-primary" />
+                        Famílias ({hierarchyData.families.length})
+                      </h3>
+                      {hierarchyData.families.map((familyData) => (
+                        <Card key={familyData.family.id} className="border-l-4 border-l-primary">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <CardTitle className="text-base">
+                                Família {familyData.family.familyCode}
+                              </CardTitle>
+                              <Badge variant="secondary">{familyData.members.length} membros</Badge>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            {familyData.members.length > 0 ? (
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Nome</TableHead>
+                                    <TableHead>CPF</TableHead>
+                                    <TableHead>Data Nasc.</TableHead>
+                                    <TableHead>Sexo</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {familyData.members.map((citizen) => (
+                                    <TableRow key={citizen.id} data-testid={`row-citizen-${citizen.id}`}>
+                                      <TableCell className="font-medium">{citizen.name}</TableCell>
+                                      <TableCell>{citizen.cpf || "N/A"}</TableCell>
+                                      <TableCell>
+                                        {citizen.birthDate ? new Date(citizen.birthDate).toLocaleDateString("pt-BR") : "N/A"}
+                                      </TableCell>
+                                      <TableCell>
+                                        <Badge variant="outline">
+                                          {citizen.gender === "M" ? "Masculino" : citizen.gender === "F" ? "Feminino" : "Outro"}
+                                        </Badge>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            ) : (
+                              <div className="text-center py-6 text-muted-foreground text-sm">
+                                Nenhum membro cadastrado nesta família
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <Users className="h-16 w-16 mx-auto mb-4 opacity-20" />
+                      <p className="text-lg font-medium mb-2">Nenhuma família cadastrada</p>
+                      <p className="text-sm">
+                        Este domicílio ainda não possui famílias cadastradas
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         </TabsContent>

@@ -1043,6 +1043,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: error.message });
     }
   });
+  
+  // ============================================================================
+  // TERRITORIAL INTEGRATION (Complete Hierarchy)
+  // ============================================================================
+  
+  // Get complete territorial hierarchy: Dwelling → Families → Citizens
+  app.get("/api/dwellings/:id/hierarchy", async (req, res) => {
+    try {
+      const hierarchy = await storage.getTerritorialHierarchy(req.params.id);
+      res.json(hierarchy);
+    } catch (error: any) {
+      if (error.message.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Get family with all members and dwelling info
+  app.get("/api/families/:id/with-members", async (req, res) => {
+    try {
+      const result = await storage.getFamilyWithMembers(req.params.id);
+      res.json(result);
+    } catch (error: any) {
+      if (error.message.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Get dwelling with all families and their members
+  app.get("/api/dwellings/:id/with-families", async (req, res) => {
+    try {
+      const result = await storage.getDwellingWithFamilies(req.params.id);
+      res.json(result);
+    } catch (error: any) {
+      if (error.message.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Transfer family member from one family to another
+  app.post("/api/family-members/:id/transfer", async (req, res) => {
+    try {
+      const { newFamilyId } = req.body;
+      if (!newFamilyId) {
+        return res.status(400).json({ error: "newFamilyId é obrigatório" });
+      }
+      
+      const member = await storage.transferFamilyMember(req.params.id, newFamilyId);
+      if (!member) {
+        return res.status(404).json({ error: "Membro não encontrado" });
+      }
+      
+      res.json(member);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   // Home Visits (Visitas Domiciliares)
   app.get("/api/home-visits", async (req, res) => {
