@@ -6,19 +6,25 @@ MuniSaúde Integrado is a comprehensive municipal health management system desig
 
 ## Recent Changes (November 22, 2025)
 
-### Integração Territorial Completa
--   **Schema**: Adicionado campo opcional `familyId` em `citizens` para vinculação direta à família principal
--   **Storage Layer**: Implementados métodos de hierarquia territorial:
+### Integração Territorial - Implementação Completa
+-   **Schema**: Adicionado campo opcional `familyId` em `citizens` para vinculação direta à família principal; adicionados campos `batchId`, `jsonPath`, `xmlPath` em `esusExports`
+-   **Storage Layer**: Implementados 4 métodos de hierarquia territorial:
     - `getTerritorialHierarchy(dwellingId)`: Busca hierarquia completa Domicílio → Famílias → Cidadãos
     - `getDwellingWithFamilies(dwellingId)`: Busca domicílio com todas as famílias e membros
     - `getFamilyWithMembers(familyId)`: Busca família com todos os membros e informações do domicílio
-    - `transferFamilyMember(memberId, newFamilyId)`: Transfere membro entre famílias
--   **API Routes**: Novos endpoints RESTful:
+    - `transferFamilyMember(memberId, newFamilyId)`: Transfere membro entre famílias com transação atômica, validação completa, e atualização de contadores
+-   **API Routes**: 4 novos endpoints RESTful:
     - GET `/api/dwellings/:id/hierarchy` - Hierarquia territorial completa
     - GET `/api/families/:id/with-members` - Família com membros
-    - GET `/api/dwellings/:id/with-families` - Domicílio com famílias
+    - GET `/api/dwellings/:id/with-families` - Domicílio com famílias  
     - POST `/api/family-members/:id/transfer` - Transferência de membros
--   **UI**: Nova aba "Hierarquia Territorial" em Território exibindo visualização completa Domicílio → Famílias → Cidadãos com seletor de domicílios
+-   **UI**: Nova aba "Hierarquia Territorial" em Território com:
+    - Seletor de domicílios para escolher hierarquia
+    - Visualização completa Domicílio → Famílias → Cidadãos
+    - Estados de loading, erro e vazios
+    - Todos os elementos dinâmicos com data-testid para testes
+-   **Drizzle Schemas**: Regenerados `insertEsusExportSchema`, `InsertEsusExport` e `EsusExport` types; sincronizados com banco via `npm run db:push --force`
+-   **Refinamentos**: Corrigidos valores null em formulários usando `??` (nullish coalescing), queryKey com array segments para invalidação correta, transação atômica em transferFamilyMember
 
 ### Correções Anteriores
 -   **Schema Enhancement**: Added `batchId`, `jsonPath`, and `xmlPath` fields to `esusExports` table for future e-SUS export functionality.

@@ -549,6 +549,13 @@ export const insertFamilyMemberSchema = createInsertSchema(familyMembers).omit({
   joinedAt: true,
 });
 
+// e-SUS Export Insert Schema
+export const insertEsusExportSchema = createInsertSchema(esusExports).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+});
+
 // Endemic Control Insert Schemas
 export const insertEndemicCycleSchema = createInsertSchema(endemicCycles).omit({
   id: true,
@@ -627,6 +634,9 @@ export type FamilyMember = typeof familyMembers.$inferSelect;
 
 export type InsertHomeVisit = z.infer<typeof insertHomeVisitSchema>;
 export type HomeVisit = typeof homeVisits.$inferSelect;
+
+export type InsertEsusExport = z.infer<typeof insertEsusExportSchema>;
+export type EsusExport = typeof esusExports.$inferSelect;
 
 export type InsertEndemicCycle = z.infer<typeof insertEndemicCycleSchema>;
 export type EndemicCycle = typeof endemicCycles.$inferSelect;

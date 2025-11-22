@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Home, Users, Calendar, Plus, MapPin, Search, Pencil, Trash2, UserPlus, ArrowRightLeft, BarChart3, Filter, UserCheck, UserMinus } from "lucide-react";
+import { Home, Users, Calendar, Plus, MapPin, Search, Pencil, Trash2, UserPlus, ArrowRightLeft, BarChart3, Filter, UserCheck, UserMinus, AlertCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -172,8 +172,8 @@ export default function TerritoryPage() {
   });
   
   // Territorial hierarchy query
-  const { data: hierarchyData, isLoading: territorialHierarchyLoading } = useQuery<TerritorialHierarchy>({
-    queryKey: [`/api/dwellings/${selectedDwellingForHierarchy}/hierarchy`, selectedDwellingForHierarchy],
+  const { data: hierarchyData, isLoading: territorialHierarchyLoading, error: hierarchyError } = useQuery<TerritorialHierarchy>({
+    queryKey: ['/api/dwellings', selectedDwellingForHierarchy, 'hierarchy'],
     enabled: !!selectedDwellingForHierarchy,
   });
 
@@ -931,7 +931,7 @@ export default function TerritoryPage() {
                         <FormItem>
                           <FormLabel>Número</FormLabel>
                           <FormControl>
-                            <Input placeholder="123" {...field} data-testid="input-number" />
+                            <Input placeholder="123" {...field} value={field.value ?? ""} data-testid="input-number" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -945,7 +945,7 @@ export default function TerritoryPage() {
                         <FormItem>
                           <FormLabel>Complemento</FormLabel>
                           <FormControl>
-                            <Input placeholder="Apt 201" {...field} data-testid="input-complement" />
+                            <Input placeholder="Apt 201" {...field} value={field.value ?? ""} data-testid="input-complement" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -959,7 +959,7 @@ export default function TerritoryPage() {
                         <FormItem>
                           <FormLabel>CEP</FormLabel>
                           <FormControl>
-                            <Input placeholder="48340-000" {...field} data-testid="input-zipcode" />
+                            <Input placeholder="48340-000" {...field} value={field.value ?? ""} data-testid="input-zipcode" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -1012,7 +1012,7 @@ export default function TerritoryPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Saneamento</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value ?? undefined}>
                             <FormControl>
                               <SelectTrigger data-testid="select-sanitation">
                                 <SelectValue placeholder="Selecione" />
@@ -1036,7 +1036,7 @@ export default function TerritoryPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Abastecimento</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value ?? undefined}>
                             <FormControl>
                               <SelectTrigger data-testid="select-water">
                                 <SelectValue placeholder="Selecione" />
@@ -1093,7 +1093,7 @@ export default function TerritoryPage() {
                         <FormItem className="flex flex-row items-center gap-2 space-y-0">
                           <FormControl>
                             <Switch
-                              checked={field.value}
+                              checked={field.value ?? true}
                               onCheckedChange={field.onChange}
                               data-testid="switch-electricity"
                             />
@@ -1110,7 +1110,7 @@ export default function TerritoryPage() {
                         <FormItem className="flex flex-row items-center gap-2 space-y-0">
                           <FormControl>
                             <Switch
-                              checked={field.value}
+                              checked={field.value ?? false}
                               onCheckedChange={field.onChange}
                               data-testid="switch-animals"
                             />
@@ -1947,13 +1947,21 @@ export default function TerritoryPage() {
                   </p>
                 </div>
               ) : territorialHierarchyLoading ? (
-                <div className="text-center py-8">
+                <div className="text-center py-8" data-testid="loading-hierarchy">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
                   <p className="text-sm text-muted-foreground mt-4">Carregando hierarquia...</p>
                 </div>
+              ) : hierarchyError ? (
+                <div className="text-center py-12 text-destructive" data-testid="error-hierarchy">
+                  <AlertCircle className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                  <p className="text-lg font-medium mb-2">Erro ao carregar hierarquia</p>
+                  <p className="text-sm text-muted-foreground">
+                    {hierarchyError instanceof Error ? hierarchyError.message : 'Erro desconhecido'}
+                  </p>
+                </div>
               ) : hierarchyData ? (
                 <div className="space-y-6">
-                  <Card className="bg-muted/50">
+                  <Card className="bg-muted/50" data-testid={`card-dwelling-${hierarchyData.dwelling.id}`}>
                     <CardHeader className="pb-3">
                       <div className="flex items-center gap-2">
                         <Home className="h-5 w-5 text-primary" />
@@ -1962,22 +1970,22 @@ export default function TerritoryPage() {
                     </CardHeader>
                     <CardContent className="space-y-2">
                       <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
+                        <div data-testid="text-dwelling-address">
                           <span className="font-medium">Endereço:</span> {hierarchyData.dwelling.address}, {hierarchyData.dwelling.number || "S/N"}
                         </div>
-                        <div>
+                        <div data-testid="text-dwelling-neighborhood">
                           <span className="font-medium">Bairro:</span> {hierarchyData.dwelling.neighborhood}
                         </div>
-                        <div>
+                        <div data-testid="text-dwelling-microarea">
                           <span className="font-medium">Microárea:</span> {hierarchyData.dwelling.microarea}
                         </div>
-                        <div>
+                        <div data-testid="text-dwelling-type">
                           <span className="font-medium">Tipo:</span> {hierarchyData.dwelling.dwellingType}
                         </div>
-                        <div>
+                        <div data-testid="text-dwelling-families-count">
                           <span className="font-medium">Famílias:</span> {hierarchyData.families.length}
                         </div>
-                        <div>
+                        <div data-testid="text-dwelling-members-total">
                           <span className="font-medium">Total Membros:</span> {hierarchyData.families.reduce((sum, f) => sum + f.members.length, 0)}
                         </div>
                       </div>
@@ -1991,13 +1999,15 @@ export default function TerritoryPage() {
                         Famílias ({hierarchyData.families.length})
                       </h3>
                       {hierarchyData.families.map((familyData) => (
-                        <Card key={familyData.family.id} className="border-l-4 border-l-primary">
+                        <Card key={familyData.family.id} className="border-l-4 border-l-primary" data-testid={`card-family-${familyData.family.id}`}>
                           <CardHeader className="pb-3">
                             <div className="flex items-center justify-between">
-                              <CardTitle className="text-base">
-                                Família {familyData.family.familyCode}
+                              <CardTitle className="text-base" data-testid={`text-family-code-${familyData.family.id}`}>
+                                Família {(familyData.family as any).familyCode || familyData.family.id.substring(0, 8)}
                               </CardTitle>
-                              <Badge variant="secondary">{familyData.members.length} membros</Badge>
+                              <Badge variant="secondary" data-testid={`badge-family-members-count-${familyData.family.id}`}>
+                                {familyData.members.length} membros
+                              </Badge>
                             </div>
                           </CardHeader>
                           <CardContent>
@@ -2029,7 +2039,7 @@ export default function TerritoryPage() {
                                 </TableBody>
                               </Table>
                             ) : (
-                              <div className="text-center py-6 text-muted-foreground text-sm">
+                              <div className="text-center py-6 text-muted-foreground text-sm" data-testid={`empty-family-members-${familyData.family.id}`}>
                                 Nenhum membro cadastrado nesta família
                               </div>
                             )}
@@ -2038,7 +2048,7 @@ export default function TerritoryPage() {
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-12 text-muted-foreground">
+                    <div className="text-center py-12 text-muted-foreground" data-testid="empty-families">
                       <Users className="h-16 w-16 mx-auto mb-4 opacity-20" />
                       <p className="text-lg font-medium mb-2">Nenhuma família cadastrada</p>
                       <p className="text-sm">

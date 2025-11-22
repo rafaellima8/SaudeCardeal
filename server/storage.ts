@@ -1226,29 +1226,83 @@ export class DbStorage implements IStorage {
     return this.removeFamilyMember(id);
   }
   
-  // Transfer citizen from one family to another
+  // Transfer citizen from one family to another with complete validation in atomic transaction
   async transferFamilyMember(memberId: string, newFamilyId: string): Promise<FamilyMember | undefined> {
-    const member = await db.select().from(schema.familyMembers).where(eq(schema.familyMembers.id, memberId)).limit(1);
-    if (!member[0]) return undefined;
-    
-    const oldFamilyId = member[0].familyId;
-    
-    // Mark as left from old family
-    await db
-      .update(schema.familyMembers)
-      .set({ leftAt: new Date() })
-      .where(eq(schema.familyMembers.id, memberId));
-    
-    // Create new membership in new family
-    const newMember = await this.addFamilyMember({
-      familyId: newFamilyId,
-      citizenId: member[0].citizenId,
-      relationshipType: member[0].relationshipType,
-      isHeadOfFamily: false,
-      notes: `Transferido da família ${oldFamilyId}`
+    return await db.transaction(async (tx) => {
+      // 1. Validate source member exists and is still active
+      const member = await tx.select().from(schema.familyMembers).where(
+        and(
+          eq(schema.familyMembers.id, memberId),
+          isNull(schema.familyMembers.leftAt)
+        )
+      ).limit(1);
+      if (!member[0]) {
+        throw new Error(`Membro ativo ${memberId} não encontrado ou já foi transferido`);
+      }
+      
+      const oldFamilyId = member[0].familyId;
+      const citizenId = member[0].citizenId;
+      
+      // 2. Validate destination family exists
+      const newFamily = await tx.select().from(schema.families).where(eq(schema.families.id, newFamilyId)).limit(1);
+      if (!newFamily[0]) {
+        throw new Error(`Família de destino ${newFamilyId} não encontrada`);
+      }
+      
+      // 3. Validate both families belong to same dwelling
+      const oldFamily = await tx.select().from(schema.families).where(eq(schema.families.id, oldFamilyId)).limit(1);
+      if (oldFamily[0] && oldFamily[0].dwellingId !== newFamily[0].dwellingId) {
+        throw new Error(`Não é possível transferir entre famílias de domicílios diferentes`);
+      }
+      
+      // 4. Execute transfer atomically
+      // Mark as left from old family (only if not already set)
+      await tx
+        .update(schema.familyMembers)
+        .set({ leftAt: new Date() })
+        .where(
+          and(
+            eq(schema.familyMembers.id, memberId),
+            isNull(schema.familyMembers.leftAt)
+          )
+        );
+      
+      // Update citizen's primary family link
+      await tx
+        .update(schema.citizens)
+        .set({ familyId: newFamilyId })
+        .where(eq(schema.citizens.id, citizenId));
+      
+      // Update family member counts
+      await tx
+        .update(schema.families)
+        .set({ 
+          membersCount: sql`(SELECT COUNT(*) FROM ${schema.familyMembers} WHERE family_id = ${oldFamilyId} AND left_at IS NULL)` 
+        })
+        .where(eq(schema.families.id, oldFamilyId));
+      
+      // Create new membership using insert to ensure consistent behavior
+      const [newMember] = await tx
+        .insert(schema.familyMembers)
+        .values({
+          familyId: newFamilyId,
+          citizenId: citizenId,
+          relationshipType: member[0].relationshipType,
+          isHeadOfFamily: false,
+          notes: `Transferido da família ${oldFamilyId}`
+        })
+        .returning();
+      
+      // Update new family member count
+      await tx
+        .update(schema.families)
+        .set({ 
+          membersCount: sql`(SELECT COUNT(*) FROM ${schema.familyMembers} WHERE family_id = ${newFamilyId} AND left_at IS NULL)` 
+        })
+        .where(eq(schema.families.id, newFamilyId));
+      
+      return newMember;
     });
-    
-    return newMember;
   }
   
   // Territorial Hierarchy Integration Methods
