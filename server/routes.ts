@@ -15,6 +15,7 @@ import {
   insertProfessionalSchema,
   insertDwellingSchema,
   insertFamilySchema,
+  insertFamilyMemberSchema,
   insertHomeVisitSchema,
   insertEndemicCycleSchema,
   insertFadEvaluationSchema,
@@ -978,6 +979,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Família não encontrada" });
       }
       res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Family Members (Membros da Família)
+  app.get("/api/families/:familyId/members", async (req, res) => {
+    try {
+      const members = await storage.getFamilyMembers(req.params.familyId);
+      res.json(members);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/citizens/:citizenId/family", async (req, res) => {
+    try {
+      const familyMembership = await storage.getCitizenFamilyMembership(req.params.citizenId);
+      if (!familyMembership) {
+        return res.status(404).json({ error: "Cidadão não vinculado a nenhuma família" });
+      }
+      res.json(familyMembership);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/families/:familyId/members", async (req, res) => {
+    try {
+      const data = insertFamilyMemberSchema.parse({
+        ...req.body,
+        familyId: req.params.familyId,
+      });
+      const member = await storage.addFamilyMember(data);
+      res.status(201).json(member);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/family-members/:id", async (req, res) => {
+    try {
+      const member = await storage.updateFamilyMember(req.params.id, req.body);
+      if (!member) {
+        return res.status(404).json({ error: "Membro não encontrado" });
+      }
+      res.json(member);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/family-members/:id", async (req, res) => {
+    try {
+      const success = await storage.removeFamilyMember(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Membro não encontrado" });
+      }
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/families/:familyId/hierarchy", async (req, res) => {
+    try {
+      const hierarchy = await storage.getFamilyHierarchy(req.params.familyId);
+      res.json(hierarchy);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

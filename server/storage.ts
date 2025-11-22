@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, or, desc, asc, like, sql, gte, lte, lt } from "drizzle-orm";
+import { eq, and, or, desc, asc, like, sql, gte, lte, lt, isNull } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import type {
   InsertCitizen,
@@ -29,6 +29,8 @@ import type {
   Dwelling,
   InsertFamily,
   Family,
+  InsertFamilyMember,
+  FamilyMember,
   InsertHomeVisit,
   HomeVisit,
 } from "@shared/schema";
@@ -1113,6 +1115,91 @@ export class DbStorage implements IStorage {
   async deleteFamily(id: string): Promise<boolean> {
     const result = await db.delete(schema.families).where(eq(schema.families.id, id));
     return result.changes > 0;
+  }
+
+  // Family Members (Membros da Família)
+  async getFamilyMembers(familyId: string): Promise<FamilyMember[]> {
+    return db
+      .select()
+      .from(schema.familyMembers)
+      .where(eq(schema.familyMembers.familyId, familyId))
+      .orderBy(desc(schema.familyMembers.isHeadOfFamily), desc(schema.familyMembers.joinedAt));
+  }
+
+  async getCitizenFamilyMembership(citizenId: string): Promise<FamilyMember | undefined> {
+    const [membership] = await db
+      .select()
+      .from(schema.familyMembers)
+      .where(
+        and(
+          eq(schema.familyMembers.citizenId, citizenId),
+          isNull(schema.familyMembers.leftAt)
+        )
+      )
+      .orderBy(desc(schema.familyMembers.joinedAt))
+      .limit(1);
+    return membership;
+  }
+
+  async addFamilyMember(member: InsertFamilyMember): Promise<FamilyMember> {
+    const [created] = await db.insert(schema.familyMembers).values(member).returning();
+    
+    // Update family membersCount
+    await db
+      .update(schema.families)
+      .set({ 
+        membersCount: sql`(SELECT COUNT(*) FROM ${schema.familyMembers} WHERE family_id = ${created.familyId} AND left_at IS NULL)` 
+      })
+      .where(eq(schema.families.id, created.familyId));
+    
+    return created;
+  }
+
+  async updateFamilyMember(id: string, member: Partial<InsertFamilyMember>): Promise<FamilyMember | undefined> {
+    const [updated] = await db
+      .update(schema.familyMembers)
+      .set(member)
+      .where(eq(schema.familyMembers.id, id))
+      .returning();
+    return updated;
+  }
+
+  async removeFamilyMember(id: string): Promise<boolean> {
+    const result = await db.delete(schema.familyMembers).where(eq(schema.familyMembers.id, id));
+    return result.changes > 0;
+  }
+
+  async getFamilyHierarchy(familyId: string): Promise<any> {
+    const family = await this.getFamilyById(familyId);
+    if (!family) return null;
+
+    const members = await db
+      .select({
+        id: schema.familyMembers.id,
+        relationshipType: schema.familyMembers.relationshipType,
+        isHeadOfFamily: schema.familyMembers.isHeadOfFamily,
+        joinedAt: schema.familyMembers.joinedAt,
+        leftAt: schema.familyMembers.leftAt,
+        citizen: {
+          id: schema.citizens.id,
+          name: schema.citizens.name,
+          cpf: schema.citizens.cpf,
+          birthDate: schema.citizens.birthDate,
+          gender: schema.citizens.gender,
+        },
+      })
+      .from(schema.familyMembers)
+      .innerJoin(schema.citizens, eq(schema.familyMembers.citizenId, schema.citizens.id))
+      .where(eq(schema.familyMembers.familyId, familyId))
+      .orderBy(desc(schema.familyMembers.isHeadOfFamily), desc(schema.familyMembers.joinedAt));
+
+    const dwelling = await this.getDwellingById(family.dwellingId);
+
+    return {
+      family,
+      dwelling,
+      members,
+    };
   }
 
   // Home Visits
