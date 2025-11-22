@@ -290,6 +290,20 @@ export const families = sqliteTable("families", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
+// Family Members (Membros da Família) - Relationship tracking
+export const familyMembers = sqliteTable("family_members", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  familyId: text("family_id").notNull().references(() => families.id, { onDelete: "cascade" }),
+  citizenId: text("citizen_id").notNull().references(() => citizens.id, { onDelete: "cascade" }),
+  relationshipType: text("relationship_type", {
+    enum: ["responsavel_familiar", "conjuge", "filho", "neto", "pai_mae", "avo", "irmao", "outro"]
+  }).notNull().default("outro"),
+  isHeadOfFamily: integer("is_head_of_family", { mode: "boolean" }).default(false).notNull(),
+  joinedAt: integer("joined_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  leftAt: integer("left_at", { mode: "timestamp" }),
+  notes: text("notes"),
+});
+
 // Home Visits (Visitas Domiciliares)
 export const homeVisits = sqliteTable("home_visits", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
@@ -526,6 +540,11 @@ export const insertHomeVisitSchema = createInsertSchema(homeVisits).omit({
   createdAt: true,
 });
 
+export const insertFamilyMemberSchema = createInsertSchema(familyMembers).omit({
+  id: true,
+  joinedAt: true,
+});
+
 // Endemic Control Insert Schemas
 export const insertEndemicCycleSchema = createInsertSchema(endemicCycles).omit({
   id: true,
@@ -598,6 +617,9 @@ export type Dwelling = typeof dwellings.$inferSelect;
 
 export type InsertFamily = z.infer<typeof insertFamilySchema>;
 export type Family = typeof families.$inferSelect;
+
+export type InsertFamilyMember = z.infer<typeof insertFamilyMemberSchema>;
+export type FamilyMember = typeof familyMembers.$inferSelect;
 
 export type InsertHomeVisit = z.infer<typeof insertHomeVisitSchema>;
 export type HomeVisit = typeof homeVisits.$inferSelect;
