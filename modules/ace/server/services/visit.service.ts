@@ -1,22 +1,20 @@
 import { db } from "../../../../server/db";
-import { sql } from "drizzle-orm";
+import { eq, and, gte, lte, desc } from "drizzle-orm";
+import { aceVisits, aceDwellings, aceAuditLogs, professionals } from "../../../../shared/schema";
 import type { AceVisitSync } from "../schemas/sync.schema";
 
 export class VisitService {
-  /**
-   * Cria uma nova visita ACE
-   */
   async createVisit(data: AceVisitSync & { dwelling_id?: string }, userId?: string): Promise<any> {
-    // Resolver dwelling_id a partir do external_id se necessário
     let dwellingId = data.dwelling_id;
     
     if (!dwellingId && data.dwelling_external_id) {
-      const dwellingResult = await db.execute(sql`
-        SELECT id FROM ace_dwellings WHERE external_id = ${data.dwelling_external_id}
-      `);
+      const [dwelling] = await db
+        .select()
+        .from(aceDwellings)
+        .where(eq(aceDwellings.externalId, data.dwelling_external_id));
       
-      if (dwellingResult.rows.length > 0) {
-        dwellingId = dwellingResult.rows[0].id as string;
+      if (dwelling) {
+        dwellingId = dwelling.id;
       } else {
         throw new Error(`Dwelling com external_id ${data.dwelling_external_id} não encontrado`);
       }
@@ -26,50 +24,42 @@ export class VisitService {
       throw new Error("dwelling_id ou dwelling_external_id é obrigatório");
     }
 
-    const insertResult = await db.execute(sql`
-      INSERT INTO ace_visits (
-        external_id, dwelling_id, professional_id, unit_id, visit_date,
-        visit_type, visit_motive, latitude, longitude,
-        temperature, blood_pressure_systolic, blood_pressure_diastolic,
-        heart_rate, respiratory_rate, blood_glucose, weight, height,
-        observations, findings
-      ) VALUES (
-        ${data.external_id || null},
-        ${dwellingId},
-        ${data.professional_id},
-        ${data.unit_id},
-        ${data.visit_date},
-        ${data.visit_type || null},
-        ${data.visit_motive || null},
-        ${data.latitude || null},
-        ${data.longitude || null},
-        ${data.temperature || null},
-        ${data.blood_pressure_systolic || null},
-        ${data.blood_pressure_diastolic || null},
-        ${data.heart_rate || null},
-        ${data.respiratory_rate || null},
-        ${data.blood_glucose || null},
-        ${data.weight || null},
-        ${data.height || null},
-        ${data.observations || null},
-        ${sql.raw(`'${JSON.stringify(data.findings || {})}'::jsonb`)}
-      )
-      RETURNING *
-    `);
+    const visitTimestamp = Math.floor(new Date(data.visit_date).getTime() / 1000);
+    
+    const [visit] = await db
+      .insert(aceVisits)
+      .values({
+        externalId: data.external_id || null,
+        dwellingId,
+        professionalId: data.professional_id,
+        unitId: data.unit_id,
+        visitDate: visitTimestamp,
+        visitType: data.visit_type || null,
+        visitMotive: data.visit_motive || null,
+        latitude: data.latitude || null,
+        longitude: data.longitude || null,
+        temperature: data.temperature || null,
+        bloodPressureSystolic: data.blood_pressure_systolic || null,
+        bloodPressureDiastolic: data.blood_pressure_diastolic || null,
+        heartRate: data.heart_rate || null,
+        respiratoryRate: data.respiratory_rate || null,
+        bloodGlucose: data.blood_glucose || null,
+        weight: data.weight || null,
+        height: data.height || null,
+        observations: data.observations || null,
+        findings: JSON.stringify(data.findings || {}),
+      })
+      .returning();
 
-    // Log de auditoria
-    if (userId) {
-      await this.logAudit('ace_visits', insertResult.rows[0].id as string, 'create', userId, {
+    if (userId && visit) {
+      await this.logAudit('ace_visits', visit.id, 'create', userId, {
         external_id: data.external_id
       });
     }
 
-    return insertResult.rows[0];
+    return visit;
   }
 
-  /**
-   * Lista visitas com filtros opcionais
-   */
   async listVisits(filters: {
     dwelling_id?: string;
     professional_id?: string;
@@ -79,84 +69,113 @@ export class VisitService {
     limit?: number;
     offset?: number;
   } = {}): Promise<any[]> {
-    const conditions: string[] = [];
-    const params: any[] = [];
-    let paramIndex = 1;
+    const conditions = [];
 
     if (filters.dwelling_id) {
-      conditions.push(`dwelling_id = $${paramIndex++}`);
-      params.push(filters.dwelling_id);
+      conditions.push(eq(aceVisits.dwellingId, filters.dwelling_id));
     }
 
     if (filters.professional_id) {
-      conditions.push(`professional_id = $${paramIndex++}`);
-      params.push(filters.professional_id);
+      conditions.push(eq(aceVisits.professionalId, filters.professional_id));
     }
 
     if (filters.unit_id) {
-      conditions.push(`unit_id = $${paramIndex++}`);
-      params.push(filters.unit_id);
+      conditions.push(eq(aceVisits.unitId, filters.unit_id));
     }
 
     if (filters.start_date) {
-      conditions.push(`visit_date >= $${paramIndex++}`);
-      params.push(filters.start_date);
+      const startTimestamp = Math.floor(new Date(filters.start_date).getTime() / 1000);
+      conditions.push(gte(aceVisits.visitDate, startTimestamp));
     }
 
     if (filters.end_date) {
-      conditions.push(`visit_date <= $${paramIndex++}`);
-      params.push(filters.end_date);
+      const endTimestamp = Math.floor(new Date(filters.end_date).getTime() / 1000);
+      conditions.push(lte(aceVisits.visitDate, endTimestamp));
     }
 
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
     const limit = filters.limit || 100;
     const offset = filters.offset || 0;
 
-    const query = `
-      SELECT v.*, 
-        d.street as dwelling_street, 
-        d.number as dwelling_number,
-        d.neighborhood as dwelling_neighborhood
-      FROM ace_visits v
-      LEFT JOIN ace_dwellings d ON v.dwelling_id = d.id
-      ${whereClause}
-      ORDER BY v.visit_date DESC
-      LIMIT $${paramIndex++} OFFSET $${paramIndex}
-    `;
+    const visits = await db
+      .select({
+        id: aceVisits.id,
+        externalId: aceVisits.externalId,
+        dwellingId: aceVisits.dwellingId,
+        professionalId: aceVisits.professionalId,
+        unitId: aceVisits.unitId,
+        visitDate: aceVisits.visitDate,
+        visitType: aceVisits.visitType,
+        visitMotive: aceVisits.visitMotive,
+        latitude: aceVisits.latitude,
+        longitude: aceVisits.longitude,
+        temperature: aceVisits.temperature,
+        bloodPressureSystolic: aceVisits.bloodPressureSystolic,
+        bloodPressureDiastolic: aceVisits.bloodPressureDiastolic,
+        heartRate: aceVisits.heartRate,
+        respiratoryRate: aceVisits.respiratoryRate,
+        bloodGlucose: aceVisits.bloodGlucose,
+        weight: aceVisits.weight,
+        height: aceVisits.height,
+        observations: aceVisits.observations,
+        findings: aceVisits.findings,
+        createdAt: aceVisits.createdAt,
+        dwelling_street: aceDwellings.street,
+        dwelling_number: aceDwellings.number,
+        dwelling_neighborhood: aceDwellings.neighborhood,
+      })
+      .from(aceVisits)
+      .leftJoin(aceDwellings, eq(aceVisits.dwellingId, aceDwellings.id))
+      .where(whereClause)
+      .orderBy(desc(aceVisits.visitDate))
+      .limit(limit)
+      .offset(offset);
 
-    params.push(limit, offset);
-
-    const result = await db.execute(sql.raw(query, params));
-    return result.rows;
+    return visits;
   }
 
-  /**
-   * Busca visita por ID
-   */
   async getVisitById(id: string): Promise<any> {
-    const result = await db.execute(sql`
-      SELECT v.*, 
-        d.street as dwelling_street, 
-        d.number as dwelling_number,
-        d.neighborhood as dwelling_neighborhood,
-        d.microarea as dwelling_microarea,
-        p.name as professional_name
-      FROM ace_visits v
-      LEFT JOIN ace_dwellings d ON v.dwelling_id = d.id
-      LEFT JOIN professionals p ON v.professional_id = p.id
-      WHERE v.id = ${id}
-    `);
+    const [visit] = await db
+      .select({
+        id: aceVisits.id,
+        externalId: aceVisits.externalId,
+        dwellingId: aceVisits.dwellingId,
+        professionalId: aceVisits.professionalId,
+        unitId: aceVisits.unitId,
+        visitDate: aceVisits.visitDate,
+        visitType: aceVisits.visitType,
+        visitMotive: aceVisits.visitMotive,
+        latitude: aceVisits.latitude,
+        longitude: aceVisits.longitude,
+        temperature: aceVisits.temperature,
+        bloodPressureSystolic: aceVisits.bloodPressureSystolic,
+        bloodPressureDiastolic: aceVisits.bloodPressureDiastolic,
+        heartRate: aceVisits.heartRate,
+        respiratoryRate: aceVisits.respiratoryRate,
+        bloodGlucose: aceVisits.bloodGlucose,
+        weight: aceVisits.weight,
+        height: aceVisits.height,
+        observations: aceVisits.observations,
+        findings: aceVisits.findings,
+        createdAt: aceVisits.createdAt,
+        dwelling_street: aceDwellings.street,
+        dwelling_number: aceDwellings.number,
+        dwelling_neighborhood: aceDwellings.neighborhood,
+        dwelling_microarea: aceDwellings.microarea,
+        professional_name: professionals.name,
+      })
+      .from(aceVisits)
+      .leftJoin(aceDwellings, eq(aceVisits.dwellingId, aceDwellings.id))
+      .leftJoin(professionals, eq(aceVisits.professionalId, professionals.id))
+      .where(eq(aceVisits.id, id));
 
-    if (result.rows.length === 0) {
+    if (!visit) {
       throw new Error(`Visita ${id} não encontrada`);
     }
 
-    return result.rows[0];
+    return visit;
   }
 
-  /**
-   * Registra auditoria
-   */
   private async logAudit(
     entityType: string,
     entityId: string,
@@ -164,10 +183,14 @@ export class VisitService {
     userId: string,
     metadata: Record<string, any> = {}
   ): Promise<void> {
-    await db.execute(sql`
-      INSERT INTO ace_audit_logs (entity_type, entity_id, action, user_id, metadata)
-      VALUES (${entityType}, ${entityId}, ${action}, ${userId}, ${sql.raw(`'${JSON.stringify(metadata)}'::jsonb`)})
-    `);
+    await db.insert(aceAuditLogs).values({
+      entityType,
+      entityId,
+      action,
+      userId,
+      changes: JSON.stringify({}),
+      metadata: JSON.stringify(metadata),
+    });
   }
 }
 

@@ -4,9 +4,27 @@
 
 MuniSaúde Integrado is a comprehensive municipal health management system designed to integrate and optimize primary healthcare services for Cardeal da Silva, Bahia, Brazil. It encompasses electronic health records (PEC), scheduling, pharmacy management, inter-municipal patient transport (TFD), and robust reporting, all compliant with e-SUS APS standards. The system supports diverse user profiles (administrators, doctors, nurses, community health agents, pharmacists, managers, receptionists) with tailored interfaces to enhance healthcare delivery, administrative efficiency, and public health oversight. The business vision is to modernize municipal health management, improve patient care coordination, and provide valuable data for public health initiatives.
 
-## Recent Changes (November 22, 2025)
+## Recent Changes
 
-### Integração Territorial - Implementação Completa
+### Módulo ACE - Migração para SQLite + Drizzle (November 23, 2025)
+-   **Database Architecture**: Migrado módulo ACE de PostgreSQL raw SQL para SQLite + Drizzle ORM
+-   **Schema Tables**: Adicionadas 4 tabelas ACE no `shared/schema.ts`:
+    - `aceDwellings`: Imóveis ACE com geolocalização, tipo de residência, saneamento, e dados de animais
+    - `aceVisits`: Visitas domiciliares com sinais vitais completos (temperatura, PA, FC, glicemia, peso/altura)
+    - `aceFoci`: Focos vetoriais com status (active/resolved/monitoring) e geolocalização
+    - `aceAuditLogs`: Logs de auditoria para rastreabilidade de todas operações ACE
+-   **Services Rewritten**: 3 services completamente reescritos usando Drizzle query builder:
+    - `visit.service.ts`: db.select, db.insert com joins em dwellings/professionals
+    - `foci.service.ts`: db.select, db.insert, db.update com filtros por status/tipo
+    - `dwelling.service.ts`: db.select, db.insert com lógica de upsert idempotente
+-   **Data Type Corrections**: 
+    - Timestamps convertidos para integer Unix epoch (Math.floor(date.getTime() / 1000))
+    - JSON fields serialized corretamente com JSON.stringify antes de insert
+    - Zero LSP errors, zero runtime errors
+-   **Sync Database**: Schema sincronizado via `npm run db:push --force`
+-   **Status**: Backend ACE completo e funcional; frontend pendente (forms, pages, routing)
+
+### Integração Territorial - Implementação Completa (November 22, 2025)
 -   **Schema**: Adicionado campo opcional `familyId` em `citizens` para vinculação direta à família principal; adicionados campos `batchId`, `jsonPath`, `xmlPath` em `esusExports`
 -   **Storage Layer**: Implementados 4 métodos de hierarquia territorial:
     - `getTerritorialHierarchy(dwellingId)`: Busca hierarquia completa Domicílio → Famílias → Cidadãos
@@ -49,7 +67,7 @@ The frontend is built with React 18+, TypeScript, Vite, and Wouter for routing. 
 
 ### Backend
 
-The backend uses Express.js and TypeScript on Node.js, providing a RESTful API with JSON responses. PostgreSQL is the primary database (with SQLite for local use), managed with Drizzle ORM. A repository pattern abstracts data access. API endpoints cover core healthcare entities and administrative functions. Security includes password-based authentication with bcrypt, session management, and Role-Based Access Control (RBAC) for 7 user roles.
+The backend uses Express.js and TypeScript on Node.js, providing a RESTful API with JSON responses. SQLite (Better-SQLite3) is the database, managed with Drizzle ORM using query builder patterns (db.select, db.insert, db.update). All queries are strongly typed and use parameterized statements for security. API endpoints cover core healthcare entities and administrative functions. Security includes password-based authentication with bcrypt, session management, and Role-Based Access Control (RBAC) for 7 user roles.
 
 ### UI/UX and Brand Identity
 
@@ -60,7 +78,7 @@ The system features a modern UI with dark mode support, using Inter for typograp
 #### Core Features
 
 -   **Territorial Management**: Comprehensive CRUD for Dwellings, Home Visits, and a complete Family Hierarchy System linking Citizens, Families, and Dwellings, with rich UI for managing members and displaying visual hierarchies.
--   **Endemic Disease Surveillance (ACE)**: CRUD for work cycles and dashboards with IIP/IB indicators.
+-   **Endemic Disease Surveillance (ACE)**: Backend completo com módulo ACE usando SQLite + Drizzle ORM. Includes CRUD para imóveis (dwellings), visitas domiciliares com sinais vitais, registro de focos vetoriais com geolocalização, e sistema de auditoria. Frontend pendente (forms, tabelas, mapas).
 -   **Reports & Indicators**: Aggregated health indicators with professional PDF export and customizable filters.
 -   **Appointment Scheduling**: Complete scheduling and queue management with calendar views.
 -   **Electronic Prescriptions**: Prescription management with transactional integrity and robust PDF export.
