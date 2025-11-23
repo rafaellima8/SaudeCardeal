@@ -22,6 +22,77 @@ export class DwellingService {
     return dwelling;
   }
 
+  async updateDwelling(id: string, data: Partial<DwellingCreate>, userId?: string): Promise<any> {
+    const currentTimestamp = Math.floor(Date.now() / 1000);
+    
+    const updateData: any = {
+      street: data.street,
+      number: data.number,
+      complement: data.complement,
+      neighborhood: data.neighborhood,
+      zipCode: data.zip_code,
+      microarea: data.microarea,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      dwellingType: data.dwelling_type,
+      sanitation: data.sanitation,
+      waterSupply: data.water_supply,
+      hasElectricity: data.has_electricity,
+      hasAnimals: data.has_animals,
+      animalTypes: data.animal_types ? JSON.stringify(data.animal_types) : null,
+      householdMembers: data.household_members,
+      notes: data.notes,
+      updatedAt: currentTimestamp,
+    };
+
+    // Remove undefined fields
+    Object.keys(updateData).forEach(key => 
+      updateData[key] === undefined && delete updateData[key]
+    );
+
+    const [updated] = await db
+      .update(aceDwellings)
+      .set(updateData)
+      .where(eq(aceDwellings.id, id))
+      .returning();
+
+    // Log audit
+    if (userId) {
+      await db.insert(aceAuditLogs).values({
+        id: crypto.randomUUID(),
+        entityType: "dwelling",
+        entityId: id,
+        action: "update",
+        userId,
+        timestamp: currentTimestamp,
+        changes: JSON.stringify({ updated: Object.keys(updateData) }),
+      });
+    }
+
+    return updated;
+  }
+
+  async deleteDwelling(id: string, userId?: string): Promise<void> {
+    const currentTimestamp = Math.floor(Date.now() / 1000);
+
+    // Log audit before delete
+    if (userId) {
+      await db.insert(aceAuditLogs).values({
+        id: crypto.randomUUID(),
+        entityType: "dwelling",
+        entityId: id,
+        action: "delete",
+        userId,
+        timestamp: currentTimestamp,
+        changes: null,
+      });
+    }
+
+    await db
+      .delete(aceDwellings)
+      .where(eq(aceDwellings.id, id));
+  }
+
   async createOrUpdateDwelling(data: DwellingCreate, userId?: string): Promise<any> {
     if (data.external_id) {
       const [existing] = await db

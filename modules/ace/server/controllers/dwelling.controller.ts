@@ -37,6 +37,45 @@ export class DwellingController {
     }
   }
 
+  async updateDwelling(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const userId = (req as any).user?.id;
+      
+      const dwelling = await dwellingService.updateDwelling(id, req.body, userId);
+      
+      if (!dwelling) {
+        res.status(404).json({ error: "Imóvel não encontrado" });
+        return;
+      }
+      
+      res.json(dwelling);
+    } catch (error: any) {
+      console.error("Erro ao atualizar imóvel ACE:", error);
+      res.status(500).json({
+        error: "Erro ao atualizar imóvel",
+        message: error.message
+      });
+    }
+  }
+
+  async deleteDwelling(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const userId = (req as any).user?.id;
+      
+      await dwellingService.deleteDwelling(id, userId);
+      
+      res.status(204).send();
+    } catch (error: any) {
+      console.error("Erro ao deletar imóvel ACE:", error);
+      res.status(500).json({
+        error: "Erro ao deletar imóvel",
+        message: error.message
+      });
+    }
+  }
+
   /**
    * POST /api/ace/dwellings
    * Cria ou atualiza um imóvel ACE

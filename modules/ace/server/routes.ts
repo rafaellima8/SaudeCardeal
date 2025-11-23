@@ -23,6 +23,14 @@ aceRouter.post("/dwellings", async (req, res) => {
   await dwellingController.createDwelling(req, res);
 });
 
+aceRouter.patch("/dwellings/:id", async (req, res) => {
+  await dwellingController.updateDwelling(req, res);
+});
+
+aceRouter.delete("/dwellings/:id", async (req, res) => {
+  await dwellingController.deleteDwelling(req, res);
+});
+
 // ACE Module - Stats API
 aceRouter.get("/stats", async (req, res) => {
   await aceStatsController.getStats(req, res);
