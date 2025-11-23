@@ -1,0 +1,73 @@
+⚠️ MÓDULOS PARCIALMENTE IMPLEMENTADOS
+9. Módulo ACE (Agente Comunitário)
+✅ Dashboard ACE com estatísticas
+✅ Backend completo (dwellings, visits, foci)
+✅ API REST com CRUD completo
+❌ Frontend incompleto (páginas ace-dwellings, ace-visits, ace-foci existem mas estão vazias)
+Status: 70% COMPLETO - NÃO PRONTO
+10. TFD (Transporte Fora do Domicílio)
+✅ Estrutura de tabelas
+✅ Formulário básico
+❌ Falta workflow de aprovação
+❌ Falta gestão de veículos
+Status: 40% COMPLETO - NÃO PRONTO
+11. Gestão Territorial
+✅ Página criada
+❌ Funcionalidades não implementadas
+Status: 10% COMPLETO - NÃO PRONTO
+12. Endemias
+✅ Estrutura de tabelas (ciclos, FAD, tratamentos)
+✅ Dashboard básico
+❌ Formulários não implementados
+Status: 30% COMPLETO - NÃO PRONTO
+❌ MÓDULOS CRÍTICOS FALTANTES
+13. Exportação e-SUS
+❌ Código desabilitado (linha 3 do exporter.ts: "temporarily disabled")
+❌ Mapeamento incompleto
+Status: 5% COMPLETO - BLOQUEADOR
+14. Fila de Atendimento
+✅ Rota criada
+❌ Funcionalidade não implementada
+Status: 10% COMPLETO - IMPORTANTE
+15. Exames
+✅ Tabela criada
+❌ CRUD não implementado
+Status: 5% COMPLETO - IMPORTANTE
+🔴 PROBLEMAS CRÍTICOS IDENTIFICADOS
+1. Páginas ACE Vazias
+As páginas ace-dwellings.tsx, ace-visits.tsx e ace-foci.tsx estão praticamente vazias, apesar do backend estar completo.
+
+2. e-SUS Export Desabilitado
+// server/integrations/esus/exporter.ts (linha 1-4)
+export async function generateExport() {
+  throw new Error("e-SUS export temporarily disabled - schema reduced for SQLite auth demo");
+}
+Impacto: Sem exportação e-SUS, o município não consegue cumprir obrigações com o Ministério da Saúde.
+
+3. Seed de Dados Incompleto
+O seed atual cria poucos dados de teste, dificultando validação.
+
+4. Sem Backup Automatizado
+Não há sistema de backup automático do banco de dados SQLite.
+
+📋 CHECKLIST PARA PRODUÇÃO
+Obrigatório (Bloqueadores)
+ Implementar formulários ACE (dwellings, visits, foci)
+ Reativar e completar exportação e-SUS
+ Implementar gestão de fila de atendimento
+ Implementar CRUD de exames
+ Sistema de backup automático
+ Testes de carga e performance
+ Documentação de uso para operadores
+Importante (Recomendado)
+ Workflow de aprovação TFD
+ Gestão territorial completa
+ Módulo de endemias completo
+ Relatórios customizados por unidade
+ Auditoria de ações críticas
+ Sistema de notificações
+Desejável
+ App mobile (PWA)
+ Sincronização offline
+ Integração com CNS (validação online)
+ Dashboard gerencial avançado
