@@ -24,6 +24,7 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 import { generateExport } from "./integrations/esus/exporter";
+import seedSIGTAPMappings from "./seed-sigtap";
 import { authenticateUser, requireAuth, requireRole } from "./auth";
 import aiRoutes from "./routes-ai";
 
@@ -891,6 +892,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("[API] Error downloading e-SUS export:", error);
       res.status(500).json({ error: "Erro ao fazer download do arquivo" });
+    }
+  });
+
+  // ============================================================================
+  // ADMINISTRATIVE API - Seed and Data Management
+  // ============================================================================
+
+  // Seed SIGTAP mappings (admin only)
+  app.post("/api/admin/seed-sigtap", requireRole(["admin"]), async (req, res) => {
+    try {
+      console.log("[ADMIN] Executando seed SIGTAP mappings...");
+      
+      const result = await seedSIGTAPMappings();
+      
+      res.json({
+        success: true,
+        message: `${result.count} códigos SIGTAP inseridos/atualizados com sucesso`,
+        count: result.count,
+      });
+    } catch (error: any) {
+      console.error("[ADMIN] Erro ao executar seed SIGTAP:", error);
+      res.status(500).json({ 
+        error: "Erro ao executar seed SIGTAP",
+        details: error.message 
+      });
     }
   });
 

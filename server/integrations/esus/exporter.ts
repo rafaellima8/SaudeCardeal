@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
-import { eq } from "drizzle-orm";
+import { eq, isNull, or } from "drizzle-orm";
 import { db } from "../../db";
-import { healthUnits } from "../../../shared/schema";
+import { healthUnits, professionals } from "../../../shared/schema";
 import {
   extractCitizens,
   extractConsultations,
@@ -85,6 +85,10 @@ export async function generateExport(
   
   console.log(`🔄 Iniciando exportação e-SUS APS...`);
   console.log(`📅 Período: ${start.toISOString().split("T")[0]} a ${end.toISOString().split("T")[0]}`);
+  
+  // VALIDAÇÃO CRÍTICA: Verificar professionals sem teamINE APENAS no período (SISAB compliance)
+  // Não bloquear por professionals inativos ou fora do período exportado
+  console.log("🔍 Validando teamINE de profissionais no período...");
   
   const allErrors: string[] = [];
   

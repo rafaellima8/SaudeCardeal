@@ -1,5 +1,5 @@
 import { db } from "../../db";
-import { eq, gte, lte, and } from "drizzle-orm";
+import { eq, gte, lte, and, sql } from "drizzle-orm";
 import {
   citizens,
   consultations,
@@ -7,6 +7,7 @@ import {
   tfdRequests,
   professionals,
   healthUnits,
+  sigtapMappings,
 } from "../../../shared/schema";
 import type {
   ESUSCitizenDTO,
@@ -111,15 +112,64 @@ function parseAddress(address: string | null): { street?: string; number?: strin
 }
 
 /**
- * Mapeamento de tipos de consulta para procedimentos SIGTAP
+ * Mapeamento de tipos de consulta para procedimentos SIGTAP (FALLBACK)
+ * Usado apenas se não houver mapeamento na tabela sigtapMappings
  */
-const CONSULTATION_TYPE_TO_SIGTAP: Record<string, string> = {
+const CONSULTATION_TYPE_TO_SIGTAP_FALLBACK: Record<string, string> = {
   consulta_medica: "0301010072", // Consulta médica em atenção básica
   consulta_enfermagem: "0301010080", // Consulta de enfermagem
   consulta_odontologica: "0301010064", // Consulta odontológica
   procedimento: "0301010072", // Default
   visita_domiciliar: "0301010013", // Visita domiciliar
 };
+
+/**
+ * Cache de códigos SIGTAP para melhorar performance
+ */
+let sigtapCache: Record<string, string> | null = null;
+
+/**
+ * Invalida cache de códigos SIGTAP (chamar após seed)
+ */
+export function invalidateSIGTAPCache() {
+  sigtapCache = null;
+  console.log("[SIGTAP] Cache invalidado - será recarregado na próxima extração");
+}
+
+/**
+ * Busca código SIGTAP do banco de dados ou fallback para hardcoded
+ */
+async function getSIGTAPCode(internalCode: string): Promise<string> {
+  // Inicializar cache na primeira chamada
+  if (sigtapCache === null) {
+    sigtapCache = {};
+    try {
+      const mappings = await db
+        .select({
+          internalCode: sigtapMappings.internalCode,
+          sigtapCode: sigtapMappings.sigtapCode,
+        })
+        .from(sigtapMappings)
+        .where(eq(sigtapMappings.active, true));
+      
+      mappings.forEach(({ internalCode, sigtapCode }) => {
+        sigtapCache![internalCode] = sigtapCode;
+      });
+      
+      console.log(`[SIGTAP] Cache inicializado com ${mappings.length} códigos`);
+    } catch (error) {
+      console.warn("[SIGTAP] Erro ao carregar mapeamentos, usando fallback:", error);
+    }
+  }
+  
+  // Buscar no cache primeiro
+  if (sigtapCache[internalCode]) {
+    return sigtapCache[internalCode];
+  }
+  
+  // Fallback para mapa hardcoded
+  return CONSULTATION_TYPE_TO_SIGTAP_FALLBACK[internalCode] || "0301010072";
+}
 
 /**
  * Extrai cidadãos do banco de dados no formato e-SUS
@@ -133,18 +183,15 @@ export async function extractCitizens(
   endDate?: Date
 ): Promise<ESUSCitizenDTO[]> {
   try {
-    // Construir condições de filtro com timestamps Unix
-    const conditions = [];
-    
-    if (startDate) {
-      conditions.push(gte(citizens.createdAt, toUnixTimestamp(startDate)));
+    // Construir WHERE clause único com sql template (não misturar com and())
+    let whereClause = undefined;
+    if (startDate && endDate) {
+      whereClause = sql`${citizens.createdAt} >= ${toUnixTimestamp(startDate)} AND ${citizens.createdAt} <= ${toUnixTimestamp(endDate)}`;
+    } else if (startDate) {
+      whereClause = sql`${citizens.createdAt} >= ${toUnixTimestamp(startDate)}`;
+    } else if (endDate) {
+      whereClause = sql`${citizens.createdAt} <= ${toUnixTimestamp(endDate)}`;
     }
-    
-    if (endDate) {
-      conditions.push(lte(citizens.createdAt, toUnixTimestamp(endDate)));
-    }
-    
-    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
     
     const results = await db
       .select({
@@ -196,18 +243,15 @@ export async function extractConsultations(
   endDate?: Date
 ): Promise<ESUSConsultationDTO[]> {
   try {
-    // Construir condições de filtro com timestamps Unix
-    const conditions = [];
-    
-    if (startDate) {
-      conditions.push(gte(consultations.consultationDate, toUnixTimestamp(startDate)));
+    // Construir WHERE clause único com sql template (não misturar com and())
+    let whereClause = undefined;
+    if (startDate && endDate) {
+      whereClause = sql`${consultations.consultationDate} >= ${toUnixTimestamp(startDate)} AND ${consultations.consultationDate} <= ${toUnixTimestamp(endDate)}`;
+    } else if (startDate) {
+      whereClause = sql`${consultations.consultationDate} >= ${toUnixTimestamp(startDate)}`;
+    } else if (endDate) {
+      whereClause = sql`${consultations.consultationDate} <= ${toUnixTimestamp(endDate)}`;
     }
-    
-    if (endDate) {
-      conditions.push(lte(consultations.consultationDate, toUnixTimestamp(endDate)));
-    }
-    
-    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
     
     const results = await db
       .select({
@@ -233,6 +277,12 @@ export async function extractConsultations(
         
         const consultDate = formatDate(consultation.consultationDate);
         if (!consultDate) return null;
+        
+        // BLOCKER: teamINE obrigatório para SISAB compliance
+        if (!professionalTeamINE) {
+          console.error(`[e-SUS BLOCKER] Consulta ${consultation.id} - Professional CNS ${profCNS} sem teamINE - SISAB REJEITARÁ`);
+          return null; // Filtrar registro não-conforme
+        }
         
         // Parsear CID-10 e CIAP-2 se existirem
         let cid10Codes: string[] | undefined;
@@ -292,18 +342,15 @@ export async function extractProcedures(
   endDate?: Date
 ): Promise<ESUSProcedureDTO[]> {
   try {
-    // Construir condições de filtro com timestamps Unix
-    const conditions = [];
-    
-    if (startDate) {
-      conditions.push(gte(consultations.consultationDate, toUnixTimestamp(startDate)));
+    // Construir WHERE clause único com sql template (não misturar com and())
+    let whereClause = undefined;
+    if (startDate && endDate) {
+      whereClause = sql`${consultations.consultationDate} >= ${toUnixTimestamp(startDate)} AND ${consultations.consultationDate} <= ${toUnixTimestamp(endDate)}`;
+    } else if (startDate) {
+      whereClause = sql`${consultations.consultationDate} >= ${toUnixTimestamp(startDate)}`;
+    } else if (endDate) {
+      whereClause = sql`${consultations.consultationDate} <= ${toUnixTimestamp(endDate)}`;
     }
-    
-    if (endDate) {
-      conditions.push(lte(consultations.consultationDate, toUnixTimestamp(endDate)));
-    }
-    
-    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
     
     const results = await db
       .select({
@@ -320,16 +367,22 @@ export async function extractProcedures(
       .innerJoin(healthUnits, eq(consultations.unitId, healthUnits.id))
       .where(whereClause);
     
-    return results
-      .map(({ consultation, citizenCPF, citizenCNS, professionalCNS, professionalTeamINE, unitCNES }) => {
+    const procedures = await Promise.all(
+      results.map(async ({ consultation, citizenCPF, citizenCNS, professionalCNS, professionalTeamINE, unitCNES }) => {
         const profCNS = cleanCNS(professionalCNS);
         if (!profCNS || !unitCNES) return null;
         
         const executionDate = formatDate(consultation.consultationDate);
         if (!executionDate) return null;
         
-        // Mapear tipo de consulta para código SIGTAP
-        const procedureCode = CONSULTATION_TYPE_TO_SIGTAP[consultation.type || ""] || "0301010072";
+        // BLOCKER: teamINE obrigatório para SISAB compliance
+        if (!professionalTeamINE) {
+          console.error(`[e-SUS BLOCKER] Professional CNS ${profCNS} sem teamINE - SISAB REJEITARÁ este registro`);
+          return null; // Filtrar registro não-conforme
+        }
+        
+        // Buscar código SIGTAP do banco de dados ou fallback
+        const procedureCode = await getSIGTAPCode(consultation.type || "consulta_medica");
         
         return {
           citizenCPF: cleanCPF(citizenCPF),
@@ -343,7 +396,9 @@ export async function extractProcedures(
           shift: calculateShift(consultation.consultationDate),
         };
       })
-      .filter((p): p is ESUSProcedureDTO => p !== null);
+    );
+    
+    return procedures.filter((p): p is ESUSProcedureDTO => p !== null);
   } catch (error) {
     console.error("Error extracting procedures:", error);
     return [];
@@ -358,18 +413,15 @@ export async function extractExams(
   endDate?: Date
 ): Promise<ESUSExamDTO[]> {
   try {
-    // Construir condições de filtro com timestamps Unix
-    const conditions = [];
-    
-    if (startDate) {
-      conditions.push(gte(exams.requestDate, toUnixTimestamp(startDate)));
+    // Construir WHERE clause único com sql template (não misturar com and())
+    let whereClause = undefined;
+    if (startDate && endDate) {
+      whereClause = sql`${exams.requestDate} >= ${toUnixTimestamp(startDate)} AND ${exams.requestDate} <= ${toUnixTimestamp(endDate)}`;
+    } else if (startDate) {
+      whereClause = sql`${exams.requestDate} >= ${toUnixTimestamp(startDate)}`;
+    } else if (endDate) {
+      whereClause = sql`${exams.requestDate} <= ${toUnixTimestamp(endDate)}`;
     }
-    
-    if (endDate) {
-      conditions.push(lte(exams.requestDate, toUnixTimestamp(endDate)));
-    }
-    
-    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
     
     const results = await db
       .select({
@@ -443,18 +495,15 @@ export async function extractTFD(
   endDate?: Date
 ): Promise<ESUSTFDDTO[]> {
   try {
-    // Construir condições de filtro com timestamps Unix
-    const conditions = [];
-    
-    if (startDate) {
-      conditions.push(gte(tfdRequests.requestDate, toUnixTimestamp(startDate)));
+    // Construir WHERE clause único com sql template (não misturar com and())
+    let whereClause = undefined;
+    if (startDate && endDate) {
+      whereClause = sql`${tfdRequests.requestDate} >= ${toUnixTimestamp(startDate)} AND ${tfdRequests.requestDate} <= ${toUnixTimestamp(endDate)}`;
+    } else if (startDate) {
+      whereClause = sql`${tfdRequests.requestDate} >= ${toUnixTimestamp(startDate)}`;
+    } else if (endDate) {
+      whereClause = sql`${tfdRequests.requestDate} <= ${toUnixTimestamp(endDate)}`;
     }
-    
-    if (endDate) {
-      conditions.push(lte(tfdRequests.requestDate, toUnixTimestamp(endDate)));
-    }
-    
-    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
     
     const results = await db
       .select({

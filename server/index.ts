@@ -3,6 +3,7 @@ import session from "express-session";
 import { db } from "./db";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import seedSIGTAPMappings from "./seed-sigtap";
 
 const app = express();
 
@@ -65,6 +66,13 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Garantir seed SIGTAP no startup (SISAB compliance)
+  try {
+    await seedSIGTAPMappings();
+  } catch (error) {
+    console.warn("[STARTUP] Aviso: Seed SIGTAP falhou (pode já estar populado):", error);
+  }
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
