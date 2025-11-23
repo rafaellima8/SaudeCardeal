@@ -17,6 +17,7 @@ import {
   Stethoscope,
   ListChecks,
   FileCheck,
+  ChevronRight,
 } from "lucide-react";
 import {
   Sidebar,
@@ -27,9 +28,13 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -49,7 +54,15 @@ const allMenuItems = [
   { title: "Atendimentos", icon: Stethoscope, url: "/atendimentos" },
   { title: "Prescrições", icon: FileCheck, url: "/prescricoes" },
   { title: "Território", icon: MapPin, url: "/territorio" },
-  { title: "ACE", icon: Activity, url: "/ace" },
+  { 
+    title: "ACE", 
+    icon: Activity, 
+    url: "/ace",
+    submenu: [
+      { title: "Dashboard", url: "/ace" },
+      { title: "Imóveis", url: "/ace/imoveis" },
+    ]
+  },
   { title: "Endemias", icon: Bug, url: "/endemias" },
   { title: "Farmácia", icon: Pill, url: "/farmacia" },
   { title: "TFD", icon: Truck, url: "/tfd" },
@@ -140,14 +153,41 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {menuItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild data-testid={`nav-${item.title.toLowerCase()}`}>
-                      <a href={item.url} className="hover-elevate active-elevate-2">
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
-                      </a>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  <Collapsible key={item.title} asChild defaultOpen={false}>
+                    <SidebarMenuItem>
+                      {item.submenu ? (
+                        <>
+                          <CollapsibleTrigger asChild>
+                            <SidebarMenuButton data-testid={`nav-${item.title.toLowerCase()}`} className="hover-elevate active-elevate-2">
+                              <item.icon className="h-4 w-4" />
+                              <span>{item.title}</span>
+                              <ChevronRight className="ml-auto h-4 w-4 transition-transform group-data-[state=open]:rotate-90" />
+                            </SidebarMenuButton>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <SidebarMenuSub>
+                              {item.submenu.map((subItem) => (
+                                <SidebarMenuSubItem key={subItem.title}>
+                                  <SidebarMenuSubButton asChild data-testid={`nav-${item.title.toLowerCase()}-${subItem.title.toLowerCase()}`}>
+                                    <a href={subItem.url} className="hover-elevate active-elevate-2">
+                                      <span>{subItem.title}</span>
+                                    </a>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                              ))}
+                            </SidebarMenuSub>
+                          </CollapsibleContent>
+                        </>
+                      ) : (
+                        <SidebarMenuButton asChild data-testid={`nav-${item.title.toLowerCase()}`}>
+                          <a href={item.url} className="hover-elevate active-elevate-2">
+                            <item.icon className="h-4 w-4" />
+                            <span>{item.title}</span>
+                          </a>
+                        </SidebarMenuButton>
+                      )}
+                    </SidebarMenuItem>
+                  </Collapsible>
                 ))}
               </SidebarMenu>
             </SidebarGroupContent>
