@@ -178,9 +178,6 @@ export async function extractCitizens(
             cityCode: MUNICIPALITY_CODE,
             state: "BA",
           } : undefined,
-          bloodType: citizen.bloodType || undefined,
-          allergies: citizen.allergies ? (Array.isArray(citizen.allergies) ? citizen.allergies : []) : undefined,
-          familyGroup: citizen.familyGroup || undefined,
           healthUnitCNES: unitCNES || undefined,
         };
       })
@@ -218,6 +215,7 @@ export async function extractConsultations(
         citizenCPF: citizens.cpf,
         citizenCNS: citizens.cns,
         professionalCNS: professionals.cns,
+        professionalTeamINE: professionals.teamINE,
         unitCNES: healthUnits.cnes,
       })
       .from(consultations)
@@ -227,7 +225,7 @@ export async function extractConsultations(
       .where(whereClause);
     
     return results
-      .map(({ consultation, citizenCPF, citizenCNS, professionalCNS, unitCNES }) => {
+      .map(({ consultation, citizenCPF, citizenCNS, professionalCNS, professionalTeamINE, unitCNES }) => {
         const cpf = cleanCPF(citizenCPF);
         const profCNS = cleanCNS(professionalCNS);
         
@@ -267,6 +265,7 @@ export async function extractConsultations(
           citizenCPF: cpf,
           citizenCNS: cleanCNS(citizenCNS),
           professionalCNS: profCNS,
+          teamINE: professionalTeamINE || undefined,
           consultationDate: consultDate,
           shift: calculateShift(consultation.consultationDate),
           unitCNES,
@@ -312,6 +311,7 @@ export async function extractProcedures(
         citizenCPF: citizens.cpf,
         citizenCNS: citizens.cns,
         professionalCNS: professionals.cns,
+        professionalTeamINE: professionals.teamINE,
         unitCNES: healthUnits.cnes,
       })
       .from(consultations)
@@ -321,7 +321,7 @@ export async function extractProcedures(
       .where(whereClause);
     
     return results
-      .map(({ consultation, citizenCPF, citizenCNS, professionalCNS, unitCNES }) => {
+      .map(({ consultation, citizenCPF, citizenCNS, professionalCNS, professionalTeamINE, unitCNES }) => {
         const profCNS = cleanCNS(professionalCNS);
         if (!profCNS || !unitCNES) return null;
         
@@ -335,6 +335,7 @@ export async function extractProcedures(
           citizenCPF: cleanCPF(citizenCPF),
           citizenCNS: cleanCNS(citizenCNS),
           professionalCNS: profCNS,
+          teamINE: professionalTeamINE || undefined,
           procedureCode,
           quantity: 1,
           unitCNES,

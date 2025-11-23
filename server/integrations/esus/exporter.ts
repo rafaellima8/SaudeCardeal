@@ -1,4 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
+import { eq } from "drizzle-orm";
+import { db } from "../../db";
+import { healthUnits } from "../../../shared/schema";
 import {
   extractCitizens,
   extractConsultations,
@@ -179,8 +182,30 @@ export async function generateExport(
   console.log(`  - Exames válidos: ${validExams.length}/${examsData.length}`);
   console.log(`  - TFD válidos: ${validTFD.length}/${tfdData.length}`);
   
-  // Obter CNES da primeira unidade (ou usar fornecido)
-  const defaultCNES = unitCNES || "0000000"; // TODO: Obter do banco
+  // Obter CNES dinamicamente do banco de dados
+  let cnesCode: string;
+  
+  if (unitCNES) {
+    // Usar CNES fornecido (já validado)
+    cnesCode = unitCNES;
+  } else {
+    // Buscar CNES da primeira unidade ativa
+    const units = await db
+      .select({ cnes: healthUnits.cnes })
+      .from(healthUnits)
+      .where(eq(healthUnits.isActive, true))
+      .limit(1);
+    
+    if (units.length === 0) {
+      throw new Error(
+        "Nenhuma unidade de saúde cadastrada. Cadastre ao menos uma unidade com CNES válido antes de exportar."
+      );
+    }
+    
+    cnesCode = units[0].cnes;
+  }
+  
+  console.log(`🏥 CNES da unidade: ${cnesCode}`);
   
   // Montar lote de exportação
   const batch: ESUSExportBatchDTO = {
@@ -189,7 +214,7 @@ export async function generateExport(
     startDate: start.toISOString().split("T")[0],
     endDate: end.toISOString().split("T")[0],
     municipalityCode: MUNICIPALITY_CODE,
-    healthUnitCNES: defaultCNES,
+    healthUnitCNES: cnesCode,
     systemName: "MuniSaúde Integrado - PEC Municipal",
     systemVersion: "1.0.0",
     cidadaos: validCitizens.length > 0 ? validCitizens : undefined,

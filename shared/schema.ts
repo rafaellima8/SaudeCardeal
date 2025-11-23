@@ -49,6 +49,7 @@ export const professionals = sqliteTable("professionals", {
   phone: text("phone"),
   email: text("email"),
   unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  teamINE: text("team_ine"), // Identificador Nacional de Equipes (10 dígitos CNES)
   active: integer("active", { mode: "boolean" }).default(true).notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
@@ -346,6 +347,20 @@ export const esusExports = sqliteTable("esus_exports", {
   completedAt: integer("completed_at", { mode: "timestamp" }),
 });
 
+// SIGTAP Code Mappings (Mapeamento de Códigos SIGTAP)
+// Mapeia tipos de procedimentos/exames internos para códigos SIGTAP oficiais
+export const sigtapMappings = sqliteTable("sigtap_mappings", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  internalCode: text("internal_code").notNull().unique(), // Código interno do sistema (ex: "consulta_medica_demanda_espontanea")
+  sigtapCode: text("sigtap_code").notNull(), // Código SIGTAP (ex: "0301010039")
+  description: text("description").notNull(), // Descrição do procedimento
+  category: text("category", { 
+    enum: ["consultation", "procedure", "exam", "vaccine", "other"] 
+  }).notNull(),
+  active: integer("active", { mode: "boolean" }).default(true).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
 // ============================================================================
 // ENDEMIC CONTROL TABLES (Controle de Endemias)
 // ============================================================================
@@ -556,6 +571,12 @@ export const insertEsusExportSchema = createInsertSchema(esusExports).omit({
   completedAt: true,
 });
 
+// SIGTAP Mapping Insert Schema
+export const insertSigtapMappingSchema = createInsertSchema(sigtapMappings).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Endemic Control Insert Schemas
 export const insertEndemicCycleSchema = createInsertSchema(endemicCycles).omit({
   id: true,
@@ -742,6 +763,9 @@ export type HomeVisit = typeof homeVisits.$inferSelect;
 
 export type InsertEsusExport = z.infer<typeof insertEsusExportSchema>;
 export type EsusExport = typeof esusExports.$inferSelect;
+
+export type InsertSigtapMapping = z.infer<typeof insertSigtapMappingSchema>;
+export type SigtapMapping = typeof sigtapMappings.$inferSelect;
 
 export type InsertEndemicCycle = z.infer<typeof insertEndemicCycleSchema>;
 export type EndemicCycle = typeof endemicCycles.$inferSelect;
