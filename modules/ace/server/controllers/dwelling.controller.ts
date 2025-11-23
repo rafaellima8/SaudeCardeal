@@ -1,12 +1,33 @@
 import type { Request, Response } from "express";
 import { dwellingService } from "../services/dwelling.service";
-import { dwellingCreateSchema } from "../schemas/dwelling.schema";
-import { ZodError } from "zod";
+import { z, ZodError } from "zod";
+
+// CamelCase schema for frontend payloads
+const camelCaseSchema = z.object({
+  externalId: z.string().min(1).optional(),
+  unitId: z.string().uuid("Unit ID deve ser UUID válido"),
+  microarea: z.string().optional(),
+  street: z.string().min(1, "Rua é obrigatória"),
+  number: z.string().optional(),
+  complement: z.string().optional(),
+  neighborhood: z.string().optional(),
+  zipCode: z.string().optional(),
+  latitude: z.string().optional(),
+  longitude: z.string().optional(),
+  dwellingType: z.string().optional(),
+  sanitation: z.string().optional(),
+  waterSupply: z.string().optional(),
+  hasElectricity: z.boolean().default(true),
+  hasAnimals: z.boolean().default(false),
+  animalTypes: z.array(z.string()).default([]),
+  householdMembers: z.number().int().min(0).default(0),
+  notes: z.string().optional(),
+});
 
 export class DwellingController {
   async listDwellings(req: Request, res: Response): Promise<void> {
     try {
-      const { data: dwellings } = await dwellingService.listDwellings();
+      const dwellings = await dwellingService.listDwellings();
       res.json(dwellings);
     } catch (error: any) {
       console.error("Erro ao listar imóveis ACE:", error);
@@ -83,16 +104,9 @@ export class DwellingController {
    */
   async createDwelling(req: Request, res: Response): Promise<void> {
     try {
-      // Validar request body com Zod
-      const validatedData = dwellingCreateSchema.parse(req.body);
-
-      // Extrair userId da sessão (se disponível)
+      const validatedData = camelCaseSchema.parse(req.body);
       const userId = (req as any).user?.id;
-
-      // Criar ou atualizar dwelling
       const dwelling = await dwellingService.createOrUpdateDwelling(validatedData, userId);
-
-      // Retornar 201 Created (mesmo se foi retornado registro existente)
       res.status(201).json(dwelling);
     } catch (error: any) {
       if (error instanceof ZodError) {
@@ -100,13 +114,14 @@ export class DwellingController {
           error: "Dados inválidos",
           details: error.errors
         });
-      } else {
-        console.error("Erro ao criar imóvel ACE:", error);
-        res.status(500).json({
-          error: "Erro ao criar imóvel",
-          message: error.message
-        });
+        return;
       }
+      
+      console.error("Erro ao criar imóvel ACE:", error);
+      res.status(500).json({
+        error: "Erro ao criar imóvel",
+        message: error.message
+      });
     }
   }
 }

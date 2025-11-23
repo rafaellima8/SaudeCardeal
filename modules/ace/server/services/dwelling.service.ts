@@ -4,13 +4,75 @@ import { aceDwellings, aceAuditLogs } from "../../../../shared/schema";
 import type { DwellingCreate } from "../schemas/dwelling.schema";
 
 export class DwellingService {
-  async listDwellings(): Promise<{ data: any[] }> {
+  // Map camelCase/snake_case payload to Drizzle fields (only include provided fields)
+  private mapToDrizzleFields(data: any): any {
+    const mapped: any = {};
+    
+    if (data.externalId !== undefined || data.external_id !== undefined) {
+      mapped.externalId = data.externalId || data.external_id;
+    }
+    if (data.unitId !== undefined || data.unit_id !== undefined) {
+      mapped.unitId = data.unitId || data.unit_id;
+    }
+    if (data.microarea !== undefined) {
+      mapped.microarea = data.microarea;
+    }
+    if (data.street !== undefined) {
+      mapped.street = data.street;
+    }
+    if (data.number !== undefined) {
+      mapped.number = data.number;
+    }
+    if (data.complement !== undefined) {
+      mapped.complement = data.complement;
+    }
+    if (data.neighborhood !== undefined) {
+      mapped.neighborhood = data.neighborhood;
+    }
+    if (data.zipCode !== undefined || data.zip_code !== undefined) {
+      mapped.zipCode = data.zipCode || data.zip_code;
+    }
+    if (data.latitude !== undefined) {
+      mapped.latitude = data.latitude;
+    }
+    if (data.longitude !== undefined) {
+      mapped.longitude = data.longitude;
+    }
+    if (data.dwellingType !== undefined || data.dwelling_type !== undefined) {
+      mapped.dwellingType = data.dwellingType || data.dwelling_type;
+    }
+    if (data.sanitation !== undefined) {
+      mapped.sanitation = data.sanitation;
+    }
+    if (data.waterSupply !== undefined || data.water_supply !== undefined) {
+      mapped.waterSupply = data.waterSupply || data.water_supply;
+    }
+    if (data.hasElectricity !== undefined || data.has_electricity !== undefined) {
+      mapped.hasElectricity = data.hasElectricity ?? data.has_electricity;
+    }
+    if (data.hasAnimals !== undefined || data.has_animals !== undefined) {
+      mapped.hasAnimals = data.hasAnimals ?? data.has_animals;
+    }
+    if (data.animalTypes !== undefined || data.animal_types !== undefined) {
+      mapped.animalTypes = data.animalTypes || data.animal_types;
+    }
+    if (data.householdMembers !== undefined || data.household_members !== undefined) {
+      mapped.householdMembers = data.householdMembers ?? data.household_members;
+    }
+    if (data.notes !== undefined) {
+      mapped.notes = data.notes;
+    }
+    
+    return mapped;
+  }
+
+  async listDwellings(): Promise<any[]> {
     const dwellings = await db
       .select()
       .from(aceDwellings)
       .orderBy(desc(aceDwellings.createdAt));
     
-    return { data: dwellings };
+    return dwellings;
   }
 
   async getDwellingById(id: string): Promise<any> {
@@ -22,26 +84,12 @@ export class DwellingService {
     return dwelling;
   }
 
-  async updateDwelling(id: string, data: Partial<DwellingCreate>, userId?: string): Promise<any> {
+  async updateDwelling(id: string, data: any, userId?: string): Promise<any> {
     const currentTimestamp = Math.floor(Date.now() / 1000);
     
+    const mappedData = this.mapToDrizzleFields(data);
     const updateData: any = {
-      street: data.street,
-      number: data.number,
-      complement: data.complement,
-      neighborhood: data.neighborhood,
-      zipCode: data.zip_code,
-      microarea: data.microarea,
-      latitude: data.latitude,
-      longitude: data.longitude,
-      dwellingType: data.dwelling_type,
-      sanitation: data.sanitation,
-      waterSupply: data.water_supply,
-      hasElectricity: data.has_electricity,
-      hasAnimals: data.has_animals,
-      animalTypes: data.animal_types ? JSON.stringify(data.animal_types) : null,
-      householdMembers: data.household_members,
-      notes: data.notes,
+      ...mappedData,
       updatedAt: currentTimestamp,
     };
 
@@ -93,45 +141,42 @@ export class DwellingService {
       .where(eq(aceDwellings.id, id));
   }
 
-  async createOrUpdateDwelling(data: DwellingCreate, userId?: string): Promise<any> {
-    if (data.external_id) {
+  async createOrUpdateDwelling(data: any, userId?: string): Promise<any> {
+    const mappedData = this.mapToDrizzleFields(data);
+    
+    // Validate required fields after mapping
+    if (!mappedData.street || !mappedData.unitId) {
+      throw new Error("Street and unitId are required");
+    }
+    
+    if (mappedData.externalId) {
       const [existing] = await db
         .select()
         .from(aceDwellings)
-        .where(eq(aceDwellings.externalId, data.external_id));
+        .where(eq(aceDwellings.externalId, mappedData.externalId));
 
       if (existing) {
         return existing;
       }
     }
 
+    // Apply defaults for create operation
+    const insertData = {
+      ...mappedData,
+      hasElectricity: mappedData.hasElectricity ?? true,
+      hasAnimals: mappedData.hasAnimals ?? false,
+      animalTypes: mappedData.animalTypes || [],
+      householdMembers: mappedData.householdMembers ?? 0,
+    };
+
     const [dwelling] = await db
       .insert(aceDwellings)
-      .values({
-        externalId: data.external_id || null,
-        unitId: data.unit_id,
-        microarea: data.microarea || null,
-        street: data.street,
-        number: data.number || null,
-        complement: data.complement || null,
-        neighborhood: data.neighborhood || null,
-        zipCode: data.zip_code || null,
-        latitude: data.latitude || null,
-        longitude: data.longitude || null,
-        dwellingType: data.dwelling_type || null,
-        sanitation: data.sanitation || null,
-        waterSupply: data.water_supply || null,
-        hasElectricity: data.has_electricity,
-        hasAnimals: data.has_animals,
-        animalTypes: data.animal_types,
-        householdMembers: data.household_members,
-        notes: data.notes || null,
-      })
+      .values(insertData)
       .returning();
 
     if (userId && dwelling) {
       await this.logAudit('ace_dwellings', dwelling.id, 'create', userId, {
-        external_id: data.external_id,
+        external_id: mappedData.externalId,
         action: 'dwelling_create'
       });
     }

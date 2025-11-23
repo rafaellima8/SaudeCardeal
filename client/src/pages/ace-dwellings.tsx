@@ -60,7 +60,7 @@ export default function AceDwellings() {
     queryKey: ['/api/ace/dwellings'],
   });
 
-  const { data: units } = useQuery<Array<{ id: string; name: string }>>({
+  const { data: units, isLoading: isLoadingUnits } = useQuery<Array<{ id: string; name: string }>>({
     queryKey: ['/api/units'],
   });
 
@@ -154,6 +154,16 @@ export default function AceDwellings() {
         unitId: dwelling.unitId,
       });
     } else {
+      // Validate units are available
+      if (!units || units.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: "É necessário ter pelo menos uma unidade de saúde cadastrada.",
+        });
+        return;
+      }
+      
       setSelectedDwelling(null);
       form.reset({
         street: "",
@@ -172,7 +182,7 @@ export default function AceDwellings() {
         animalTypes: [],
         householdMembers: 0,
         notes: "",
-        unitId: units?.[0]?.id || "",
+        unitId: units[0].id,
       });
     }
     setIsDialogOpen(true);
@@ -207,9 +217,13 @@ export default function AceDwellings() {
             Cadastro e gerenciamento de imóveis para Agentes de Combate a Endemias
           </p>
         </div>
-        <Button onClick={() => handleOpenDialog()} data-testid="button-add-dwelling">
+        <Button 
+          onClick={() => handleOpenDialog()} 
+          disabled={isLoadingUnits}
+          data-testid="button-add-dwelling"
+        >
           <Plus className="mr-2 h-4 w-4" />
-          Novo Imóvel
+          {isLoadingUnits ? "Carregando..." : "Novo Imóvel"}
         </Button>
       </div>
 

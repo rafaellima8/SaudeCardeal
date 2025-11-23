@@ -6,23 +6,30 @@ MuniSaúde Integrado is a comprehensive municipal health management system desig
 
 ## Recent Changes
 
-### Módulo ACE - Migração para SQLite + Drizzle (November 23, 2025)
--   **Database Architecture**: Migrado módulo ACE de PostgreSQL raw SQL para SQLite + Drizzle ORM
--   **Schema Tables**: Adicionadas 4 tabelas ACE no `shared/schema.ts`:
-    - `aceDwellings`: Imóveis ACE com geolocalização, tipo de residência, saneamento, e dados de animais
-    - `aceVisits`: Visitas domiciliares com sinais vitais completos (temperatura, PA, FC, glicemia, peso/altura)
-    - `aceFoci`: Focos vetoriais com status (active/resolved/monitoring) e geolocalização
-    - `aceAuditLogs`: Logs de auditoria para rastreabilidade de todas operações ACE
--   **Services Rewritten**: 3 services completamente reescritos usando Drizzle query builder:
-    - `visit.service.ts`: db.select, db.insert com joins em dwellings/professionals
-    - `foci.service.ts`: db.select, db.insert, db.update com filtros por status/tipo
-    - `dwelling.service.ts`: db.select, db.insert com lógica de upsert idempotente
--   **Data Type Corrections**: 
-    - Timestamps convertidos para integer Unix epoch (Math.floor(date.getTime() / 1000))
-    - JSON fields serialized corretamente com JSON.stringify antes de insert
-    - Zero LSP errors, zero runtime errors
--   **Sync Database**: Schema sincronizado via `npm run db:push --force`
--   **Status**: Backend ACE completo e funcional; frontend pendente (forms, pages, routing)
+### Módulo ACE Imóveis - Frontend Full-Stack Production-Ready (November 23, 2025)
+-   **Frontend Completo**: Implementada página `ace-dwellings.tsx` com padrões do projeto:
+    - Shadcn Form + useForm + zodResolver com validação completa
+    - apiRequest para mutations (POST/PATCH/DELETE) ao invés de fetch manual
+    - queryKey estruturado `['/api/ace/dwellings']` para cache invalidation correto
+    - Dialog com form create/edit completo: endereço, geolocalização, saneamento, água, energia, animais
+    - Loading states, error handling, toast notifications
+    - Todos elementos interativos com data-testid para testes
+    - UX melhorada: botão "Novo Imóvel" disabled durante loading de units
+-   **Backend CRUD Completo com Validação Robusta**: 
+    - GET `/api/ace/dwellings` (lista), GET `/api/ace/dwellings/:id` (detalhe)
+    - POST `/api/ace/dwellings` (create com validação Zod camelCase)
+    - PATCH `/api/ace/dwellings/:id` (update parcial preservando campos não enviados)
+    - DELETE `/api/ace/dwellings/:id` (com auditoria)
+-   **mapToDrizzleFields Bidirecional**: Função que aceita payloads camelCase (frontend) E snake_case (backend legacy) e mapeia corretamente para campos Drizzle, incluindo apenas campos fornecidos para evitar sobrescrever dados em PATCH
+-   **Validação em Camadas**:
+    - Frontend: zodResolver com insertAceDwellingSchema
+    - Backend: camelCaseSchema Zod no controller retorna 400 para payloads malformados
+    - Service: validação de required fields após mapeamento
+-   **JSON Array Handling**: animalTypes persiste corretamente como JSON array via Drizzle mode: "json" (sem double stringify)
+-   **Sidebar**: Adicionados links diretos "ACE Dashboard" e "ACE Imóveis" (solução simplificada ao invés de Collapsible complexo)
+-   **Rota**: `/ace/imoveis` adicionada em App.tsx
+-   **Zero LSP Errors**: Código TypeScript sem erros de tipagem
+-   **Status**: Módulo ACE Imóveis completo e production-ready; próximos passos: Visitas (ace-visits.tsx) e Focos (ace-foci.tsx)
 
 ### Integração Territorial - Implementação Completa (November 22, 2025)
 -   **Schema**: Adicionado campo opcional `familyId` em `citizens` para vinculação direta à família principal; adicionados campos `batchId`, `jsonPath`, `xmlPath` em `esusExports`
