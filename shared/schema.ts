@@ -578,6 +578,111 @@ export const insertFocalTreatmentSchema = createInsertSchema(focalTreatments).om
   createdAt: true,
 });
 
+// ============================================================================
+// ACE MODULE TABLES (Agente de Combate a Endemias)
+// ============================================================================
+
+// ACE Dwellings (Imóveis ACE)
+export const aceDwellings = sqliteTable("ace_dwellings", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  externalId: text("external_id").unique(),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  microarea: text("microarea"),
+  street: text("street").notNull(),
+  number: text("number"),
+  complement: text("complement"),
+  neighborhood: text("neighborhood"),
+  zipCode: text("zip_code"),
+  latitude: text("latitude"),
+  longitude: text("longitude"),
+  dwellingType: text("dwelling_type"),
+  sanitation: text("sanitation"),
+  waterSupply: text("water_supply"),
+  hasElectricity: integer("has_electricity", { mode: "boolean" }).default(true).notNull(),
+  hasAnimals: integer("has_animals", { mode: "boolean" }).default(false).notNull(),
+  animalTypes: text("animal_types", { mode: "json" }).$type<string[]>().default(sql`'[]'`).notNull(),
+  householdMembers: integer("household_members").default(0).notNull(),
+  notes: text("notes"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// ACE Visits (Visitas ACE)
+export const aceVisits = sqliteTable("ace_visits", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  externalId: text("external_id").unique(),
+  dwellingId: text("dwelling_id").notNull().references(() => aceDwellings.id, { onDelete: "cascade" }),
+  professionalId: text("professional_id").notNull().references(() => professionals.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  visitDate: integer("visit_date", { mode: "timestamp" }).notNull(),
+  visitType: text("visit_type"),
+  visitMotive: text("visit_motive"),
+  latitude: text("latitude"),
+  longitude: text("longitude"),
+  temperature: real("temperature"),
+  bloodPressureSystolic: integer("blood_pressure_systolic"),
+  bloodPressureDiastolic: integer("blood_pressure_diastolic"),
+  heartRate: integer("heart_rate"),
+  respiratoryRate: integer("respiratory_rate"),
+  bloodGlucose: integer("blood_glucose"),
+  weight: real("weight"),
+  height: real("height"),
+  observations: text("observations"),
+  findings: text("findings", { mode: "json" }).$type<Record<string, any>>().default(sql`'{}'`).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// ACE Foci (Focos Vetoriais)
+export const aceFoci = sqliteTable("ace_foci", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  visitId: text("visit_id").notNull().references(() => aceVisits.id, { onDelete: "cascade" }),
+  dwellingId: text("dwelling_id").notNull().references(() => aceDwellings.id, { onDelete: "cascade" }),
+  fociType: text("foci_type").notNull(),
+  locationDescription: text("location_description"),
+  latitude: text("latitude"),
+  longitude: text("longitude"),
+  quantity: integer("quantity").default(1).notNull(),
+  actionTaken: text("action_taken"),
+  status: text("status", { enum: ["active", "resolved", "monitoring"] }).default("active").notNull(),
+  notes: text("notes"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  resolvedAt: integer("resolved_at", { mode: "timestamp" }),
+});
+
+// ACE Audit Logs (Logs de Auditoria ACE)
+export const aceAuditLogs = sqliteTable("ace_audit_logs", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  entityType: text("entity_type").notNull(),
+  entityId: text("entity_id").notNull(),
+  action: text("action").notNull(),
+  userId: text("user_id").references(() => users.id),
+  changes: text("changes", { mode: "json" }).$type<Record<string, any>>().default(sql`'{}'`).notNull(),
+  metadata: text("metadata", { mode: "json" }).$type<Record<string, any>>().default(sql`'{}'`).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// ACE Insert Schemas
+export const insertAceDwellingSchema = createInsertSchema(aceDwellings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAceVisitSchema = createInsertSchema(aceVisits).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAceFocusSchema = createInsertSchema(aceFoci).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAceAuditLogSchema = createInsertSchema(aceAuditLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const loginSchema = z.object({
   email: z.string().email("Email inválido"),
   password: z.string().min(6, "Senha deve ter no mínimo 6 caracteres"),
@@ -656,3 +761,16 @@ export const insertAiAuditLogSchema = createInsertSchema(aiAuditLogs).omit({
 });
 export type InsertAiAuditLog = z.infer<typeof insertAiAuditLogSchema>;
 export type AiAuditLog = typeof aiAuditLogs.$inferSelect;
+
+// ACE Module Types
+export type InsertAceDwelling = z.infer<typeof insertAceDwellingSchema>;
+export type AceDwelling = typeof aceDwellings.$inferSelect;
+
+export type InsertAceVisit = z.infer<typeof insertAceVisitSchema>;
+export type AceVisit = typeof aceVisits.$inferSelect;
+
+export type InsertAceFocus = z.infer<typeof insertAceFocusSchema>;
+export type AceFocus = typeof aceFoci.$inferSelect;
+
+export type InsertAceAuditLog = z.infer<typeof insertAceAuditLogSchema>;
+export type AceAuditLog = typeof aceAuditLogs.$inferSelect;

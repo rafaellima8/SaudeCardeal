@@ -1,0 +1,59 @@
+1. Funcionalidades de Visitas ACE (CRÍTICO)
+ Controller para criar visitas (visit.controller.ts)
+ Service para visitas (visit.service.ts)
+ Schema de validação (visit.schema.ts)
+ Rota POST /api/ace/visits
+ Página de formulário de visita no frontend
+ Registro de sinais vitais (temperatura, pressão, glicemia, etc.)
+2. Funcionalidades de Focos Vetoriais (CRÍTICO)
+ Controller para focos (foci.controller.ts)
+ Service para focos (foci.service.ts)
+ Schema de validação (foci.schema.ts)
+ Rota POST /api/ace/foci
+ Página de registro de focos no frontend
+ Mapeamento geográfico de focos
+3. Sincronização Offline Completa (ALTA PRIORIDADE)
+ Implementar funções de persistência no IndexedDB
+ Implementar fila de sincronização
+ Service worker para cache
+ Detector de conectividade
+ UI de status de sincronização
+ Tratamento de conflitos
+4. Interface de Usuário Faltante
+ Formulário de cadastro de imóveis
+ Formulário de registro de visitas
+ Formulário de registro de focos
+ Lista/tabela de imóveis cadastrados
+ Lista/tabela de visitas realizadas
+ Lista/tabela de focos identificados
+ Mapa interativo com geolocalização
+ Filtros e busca avançada
+5. Integração com Sistema Principal
+ Vincular ACE com módulo de profissionais existente
+ Vincular com health_units (unidades de saúde)
+ Integração com sistema de relatórios
+ Exportação para e-SUS (similar ao módulo endemic)
+6. Recursos Avançados
+ Upload e gestão de fotos (focos, imóveis)
+ Assinatura digital de visitas
+ Relatórios específicos ACE (produtividade, cobertura)
+ Notificações push para sincronização
+ Modo offline-first completo
+ Backup automático de dados
+7. Rotas GET Faltantes
+ GET /api/ace/dwellings - Listar imóveis
+ GET /api/ace/dwellings/:id - Detalhes do imóvel
+ GET /api/ace/visits - Listar visitas
+ GET /api/ace/visits/:id - Detalhes da visita
+ GET /api/ace/foci - Listar focos
+ GET /api/ace/foci/:id - Detalhes do foco
+8. Validações e Segurança
+ Middleware de autenticação nas rotas ACE
+ Validação de permissões (apenas ACE pode criar)
+ Rate limiting para API de sincronização
+ Validação de geolocalização (coordenadas válidas)
+9. Documentação
+ Documentação de API (Swagger/OpenAPI)
+ Guia de uso para ACEs
+ Documentação técnica de sincronização offline
+ Fluxogramas de processos
