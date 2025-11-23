@@ -11,6 +11,14 @@ aceRouter.post("/sync", async (req, res) => {
 });
 
 // ACE Module - Dwelling API
+aceRouter.get("/dwellings", async (req, res) => {
+  await dwellingController.listDwellings(req, res);
+});
+
+aceRouter.get("/dwellings/:id", async (req, res) => {
+  await dwellingController.getDwellingById(req, res);
+});
+
 aceRouter.post("/dwellings", async (req, res) => {
   await dwellingController.createDwelling(req, res);
 });

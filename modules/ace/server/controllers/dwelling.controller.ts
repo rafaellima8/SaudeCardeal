@@ -4,6 +4,39 @@ import { dwellingCreateSchema } from "../schemas/dwelling.schema";
 import { ZodError } from "zod";
 
 export class DwellingController {
+  async listDwellings(req: Request, res: Response): Promise<void> {
+    try {
+      const { data: dwellings } = await dwellingService.listDwellings();
+      res.json(dwellings);
+    } catch (error: any) {
+      console.error("Erro ao listar imóveis ACE:", error);
+      res.status(500).json({
+        error: "Erro ao listar imóveis",
+        message: error.message
+      });
+    }
+  }
+
+  async getDwellingById(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const dwelling = await dwellingService.getDwellingById(id);
+      
+      if (!dwelling) {
+        res.status(404).json({ error: "Imóvel não encontrado" });
+        return;
+      }
+      
+      res.json(dwelling);
+    } catch (error: any) {
+      console.error("Erro ao buscar imóvel ACE:", error);
+      res.status(500).json({
+        error: "Erro ao buscar imóvel",
+        message: error.message
+      });
+    }
+  }
+
   /**
    * POST /api/ace/dwellings
    * Cria ou atualiza um imóvel ACE

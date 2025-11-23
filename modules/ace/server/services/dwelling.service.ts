@@ -1,9 +1,27 @@
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { db } from "../../../../server/db";
 import { aceDwellings, aceAuditLogs } from "../../../../shared/schema";
 import type { DwellingCreate } from "../schemas/dwelling.schema";
 
 export class DwellingService {
+  async listDwellings(): Promise<{ data: any[] }> {
+    const dwellings = await db
+      .select()
+      .from(aceDwellings)
+      .orderBy(desc(aceDwellings.createdAt));
+    
+    return { data: dwellings };
+  }
+
+  async getDwellingById(id: string): Promise<any> {
+    const [dwelling] = await db
+      .select()
+      .from(aceDwellings)
+      .where(eq(aceDwellings.id, id));
+    
+    return dwelling;
+  }
+
   async createOrUpdateDwelling(data: DwellingCreate, userId?: string): Promise<any> {
     if (data.external_id) {
       const [existing] = await db
