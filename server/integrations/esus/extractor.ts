@@ -167,8 +167,16 @@ async function getSIGTAPCode(internalCode: string): Promise<string> {
     return sigtapCache[internalCode];
   }
   
-  // Fallback para mapa hardcoded
-  return CONSULTATION_TYPE_TO_SIGTAP_FALLBACK[internalCode] || "0301010072";
+  // Fallback para mapa hardcoded (logar warning para detectar gaps)
+  const fallbackCode = CONSULTATION_TYPE_TO_SIGTAP_FALLBACK[internalCode] || "0301010072";
+  
+  if (!CONSULTATION_TYPE_TO_SIGTAP_FALLBACK[internalCode]) {
+    console.warn(`[SIGTAP] ⚠️  Código interno desconhecido: "${internalCode}" → usando fallback genérico ${fallbackCode}`);
+  } else {
+    console.warn(`[SIGTAP] ⚠️  Código interno "${internalCode}" não encontrado na tabela sigtapMappings → usando fallback hardcoded ${fallbackCode}`);
+  }
+  
+  return fallbackCode;
 }
 
 /**
