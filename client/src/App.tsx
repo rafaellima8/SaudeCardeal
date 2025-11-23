@@ -29,6 +29,7 @@ import EsusExports from "@/pages/admin/esus-exports";
 import TerritoryPage from "@/pages/territorio";
 import AceDashboard from "@modules/ace/client/pages/ace-dashboard";
 import AceDwellings from "@/pages/ace-dwellings";
+import AceVisits from "@/pages/ace-visits";
 import EndemicDashboard from "@/pages/endemic-dashboard";
 import LoginPage from "@/pages/login";
 import NotFound from "@/pages/not-found";
@@ -55,6 +56,7 @@ function ProtectedRoutes() {
       <Route path="/territorio" component={TerritoryPage} />
       <Route path="/ace" component={AceDashboard} />
       <Route path="/ace/imoveis" component={AceDwellings} />
+      <Route path="/ace/visitas" component={AceVisits} />
       <Route path="/endemias" component={EndemicDashboard} />
       <Route component={NotFound} />
     </Switch>

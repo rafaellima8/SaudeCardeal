@@ -29,25 +29,25 @@ export class VisitService {
     const [visit] = await db
       .insert(aceVisits)
       .values({
-        externalId: data.external_id || null,
+        externalId: data.external_id ?? null,
         dwellingId,
         professionalId: data.professional_id,
         unitId: data.unit_id,
         visitDate: visitTimestamp,
-        visitType: data.visit_type || null,
-        visitMotive: data.visit_motive || null,
-        latitude: data.latitude || null,
-        longitude: data.longitude || null,
-        temperature: data.temperature || null,
-        bloodPressureSystolic: data.blood_pressure_systolic || null,
-        bloodPressureDiastolic: data.blood_pressure_diastolic || null,
-        heartRate: data.heart_rate || null,
-        respiratoryRate: data.respiratory_rate || null,
-        bloodGlucose: data.blood_glucose || null,
-        weight: data.weight || null,
-        height: data.height || null,
-        observations: data.observations || null,
-        findings: JSON.stringify(data.findings || {}),
+        visitType: data.visit_type ?? null,
+        visitMotive: data.visit_motive ?? null,
+        latitude: data.latitude ?? null,
+        longitude: data.longitude ?? null,
+        temperature: data.temperature ?? null,
+        bloodPressureSystolic: data.blood_pressure_systolic ?? null,
+        bloodPressureDiastolic: data.blood_pressure_diastolic ?? null,
+        heartRate: data.heart_rate ?? null,
+        respiratoryRate: data.respiratory_rate ?? null,
+        bloodGlucose: data.blood_glucose ?? null,
+        weight: data.weight ?? null,
+        height: data.height ?? null,
+        observations: data.observations ?? null,
+        findings: JSON.stringify(data.findings ?? {}),
       })
       .returning();
 
@@ -57,7 +57,11 @@ export class VisitService {
       });
     }
 
-    return visit;
+    // Parse findings before returning for consistent API response
+    return {
+      ...visit,
+      findings: typeof visit.findings === 'string' ? JSON.parse(visit.findings) : visit.findings
+    };
   }
 
   async listVisits(filters: {
@@ -97,7 +101,7 @@ export class VisitService {
     const limit = filters.limit || 100;
     const offset = filters.offset || 0;
 
-    const visits = await db
+    const visitsRaw = await db
       .select({
         id: aceVisits.id,
         externalId: aceVisits.externalId,
@@ -130,6 +134,12 @@ export class VisitService {
       .orderBy(desc(aceVisits.visitDate))
       .limit(limit)
       .offset(offset);
+
+    // Parse findings from JSON string to object
+    const visits = visitsRaw.map(visit => ({
+      ...visit,
+      findings: typeof visit.findings === 'string' ? JSON.parse(visit.findings) : visit.findings
+    }));
 
     return visits;
   }
@@ -173,7 +183,76 @@ export class VisitService {
       throw new Error(`Visita ${id} não encontrada`);
     }
 
-    return visit;
+    // Parse findings from JSON string to object
+    return {
+      ...visit,
+      findings: typeof visit.findings === 'string' ? JSON.parse(visit.findings) : visit.findings
+    };
+  }
+
+  async updateVisit(id: string, data: Partial<AceVisitSync>, userId?: string): Promise<any> {
+    // Check if visit exists
+    const existing = await this.getVisitById(id);
+    if (!existing) {
+      throw new Error(`Visita ${id} não encontrada`);
+    }
+
+    // Build update object with only provided fields (using ?? null to preserve nulls and zeros)
+    const updateData: any = {};
+    
+    if (data.external_id !== undefined) updateData.externalId = data.external_id ?? null;
+    if (data.dwelling_id !== undefined) updateData.dwellingId = data.dwelling_id;
+    if (data.professional_id !== undefined) updateData.professionalId = data.professional_id;
+    if (data.unit_id !== undefined) updateData.unitId = data.unit_id;
+    if (data.visit_date !== undefined) {
+      updateData.visitDate = Math.floor(new Date(data.visit_date).getTime() / 1000);
+    }
+    if (data.visit_type !== undefined) updateData.visitType = data.visit_type ?? null;
+    if (data.visit_motive !== undefined) updateData.visitMotive = data.visit_motive ?? null;
+    if (data.latitude !== undefined) updateData.latitude = data.latitude ?? null;
+    if (data.longitude !== undefined) updateData.longitude = data.longitude ?? null;
+    if (data.temperature !== undefined) updateData.temperature = data.temperature ?? null;
+    if (data.blood_pressure_systolic !== undefined) updateData.bloodPressureSystolic = data.blood_pressure_systolic ?? null;
+    if (data.blood_pressure_diastolic !== undefined) updateData.bloodPressureDiastolic = data.blood_pressure_diastolic ?? null;
+    if (data.heart_rate !== undefined) updateData.heartRate = data.heart_rate ?? null;
+    if (data.respiratory_rate !== undefined) updateData.respiratoryRate = data.respiratory_rate ?? null;
+    if (data.blood_glucose !== undefined) updateData.bloodGlucose = data.blood_glucose ?? null;
+    if (data.weight !== undefined) updateData.weight = data.weight ?? null;
+    if (data.height !== undefined) updateData.height = data.height ?? null;
+    if (data.observations !== undefined) updateData.observations = data.observations ?? null;
+    if (data.findings !== undefined) updateData.findings = JSON.stringify(data.findings ?? {});
+
+    const [updated] = await db
+      .update(aceVisits)
+      .set(updateData)
+      .where(eq(aceVisits.id, id))
+      .returning();
+
+    if (userId && updated) {
+      await this.logAudit('ace_visits', updated.id, 'update', userId, {
+        updated_fields: Object.keys(updateData)
+      });
+    }
+
+    // Parse findings before returning
+    return {
+      ...updated,
+      findings: typeof updated.findings === 'string' ? JSON.parse(updated.findings) : updated.findings
+    };
+  }
+
+  async deleteVisit(id: string, userId?: string): Promise<void> {
+    // Check if visit exists
+    const existing = await this.getVisitById(id);
+    if (!existing) {
+      throw new Error(`Visita ${id} não encontrada`);
+    }
+
+    if (userId) {
+      await this.logAudit('ace_visits', id, 'delete', userId, {});
+    }
+
+    await db.delete(aceVisits).where(eq(aceVisits.id, id));
   }
 
   private async logAudit(

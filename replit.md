@@ -6,6 +6,30 @@ MuniSaúde Integrado is a comprehensive municipal health management system desig
 
 ## Recent Changes
 
+### Módulo ACE Visitas - Frontend Full-Stack Completo (November 23, 2025)
+-   **Frontend Completo**: Implementada página `ace-visits.tsx` com todos os padrões:
+    - Form completo com shadcn + useForm + zodResolver
+    - Seleção de imóvel, profissional e unidade (dropdowns dinâmicos)
+    - Data/hora da visita com datetime-local input
+    - Geolocalização: botão "Obter Localização Atual" via GPS (navigator.geolocation)
+    - Sinais vitais completos: temperatura, PA sistólica/diastólica, FC, FR, glicemia, peso, altura
+    - Observações com textarea expandido
+    - Mutations via fetch (POST/PATCH/DELETE) com error handling
+    - Loading states, toast notifications, confirmação de delete
+    - Tabela de visitas com colunas: data, imóvel, profissional, tipo, sinais vitais resumidos
+    - Todos elementos com data-testid para testes
+-   **Backend CRUD Completo**:
+    - GET `/api/ace/visits` (lista com filtros), GET `/api/ace/visits/:id` (detalhe)
+    - POST `/api/ace/visits` (create), PATCH `/api/ace/visits/:id` (update), DELETE `/api/ace/visits/:id`
+    - Controller com validação bidirecional Zod (camelCase E snake_case)
+    - Service com métodos createVisit, listVisits, getVisitById, updateVisit, deleteVisit
+    - Auditoria completa em aceAuditLogs
+-   **Rotas e Navegação**:
+    - Rota `/ace/visitas` adicionada em App.tsx
+    - Link "ACE Visitas" no sidebar
+-   **Zero LSP Errors**: Código TypeScript 100% válido
+-   **Status**: Módulo ACE Visitas completo; aguardando revisão architect
+
 ### Módulo ACE Imóveis - Frontend Full-Stack Production-Ready (November 23, 2025)
 -   **Frontend Completo**: Implementada página `ace-dwellings.tsx` com padrões do projeto:
     - Shadcn Form + useForm + zodResolver com validação completa

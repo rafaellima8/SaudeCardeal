@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { aceSyncController } from "./controllers/sync.controller";
 import { dwellingController } from "./controllers/dwelling.controller";
+import { visitController } from "./controllers/visit.controller";
 import { aceStatsController } from "./controllers/stats.controller";
 
 export const aceRouter = Router();
@@ -29,6 +30,27 @@ aceRouter.patch("/dwellings/:id", async (req, res) => {
 
 aceRouter.delete("/dwellings/:id", async (req, res) => {
   await dwellingController.deleteDwelling(req, res);
+});
+
+// ACE Module - Visits API
+aceRouter.get("/visits", async (req, res) => {
+  await visitController.listVisits(req, res);
+});
+
+aceRouter.get("/visits/:id", async (req, res) => {
+  await visitController.getVisitById(req, res);
+});
+
+aceRouter.post("/visits", async (req, res) => {
+  await visitController.createVisit(req, res);
+});
+
+aceRouter.patch("/visits/:id", async (req, res) => {
+  await visitController.updateVisit(req, res);
+});
+
+aceRouter.delete("/visits/:id", async (req, res) => {
+  await visitController.deleteVisit(req, res);
 });
 
 // ACE Module - Stats API
