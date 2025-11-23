@@ -23,13 +23,13 @@ export class FociService {
         visitId: data.visit_id,
         dwellingId: data.dwelling_id,
         fociType: data.foci_type,
-        locationDescription: data.location_description || null,
-        latitude: data.latitude || null,
-        longitude: data.longitude || null,
-        quantity: data.quantity || 1,
-        actionTaken: data.action_taken || null,
-        status: (data.status as "active" | "resolved" | "monitoring") || "active",
-        notes: data.notes || null,
+        locationDescription: data.location_description ?? null,
+        latitude: data.latitude ?? null,
+        longitude: data.longitude ?? null,
+        quantity: data.quantity ?? 1,
+        actionTaken: data.action_taken ?? null,
+        status: (data.status as "active" | "resolved" | "monitoring") ?? "active",
+        notes: data.notes ?? null,
       })
       .returning();
 
@@ -149,7 +149,7 @@ export class FociService {
       .update(aceFoci)
       .set({
         status: status as "active" | "resolved" | "monitoring",
-        resolvedAt,
+        resolvedAt: resolvedAt as any,
       })
       .where(eq(aceFoci.id, id))
       .returning();
@@ -182,7 +182,7 @@ export class FociService {
       userId,
       changes: JSON.stringify({}),
       metadata: JSON.stringify(metadata),
-    });
+    } as any);
   }
 }
 

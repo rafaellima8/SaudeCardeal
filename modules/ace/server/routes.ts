@@ -2,6 +2,7 @@ import { Router } from "express";
 import { aceSyncController } from "./controllers/sync.controller";
 import { dwellingController } from "./controllers/dwelling.controller";
 import { visitController } from "./controllers/visit.controller";
+import { fociController } from "./controllers/foci.controller";
 import { aceStatsController } from "./controllers/stats.controller";
 
 export const aceRouter = Router();
@@ -51,6 +52,23 @@ aceRouter.patch("/visits/:id", async (req, res) => {
 
 aceRouter.delete("/visits/:id", async (req, res) => {
   await visitController.deleteVisit(req, res);
+});
+
+// ACE Module - Foci API
+aceRouter.get("/foci", async (req, res) => {
+  await fociController.listFoci(req, res);
+});
+
+aceRouter.get("/foci/:id", async (req, res) => {
+  await fociController.getFocus(req, res);
+});
+
+aceRouter.post("/foci", async (req, res) => {
+  await fociController.createFocus(req, res);
+});
+
+aceRouter.patch("/foci/:id/status", async (req, res) => {
+  await fociController.updateFocusStatus(req, res);
 });
 
 // ACE Module - Stats API

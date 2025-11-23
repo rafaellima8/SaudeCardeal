@@ -52,6 +52,7 @@ const allMenuItems = [
   { title: "ACE Dashboard", icon: Activity, url: "/ace" },
   { title: "ACE Imóveis", icon: Home, url: "/ace/imoveis" },
   { title: "ACE Visitas", icon: ClipboardList, url: "/ace/visitas" },
+  { title: "ACE Focos", icon: Bug, url: "/ace/focos" },
   { title: "Endemias", icon: Bug, url: "/endemias" },
   { title: "Farmácia", icon: Pill, url: "/farmacia" },
   { title: "TFD", icon: Truck, url: "/tfd" },
