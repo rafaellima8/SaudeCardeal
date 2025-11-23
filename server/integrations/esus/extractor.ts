@@ -22,6 +22,13 @@ import type {
 const MUNICIPALITY_CODE = "2906501";
 
 /**
+ * Converte Date para timestamp Unix (segundos) para uso com SQLite
+ */
+function toUnixTimestamp(date: Date): number {
+  return Math.floor(date.getTime() / 1000);
+}
+
+/**
  * Helper para limpar CPF (remover pontuação)
  */
 function cleanCPF(cpf: string | null): string | undefined {
@@ -126,14 +133,15 @@ export async function extractCitizens(
   endDate?: Date
 ): Promise<ESUSCitizenDTO[]> {
   try {
+    // Construir condições de filtro com timestamps Unix
     const conditions = [];
     
     if (startDate) {
-      conditions.push(gte(citizens.createdAt, Math.floor(startDate.getTime() / 1000)));
+      conditions.push(gte(citizens.createdAt, toUnixTimestamp(startDate)));
     }
     
     if (endDate) {
-      conditions.push(lte(citizens.createdAt, Math.floor(endDate.getTime() / 1000)));
+      conditions.push(lte(citizens.createdAt, toUnixTimestamp(endDate)));
     }
     
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -191,14 +199,15 @@ export async function extractConsultations(
   endDate?: Date
 ): Promise<ESUSConsultationDTO[]> {
   try {
+    // Construir condições de filtro com timestamps Unix
     const conditions = [];
     
     if (startDate) {
-      conditions.push(gte(consultations.consultationDate, Math.floor(startDate.getTime() / 1000)));
+      conditions.push(gte(consultations.consultationDate, toUnixTimestamp(startDate)));
     }
     
     if (endDate) {
-      conditions.push(lte(consultations.consultationDate, Math.floor(endDate.getTime() / 1000)));
+      conditions.push(lte(consultations.consultationDate, toUnixTimestamp(endDate)));
     }
     
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -284,14 +293,15 @@ export async function extractProcedures(
   endDate?: Date
 ): Promise<ESUSProcedureDTO[]> {
   try {
+    // Construir condições de filtro com timestamps Unix
     const conditions = [];
     
     if (startDate) {
-      conditions.push(gte(consultations.consultationDate, Math.floor(startDate.getTime() / 1000)));
+      conditions.push(gte(consultations.consultationDate, toUnixTimestamp(startDate)));
     }
     
     if (endDate) {
-      conditions.push(lte(consultations.consultationDate, Math.floor(endDate.getTime() / 1000)));
+      conditions.push(lte(consultations.consultationDate, toUnixTimestamp(endDate)));
     }
     
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -347,14 +357,15 @@ export async function extractExams(
   endDate?: Date
 ): Promise<ESUSExamDTO[]> {
   try {
+    // Construir condições de filtro com timestamps Unix
     const conditions = [];
     
     if (startDate) {
-      conditions.push(gte(exams.requestDate, Math.floor(startDate.getTime() / 1000)));
+      conditions.push(gte(exams.requestDate, toUnixTimestamp(startDate)));
     }
     
     if (endDate) {
-      conditions.push(lte(exams.requestDate, Math.floor(endDate.getTime() / 1000)));
+      conditions.push(lte(exams.requestDate, toUnixTimestamp(endDate)));
     }
     
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -431,14 +442,15 @@ export async function extractTFD(
   endDate?: Date
 ): Promise<ESUSTFDDTO[]> {
   try {
+    // Construir condições de filtro com timestamps Unix
     const conditions = [];
     
     if (startDate) {
-      conditions.push(gte(tfdRequests.requestDate, Math.floor(startDate.getTime() / 1000)));
+      conditions.push(gte(tfdRequests.requestDate, toUnixTimestamp(startDate)));
     }
     
     if (endDate) {
-      conditions.push(lte(tfdRequests.requestDate, Math.floor(endDate.getTime() / 1000)));
+      conditions.push(lte(tfdRequests.requestDate, toUnixTimestamp(endDate)));
     }
     
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;

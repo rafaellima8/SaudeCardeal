@@ -721,23 +721,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================================================
-  // e-SUS APS Export API (Internal)
+  // e-SUS APS Export API
   // ============================================================================
   
-  app.get("/api/internal/esus/generate", async (req, res) => {
+  // Gerar nova exportação e-SUS
+  app.post("/api/esus/export", requireRole(["admin", "gestor"]), async (req, res) => {
     try {
-      // Proteção por token dev (ambiente de desenvolvimento/teste)
-      const devToken = req.headers["x-dev-token"] || req.query.token;
-      const expectedToken = process.env.DEV_TOKEN || "dev-token-2906501";
+      const { startDate, endDate, format = "json", includeTypes } = req.body;
       
-      if (devToken !== expectedToken) {
-        return res.status(401).json({ 
-          error: "Token de autorização inválido",
-          hint: "Use header 'X-Dev-Token' ou query param '?token='"
+      // Validar parâmetros
+      if (!startDate || !endDate) {
+        return res.status(400).json({ 
+          error: "Parâmetros 'startDate' e 'endDate' são obrigatórios (formato: YYYY-MM-DD)" 
         });
       }
       
-      const { from, to, cnes, limit } = req.query;
+      // Validar formato de data
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
+        return res.status(400).json({ 
+          error: "Formato de data inválido. Use YYYY-MM-DD" 
+        });
+      }
+      
+      console.log(`[e-SUS] Gerando exportação: ${startDate} a ${endDate} (formato: ${format})`);
+      
+      // Gerar exportação
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      const { batch, errors } = await generateExport({
+        startDate: start,
+        endDate: end,
+        format: format as "json" | "xml",
+        includeTypes: includeTypes || ["citizens", "consultations", "procedures", "exams", "tfd"],
+      });
+      
+      console.log(`[e-SUS] Exportação gerada com sucesso: ${batch.batchId}`);
+      console.log(`[e-SUS] Total de registros: ${
+        batch.totalRegistros.cidadaos +
+        batch.totalRegistros.atendimentos +
+        batch.totalRegistros.procedimentos +
+        batch.totalRegistros.exames +
+        batch.totalRegistros.solicitacoesTFD
+      }`);
+      
+      if (errors.length > 0) {
+        console.warn(`[e-SUS] ${errors.length} avisos de validação`);
+      }
+      
+      res.json({
+        success: true,
+        batch,
+        warnings: errors.length > 0 ? errors : undefined,
+      });
+      
+    } catch (error: any) {
+      console.error("[e-SUS] Erro ao gerar exportação:", error);
+      res.status(500).json({ 
+        error: "Erro ao gerar exportação e-SUS", 
+        details: error.message 
+      });
+    }
+  });
+  
+  // Endpoint interno para testes (requer autenticação + role admin/gestor)
+  app.get("/api/internal/esus/generate", requireRole(["admin", "gestor"]), async (req, res) => {
+    try {
+      const { from, to, format = "json" } = req.query;
       
       // Validar parâmetros
       if (!from || !to) {
@@ -754,20 +805,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // CNES padrão (pode ser obtido da primeira unidade)
-      const defaultCNES = "1234567"; // TODO: Obter da primeira unidade ativa
+      console.log(`[e-SUS] Exportação interna: ${from} a ${to}`);
       
-      console.log(`[API] e-SUS export requested: ${from} to ${to}`);
+      // Gerar exportação
+      const start = new Date(from as string);
+      const end = new Date(to as string);
       
-      // TODO: Re-enable e-SUS export when full schema is implemented
-      return res.status(503).json({
-        error: "Exportação e-SUS temporariamente desabilitada",
-        message: "A funcionalidade será reativada após implementação completa do schema e-SUS PEC",
-        hint: "Entre em contato com o suporte para mais informações"
+      const { batch, errors } = await generateExport({
+        startDate: start,
+        endDate: end,
+        format: format as "json" | "xml",
+      });
+      
+      res.json({
+        success: true,
+        batch,
+        warnings: errors.length > 0 ? errors : undefined,
       });
       
     } catch (error: any) {
-      console.error("[API] e-SUS export error:", error);
+      console.error("[e-SUS] Erro na exportação interna:", error);
       res.status(500).json({ 
         error: "Erro ao gerar exportação e-SUS", 
         details: error.message 

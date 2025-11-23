@@ -57,8 +57,8 @@ export type ESUSCitizenDTO = z.infer<typeof ESUSCitizenSchema>;
 // ============================================================================
 
 export const ESUSConsultationSchema = z.object({
-  // Identificadores
-  id: z.string().uuid().optional(),
+  // Identificadores (aceita UUID ou ULID)
+  id: z.string().min(20).optional(), // Aceita UUID (36) ou ULID (26)
   citizenCPF: z.string().regex(/^\d{11}$/),
   citizenCNS: z.string().regex(/^\d{15}$/).optional(),
   professionalCNS: z.string().regex(/^\d{15}$/),
