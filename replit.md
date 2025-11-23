@@ -6,29 +6,35 @@ MuniSaúde Integrado is a comprehensive municipal health management system desig
 
 ## Recent Changes
 
-### Módulo ACE Visitas - Frontend Full-Stack Completo (November 23, 2025)
--   **Frontend Completo**: Implementada página `ace-visits.tsx` com todos os padrões:
-    - Form completo com shadcn + useForm + zodResolver
-    - Seleção de imóvel, profissional e unidade (dropdowns dinâmicos)
+### Módulo ACE Visitas - Production-Ready Completo (November 23, 2025)
+-   **Frontend Completo**: Implementada página `ace-visits.tsx` com todos os padrões production-ready:
+    - Form completo com shadcn + useForm + zodResolver + z.preprocess para handling correto de campos vazios
+    - Seleção de imóvel, profissional e unidade (dropdowns dinâmicos com loading states)
     - Data/hora da visita com datetime-local input
     - Geolocalização: botão "Obter Localização Atual" via GPS (navigator.geolocation)
     - Sinais vitais completos: temperatura, PA sistólica/diastólica, FC, FR, glicemia, peso, altura
-    - Observações com textarea expandido
-    - Mutations via fetch (POST/PATCH/DELETE) com error handling
-    - Loading states, toast notifications, confirmação de delete
+    - Observações e achados com textarea/JSON handling
+    - Mutations via fetch (POST/PATCH/DELETE) com error handling robusto
+    - Loading states, toast notifications, confirmação de delete (sem response.json() para 204)
     - Tabela de visitas com colunas: data, imóvel, profissional, tipo, sinais vitais resumidos
     - Todos elementos com data-testid para testes
 -   **Backend CRUD Completo**:
-    - GET `/api/ace/visits` (lista com filtros), GET `/api/ace/visits/:id` (detalhe)
-    - POST `/api/ace/visits` (create), PATCH `/api/ace/visits/:id` (update), DELETE `/api/ace/visits/:id`
-    - Controller com validação bidirecional Zod (camelCase E snake_case)
+    - GET `/api/ace/visits` (lista com filtros), GET `/api/ace/visits/:id` (detalhe com joins)
+    - POST `/api/ace/visits` (create), PATCH `/api/ace/visits/:id` (update parcial), DELETE `/api/ace/visits/:id`
+    - Controller com validação bidirecional Zod (camelCase E snake_case) via toSnakeCase helper
     - Service com métodos createVisit, listVisits, getVisitById, updateVisit, deleteVisit
     - Auditoria completa em aceAuditLogs
+    - Findings parseado de JSON string para object em todas as respostas (consistência total)
+-   **Data Integrity Crítica**:
+    - z.preprocess converte strings vazias em undefined (campos vazios não viram 0)
+    - createVisit e updateVisit usam ?? null (nullish coalescing) para preservar valores 0 legítimos em sinais vitais
+    - handleEdit converte valores 0 para "0" (string) para preservá-los ao editar
+    - toSnakeCase usa ?? ao invés de || para não converter 0 em undefined
 -   **Rotas e Navegação**:
     - Rota `/ace/visitas` adicionada em App.tsx
     - Link "ACE Visitas" no sidebar
 -   **Zero LSP Errors**: Código TypeScript 100% válido
--   **Status**: Módulo ACE Visitas completo; aguardando revisão architect
+-   **Status**: ✅ **APROVADO COMO PRODUCTION-READY** pelo architect após correções completas de data integrity
 
 ### Módulo ACE Imóveis - Frontend Full-Stack Production-Ready (November 23, 2025)
 -   **Frontend Completo**: Implementada página `ace-dwellings.tsx` com padrões do projeto:
