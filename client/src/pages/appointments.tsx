@@ -88,7 +88,7 @@ export default function Appointments() {
   });
 
   const { data: units = [] } = useQuery<HealthUnit[]>({
-    queryKey: ["/api/health-units"],
+    queryKey: ["/api/units"],
   });
 
   const form = useForm<InsertAppointment>({
