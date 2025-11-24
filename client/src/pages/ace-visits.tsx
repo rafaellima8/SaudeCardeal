@@ -76,7 +76,7 @@ export default function AceVisitsPage() {
 
   // Fetch units for selection
   const { data: units = [], isLoading: unitsLoading } = useQuery<any[]>({
-    queryKey: ["/api/health-units"],
+    queryKey: ["/api/units"],
   });
 
   const form = useForm<VisitFormData>({

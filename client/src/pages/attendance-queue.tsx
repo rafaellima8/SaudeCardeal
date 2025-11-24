@@ -108,7 +108,7 @@ export default function AttendanceQueue() {
   });
 
   const { data: units = [] } = useQuery<HealthUnit[]>({
-    queryKey: ["/api/health-units"],
+    queryKey: ["/api/units"],
   });
 
   const updateStatusMutation = useMutation({
