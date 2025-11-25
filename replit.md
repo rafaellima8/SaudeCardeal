@@ -36,16 +36,28 @@ The backend uses Express.js and TypeScript on Node.js, providing a RESTful API w
     -   **Known Limitations**: Storage layer lacks internal multi-tenant guards (applies to all entities, not specific to referrals). Future enhancement: Add unitId validation inside storage methods system-wide.
 -   **AI Medical Assistant**: A production-ready AI assistant powered by OpenAI GPT-5 for diagnostic suggestions (CIAP-2/CID-10), drug interaction checks, prescription validation, and care plan generation, with robust validation and RBAC-controlled access.
 -   **SOAP Consultation System**: Full-stack implementation of medical consultations adhering to e-SUS PEC v5.3 standards, including subjective, objective, assessment, and plan (SOAP) fields, vital signs, CIAP-2/CID-10 codes, and integrated prescription management.
--   **Medical Attendance Module**: Complete 3-column workflow integrating patient selection (column 1), SOAP consultation form with vital signs and diagnostic codes (column 2), and electronic prescriptions CRUD (column 3). Fully integrated with proper consultation/professional context, cache synchronization, and transactional integrity.
-    -   **Complete API Endpoints**: Full CRUD for consultations and attendance queue management:
+-   **Medical Attendance Module**: Complete 4-tab workflow integrating patient selection, SOAP consultation form with vital signs and diagnostic codes, electronic prescriptions, medical referrals, exam requests, and comprehensive clinical history visualization. Fully integrated with proper consultation/professional context, cache synchronization, and transactional integrity.
+    -   **Complete API Endpoints**: Full CRUD for consultations, prescriptions, referrals, exams, and attendance queue management:
         -   `GET /api/attendance-queue` - List filtered attendance queue (by unit/professional/status) with multi-tenant security
         -   `GET /api/attendance/next` - Fetch next patient in queue (priority-ordered)
         -   `POST /api/attendance/start` - Start consultation from queue entry
         -   `PUT /api/consultations/:id` - Update consultation (partial updates allowed)
         -   `POST /api/consultations/:id/finalize` - Finalize consultation (requires diagnosis validation)
-        -   `GET /api/citizens/:id/history` - Complete patient clinical history
+        -   `GET /api/citizens/:id/medical-history` - Complete patient medical history with consultations, active problems, prescriptions, referrals, and exams
         -   `POST /api/consultations-with-prescriptions` - Transactional creation of consultation + prescriptions
+        -   `GET /api/exams` - List exams by consultation with multi-tenant filtering
+        -   `POST /api/exams` - Create exam request with SIGTAP mapping
+        -   `PATCH /api/exams/:id` - Update exam request
+        -   `DELETE /api/exams/:id` - Delete exam request
     -   **Security Pattern**: All endpoints enforce multi-tenant validation via `req.session.user.unitId`, ensuring data isolation at controller level.
+    -   **Cache Synchronization**: All mutations (prescriptions, referrals, exams) invalidate medical history cache (`['/api/citizens', citizenId, 'medical-history']`) for real-time UI updates.
+    -   **Data Fetching Pattern**: All queries use unified `apiRequest()` helper for consistent authentication handling and error management.
+-   **Exams & Procedures Management**: Complete CRUD system for laboratory exam and procedure requests integrated into medical consultations. Features include:
+    -   **SIGTAP Integration**: Exam types mapped to SIGTAP codes (Brazilian Unified Health System procedures table) with category="exam" or "procedure" filtering.
+    -   **Exam Request Workflow**: Dialog-based creation/editing with react-hook-form validation, exam type selection (combobox), priority levels (routine/urgent/emergency), and justification fields.
+    -   **Real-time Updates**: TanStack Query mutations with optimistic UI updates and automatic cache invalidation.
+    -   **Multi-tenant Security**: All exam endpoints validate `req.session.user.unitId` and filter by consultation ownership.
+-   **Medical History Visualization**: Comprehensive patient longitudinal record displaying complete clinical timeline with chronological consultations, active health problems, current prescriptions, pending referrals, and exam requests. Implemented as standalone `MedicalHistory.tsx` component with card-based layout and collapsible sections.
 -   **Searchable Selection (Combobox)**: System-wide implementation of searchable/autocomplete functionality for all selection fields using a reusable Combobox component.
 
 #### Next Development Priorities
