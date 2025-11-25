@@ -1,0 +1,50 @@
+Agora quero preparar o módulo para exportar os dados do ATENDIMENTO MÉDICO no formato da FICHA DE ATENDIMENTO INDIVIDUAL do e-SUS AB / SISAB.
+
+Objetivo:
+- Criar uma camada de "exportação" que converta um medical_encounter completo em um objeto estruturado compatível com o modelo de envio ao e-SUS AB (SISAB).
+- NÃO precisamos enviar de fato para o Ministério ainda, mas já deixar pronta a função de mapeamento.
+
+1. Criar um "mapper" ou "export service" específico, por exemplo:
+   - src/modules/medical/exports/medicalEncounterToFAIExport.ts
+
+2. Esse serviço deve:
+   - Receber:
+     - Um atendimento completo (medical_encounters + diagnósticos + prescrições + procedimentos + encaminhamentos)
+     - Dados auxiliares:
+       - Código IBGE do município (se já existir na configuração do tenant)
+       - CNS do paciente
+       - CNS do profissional
+       - CNES da unidade de saúde
+   - Retornar um objeto JSON com campos organizados de forma clara, por exemplo:
+     - identificacao_municipio
+     - cnes_unidade
+     - cns_profissional
+     - cns_paciente
+     - data_atendimento
+     - turno_atendimento (manhã, tarde, noite – calculado pela hora)
+     - tipo_atendimento (consulta agendada, demanda espontânea etc., se o sistema usar esse conceito)
+     - lista de diagnósticos (com código e tipo)
+     - marcadores de condições crônicas (HAS, DM etc., se tiver no prontuário)
+     - procedimentos realizados
+     - exames solicitados
+     - encaminhamentos
+     - dados de prescrição (apenas como informação, se for útil)
+
+3. Criar uma rota para testar essa exportação:
+   - GET /api/medical-encounters/:id/export-fai
+   - Essa rota:
+     - Carrega todos os dados necessários do atendimento.
+     - Chama o serviço de exportação.
+     - Retorna o JSON estruturado gerado pelo mapper.
+
+4. Organizar o código de forma que no futuro possa ser criado um módulo de:
+   - "Fila de exportação"
+   - "Envio em lote"
+   - "Reprocessamento de registros"
+
+TAREFA:
+- Implementar o serviço/mapeador de exportação.
+- Criar a rota /api/medical-encounters/:id/export-fai.
+- Me mostrar:
+  - O formato final do JSON de exportação.
+  - Onde o código do município, CNES, CNS etc. está sendo obtido (tenant/configurações).

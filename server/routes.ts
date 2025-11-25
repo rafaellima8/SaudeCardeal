@@ -531,7 +531,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Buscar prescrições da consulta
-      const prescriptions = await storage.getPrescriptionsByConsultation(req.params.id);
+      const prescriptions = await storage.getPrescriptions({ consultationId: req.params.id });
 
       // Gerar PDF
       const pdfBuffer = generatePrescriptionPDF({

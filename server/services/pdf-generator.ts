@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import type { Consultation, Citizen, Professional, HealthUnit, MedicalPrescription } from '@shared/schema';
+import type { Consultation, Citizen, Professional, HealthUnit, Prescription } from '@shared/schema';
 
 /**
  * Gera logo SVG como string para uso em PDFs
@@ -118,7 +118,7 @@ export interface PrescriptionPDFData {
   citizen: Citizen;
   professional: Professional;
   unit: HealthUnit;
-  prescriptions: MedicalPrescription[];
+  prescriptions: Prescription[];
 }
 
 /**
