@@ -382,32 +382,96 @@ export function mapConsultationToFAI(data: ConsultationExportData): ESUSFichaAte
 
 /**
  * Valida se os dados obrigatórios para exportação estão presentes
+ * Conforme especificação SISAB v5.3
  */
-export function validateExportData(fai: ESUSFichaAtendimentoIndividual): { valid: boolean; errors: string[] } {
+export function validateExportData(fai: ESUSFichaAtendimentoIndividual): { valid: boolean; errors: string[]; warnings: string[] } {
   const errors: string[] = [];
+  const warnings: string[] = [];
 
-  // Validações obrigatórias segundo e-SUS AB
+  // ========================================
+  // CAMPOS OBRIGATÓRIOS (SISAB rejeita sem eles)
+  // ========================================
+  
+  // Estabelecimento
   if (!fai.identificacaoEstabelecimento.codigoIbgeMunicipio) {
     errors.push('Código IBGE do município é obrigatório');
   }
   if (!fai.identificacaoEstabelecimento.cnesUnidade) {
     errors.push('CNES da unidade é obrigatório');
   }
+  if (!fai.identificacaoEstabelecimento.dataAtendimento) {
+    errors.push('Data do atendimento é obrigatória');
+  }
+  if (!fai.identificacaoEstabelecimento.turno) {
+    errors.push('Turno do atendimento é obrigatório');
+  }
+
+  // Profissional
   if (!fai.profissional.cns) {
     errors.push('CNS do profissional é obrigatório');
   }
-  if (!fai.profissional.cbo) {
-    errors.push('CBO do profissional é obrigatório');
+  if (!fai.profissional.cbo || fai.profissional.cbo === '') {
+    errors.push('CBO (Classificação Brasileira de Ocupações) do profissional é obrigatório - adicionar campo ao schema');
   }
+
+  // Cidadão
   if (!fai.cidadao.cns) {
     errors.push('CNS do cidadão é obrigatório');
   }
+  if (!fai.cidadao.dataNascimento) {
+    errors.push('Data de nascimento do cidadão é obrigatória');
+  }
+  if (!fai.cidadao.sexo) {
+    errors.push('Sexo do cidadão é obrigatório');
+  }
+
+  // Atendimento
+  if (!fai.atendimento.tipoAtendimento) {
+    errors.push('Tipo de atendimento é obrigatório');
+  }
+  if (!fai.atendimento.modalidade) {
+    errors.push('Modalidade do atendimento é obrigatória');
+  }
+
+  // Diagnósticos
   if (fai.diagnosticos.length === 0) {
     errors.push('Pelo menos um diagnóstico (CIAP-2 ou CID-10) é obrigatório');
+  }
+  
+  const diagnosticoPrincipal = fai.diagnosticos.find(d => d.principal);
+  if (!diagnosticoPrincipal) {
+    errors.push('É obrigatório marcar um diagnóstico como principal');
+  }
+
+  // ========================================
+  // CAMPOS RECOMENDADOS (alertas)
+  // ========================================
+  
+  if (!fai.antropometria.peso && !fai.antropometria.altura) {
+    warnings.push('Dados antropométricos (peso/altura) não fornecidos - considerar adicionar ao sistema');
+  }
+  
+  if (!fai.sinaisVitais.pressaoArterialSistolica && !fai.sinaisVitais.pressaoArterialDiastolica) {
+    warnings.push('Sinais vitais não fornecidos - considerar integração com avaliações ACE/FAD');
+  }
+
+  if (fai.examesSolicitados.length > 0) {
+    const semSigtap = fai.examesSolicitados.filter(e => !e.codigoSigtap);
+    if (semSigtap.length > 0) {
+      warnings.push(`${semSigtap.length} exame(s) sem código SIGTAP - adicionar campo ao schema de exams`);
+    }
+  }
+
+  if (fai.procedimentos.length > 0) {
+    const semSigtap = fai.procedimentos.filter(p => !p.codigoSigtap);
+    if (semSigtap.length > 0) {
+      warnings.push(`${semSigtap.length} procedimento(s) sem código SIGTAP`);
+    }
   }
 
   return {
     valid: errors.length === 0,
     errors,
+    warnings,
   };
 }
