@@ -97,7 +97,7 @@ export const appointments = sqliteTable("appointments", {
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
-// Attendance Queue (Fila de Atendimento)
+// Attendance Queue (Fila de Atendimento) - COM LINHA DE CUIDADO ✅
 export const attendanceQueue = sqliteTable("attendance_queue", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   citizenId: text("citizen_id").notNull().references(() => citizens.id),
@@ -111,6 +111,9 @@ export const attendanceQueue = sqliteTable("attendance_queue", {
   completedAt: integer("completed_at", { mode: "timestamp" }),
   consultationId: text("consultation_id").references(() => consultations.id), // Vincula fila ao atendimento médico
   professionalId: text("professional_id").references(() => professionals.id), // Profissional que chamou o paciente
+  careLineId: text("care_line_id").references(() => careLines.id), // Linha de cuidado para encaninhamento inteligente
+  referralReason: text("referral_reason"), // Motivo do encaminhamento (para triagem especializada)
+  clinicalRisk: text("clinical_risk", { enum: ["baixo", "medio", "alto"] }), // Classificação de risco clínico
 });
 
 // Consultations (Consultas Médicas) - COM CAMPOS SOAP COMPLETOS ✅
@@ -1102,3 +1105,4 @@ export type InsertCareLineDiagnosis = z.infer<typeof insertCareLineDiagnosisSche
 
 export type CareLineTrigger = typeof careLineTriggers.$inferSelect;
 export type InsertCareLineTrigger = z.infer<typeof insertCareLineTriggerSchema>;
+

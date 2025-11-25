@@ -65,6 +65,7 @@ export interface IStorage {
 
   // Attendance Queue
   getAttendanceQueue(params: { unitId: string; professionalId?: string; status?: string }): Promise<AttendanceQueue[]>;
+  getAttendanceQueueByCareLine(params: { unitId: string; careLineId: string; status?: string }): Promise<AttendanceQueue[]>;
   getQueueEntry(id: string): Promise<AttendanceQueue | undefined>; // Get single queue entry by ID ✅
   createQueueEntry(entry: InsertAttendanceQueue): Promise<AttendanceQueue>;
   updateQueueEntry(id: string, entry: Partial<InsertAttendanceQueue>): Promise<AttendanceQueue | undefined>;
@@ -413,6 +414,25 @@ export class DbStorage implements IStorage {
 
     if (params.professionalId) {
       conditions.push(eq(schema.attendanceQueue.professionalId, params.professionalId));
+    }
+
+    return db.select()
+      .from(schema.attendanceQueue)
+      .where(and(...conditions))
+      .orderBy(
+        desc(schema.attendanceQueue.priority),
+        asc(schema.attendanceQueue.arrivedAt)
+      );
+  }
+
+  async getAttendanceQueueByCareLine(params: { unitId: string; careLineId: string; status?: string }): Promise<AttendanceQueue[]> {
+    const conditions = [
+      eq(schema.attendanceQueue.unitId, params.unitId),
+      eq(schema.attendanceQueue.careLineId, params.careLineId)
+    ];
+
+    if (params.status) {
+      conditions.push(eq(schema.attendanceQueue.status, params.status as any));
     }
 
     return db.select()

@@ -788,6 +788,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Listar fila de atendimento POR LINHA DE CUIDADO ✅
+  app.get("/api/care-line-queue/:careLineId", async (req, res) => {
+    try {
+      const { careLineId } = req.params;
+      const { status } = req.query;
+
+      // SECURITY: Multi-tenant validation
+      const sessionUnitId = req.session?.user?.unitId;
+      if (!sessionUnitId) {
+        return res.status(401).json({ error: "Sessão inválida - unitId não encontrado" });
+      }
+
+      const queue = await storage.getAttendanceQueueByCareLine({
+        unitId: sessionUnitId,
+        careLineId,
+        status: status as string,
+      });
+
+      res.json(queue);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Buscar próximo paciente da fila
   app.get("/api/attendance/next", async (req, res) => {
     try {
