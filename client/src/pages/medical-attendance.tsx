@@ -208,6 +208,30 @@ export default function MedicalAttendance() {
     enabled: !!consultationId,
   });
 
+  // Buscar care lines disponíveis
+  const { data: careLines = [] } = useQuery({
+    queryKey: ["/api/care-lines"],
+    queryFn: () => apiRequest("GET", "/api/care-lines?active=true"),
+  });
+
+  // Buscar template da linha de cuidado (DEMO: usando pré-natal como exemplo)
+  const prenatalCareLine = careLines.find((cl: any) => cl.code === "PRENATAL");
+  
+  const { data: consultationTemplates = [] } = useQuery({
+    queryKey: ["/api/consultation-templates", prenatalCareLine?.id],
+    queryFn: () => apiRequest("GET", `/api/consultation-templates?careLineId=${prenatalCareLine.id}`),
+    enabled: !!prenatalCareLine?.id,
+  });
+
+  const activeTemplate = consultationTemplates[0];
+
+  // Buscar field data existente da consulta
+  const { data: existingFieldData = [] } = useQuery({
+    queryKey: ["/api/consultations", consultationId, "field-data"],
+    queryFn: () => apiRequest("GET", `/api/consultations/${consultationId}/field-data`),
+    enabled: !!consultationId && !!activeTemplate,
+  });
+
   // Form setup
   const form = useForm<SOAPFormData>({
     resolver: zodResolver(soapFormSchema),
@@ -627,6 +651,29 @@ export default function MedicalAttendance() {
     onError: (error: Error) => {
       toast({
         title: "Erro ao Remover Exame",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutation para salvar dados de formulário dinâmico
+  const saveDynamicFormMutation = useMutation({
+    mutationFn: async (data: { fieldData: any[], templateId: string }) => {
+      await apiRequest("POST", `/api/consultations/${consultationId}/field-data`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/consultations", consultationId, "field-data"] 
+      });
+      toast({
+        title: "Formulário Salvo",
+        description: "Os dados do formulário específico foram salvos com sucesso",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao Salvar Formulário",
         description: error.message,
         variant: "destructive",
       });
@@ -1314,45 +1361,78 @@ export default function MedicalAttendance() {
                     </TabsContent>
 
                     <TabsContent value="dynamic" className="space-y-4 mt-4">
-                      <div className="rounded-lg border border-muted bg-muted/30 p-4">
-                        <div className="flex items-start gap-3">
-                          <ClipboardList className="h-5 w-5 text-primary mt-0.5" />
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-sm mb-1">Formulários Específicos por Especialidade</h4>
-                            <p className="text-sm text-muted-foreground">
-                              Esta aba permite registrar dados específicos conforme a linha de cuidado do paciente 
-                              (pré-natal, diabetes, hipertensão, etc). Os protocolos clínicos avaliarão automaticamente 
-                              os dados e gerarão alertas quando necessário.
-                            </p>
+                      {activeTemplate && prenatalCareLine ? (
+                        <div className="space-y-4">
+                          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                            <div className="flex items-start gap-3">
+                              <ClipboardList className="h-5 w-5 text-primary mt-0.5" />
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-sm mb-1">
+                                  {activeTemplate.name}
+                                </h4>
+                                <p className="text-sm text-muted-foreground">
+                                  {activeTemplate.description || "Formulário específico por especialidade"}
+                                </p>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
 
-                      <div className="rounded-lg border p-6 text-center">
-                        <ClipboardList className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                        <h3 className="font-semibold mb-2">Formulários Dinâmicos em Desenvolvimento</h3>
-                        <p className="text-sm text-muted-foreground mb-4">
-                          O sistema de formulários específicos por especialidade está sendo implementado.
-                          Em breve você poderá registrar:
-                        </p>
-                        <ul className="text-sm text-muted-foreground space-y-2 max-w-md mx-auto">
-                          <li className="flex items-center gap-2">
-                            <CheckCircle2 className="h-4 w-4 text-green-600" />
-                            Pré-natal: DUM, IG, altura uterina, BCF, movimentos fetais
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <CheckCircle2 className="h-4 w-4 text-green-600" />
-                            Diabetes: Glicemia, HbA1c, ajuste de insulina
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <CheckCircle2 className="h-4 w-4 text-green-600" />
-                            Hipertensão: Controle pressórico, ajuste medicamentoso
-                          </li>
-                        </ul>
-                        <p className="text-xs text-muted-foreground mt-6">
-                          💡 Os dados serão validados automaticamente conforme protocolos clínicos do Ministério da Saúde
-                        </p>
-                      </div>
+                          <DynamicConsultationForm
+                            templateId={activeTemplate.id}
+                            careLineId={prenatalCareLine.id}
+                            specialtyId={prenatalCareLine.specialtyId}
+                            consultationId={consultationId}
+                            initialData={existingFieldData}
+                            onSubmit={(formData) => {
+                              // Convert form data to field data array format
+                              const fieldData = Object.entries(formData).map(([fieldId, value]) => ({
+                                fieldId,
+                                value,
+                              }));
+                              
+                              saveDynamicFormMutation.mutate({
+                                fieldData,
+                                templateId: activeTemplate.id,
+                              });
+                            }}
+                            onProtocolsTriggered={(protocols) => {
+                              if (protocols.length > 0) {
+                                const criticalCount = protocols.filter((p: any) => p.alertLevel === "critical").length;
+                                const warningCount = protocols.filter((p: any) => p.alertLevel === "warning").length;
+                                
+                                toast({
+                                  title: "Protocolos Clínicos Acionados",
+                                  description: criticalCount > 0 
+                                    ? `${criticalCount} alerta(s) crítico(s) e ${warningCount} aviso(s)` 
+                                    : `${warningCount} aviso(s) detectado(s)`,
+                                  variant: criticalCount > 0 ? "destructive" : "default",
+                                });
+                              }
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border p-6 text-center">
+                          <ClipboardList className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                          <h3 className="font-semibold mb-2">Nenhuma Linha de Cuidado Detectada</h3>
+                          <p className="text-sm text-muted-foreground mb-4">
+                            O sistema de formulários específicos está disponível para consultas de:
+                          </p>
+                          <ul className="text-sm text-muted-foreground space-y-2 max-w-md mx-auto text-left">
+                            <li className="flex items-center gap-2">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              <strong>Pré-natal:</strong> DUM, IG, altura uterina, BCF, movimentos fetais
+                            </li>
+                            <li className="flex items-center gap-2">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              <strong>Diabetes:</strong> Glicemia, HbA1c, ajuste de insulina
+                            </li>
+                          </ul>
+                          <p className="text-xs text-muted-foreground mt-6">
+                            💡 Para usar os formulários específicos, vincule o paciente a uma linha de cuidado
+                          </p>
+                        </div>
+                      )}
                     </TabsContent>
 
                     <TabsContent value="history" className="mt-4">

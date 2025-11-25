@@ -2484,7 +2484,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Save consultation field data
   app.post("/api/consultations/:consultationId/field-data", async (req, res) => {
     try {
-      const { fieldData } = req.body;
+      const { fieldData, templateId } = req.body;
       
       if (!Array.isArray(fieldData)) {
         return res.status(400).json({ error: "fieldData deve ser um array" });
@@ -2497,6 +2497,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (consultation.unitId !== req.session.user?.unitId) {
         return res.status(403).json({ error: "Acesso negado: consulta não pertence à sua unidade" });
+      }
+      
+      // VALIDATION: If templateId provided, validate field data against template schema
+      if (templateId) {
+        const template = await storage.getConsultationTemplateById(templateId);
+        if (!template) {
+          return res.status(404).json({ error: "Template não encontrado" });
+        }
+        
+        const templateFields = await storage.getTemplateFields(templateId);
+        
+        // Validate each field data entry against template fields
+        const templateFieldsMap = new Map(templateFields.map((f: any) => [f.id, f]));
+        const validationErrors: string[] = [];
+        
+        for (const field of fieldData) {
+          const templateField = templateFieldsMap.get(field.fieldId);
+          
+          if (!templateField) {
+            validationErrors.push(`Campo ${field.fieldId} não existe no template`);
+            continue;
+          }
+          
+          // Validate required fields
+          if (templateField.required && (field.value === null || field.value === undefined || field.value === '')) {
+            validationErrors.push(`Campo '${templateField.fieldLabel || templateField.label}' é obrigatório`);
+          }
+          
+          // Validate field type
+          if (field.value !== null && field.value !== undefined && field.value !== '') {
+            const fieldType = templateField.fieldType;
+            const value = field.value;
+            
+            if (fieldType === 'number' && typeof value !== 'number') {
+              validationErrors.push(`Campo '${templateField.fieldLabel || templateField.label}' deve ser um número`);
+            }
+            
+            if (fieldType === 'checkbox' && typeof value !== 'boolean') {
+              validationErrors.push(`Campo '${templateField.fieldLabel || templateField.label}' deve ser verdadeiro ou falso`);
+            }
+            
+            if (fieldType === 'date' && isNaN(Date.parse(value))) {
+              validationErrors.push(`Campo '${templateField.fieldLabel || templateField.label}' deve ser uma data válida`);
+            }
+          }
+        }
+        
+        if (validationErrors.length > 0) {
+          return res.status(400).json({ 
+            error: "Erro de validação dos campos", 
+            validationErrors 
+          });
+        }
       }
       
       const saved = await storage.saveConsultationFieldData(req.params.consultationId, fieldData);
