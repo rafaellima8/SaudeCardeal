@@ -26,9 +26,10 @@ The backend uses Express.js and TypeScript on Node.js, providing a RESTful API w
 -   **Endemic Disease Surveillance (ACE)**: Full-stack module for ACE, including CRUD for dwellings, home visits with vital signs, geolocated vector foci registration, and an auditing system.
 -   **Reports & Indicators**: Aggregated health indicators with professional PDF export and customizable filters.
 -   **Appointment Scheduling**: Complete scheduling and queue management with calendar views.
--   **Electronic Prescriptions**: Prescription management with transactional integrity and robust PDF export.
+-   **Electronic Prescriptions**: Prescription management with transactional integrity and robust PDF export, fully integrated into the medical attendance workflow.
 -   **AI Medical Assistant**: A production-ready AI assistant powered by OpenAI GPT-5 for diagnostic suggestions (CIAP-2/CID-10), drug interaction checks, prescription validation, and care plan generation, with robust validation and RBAC-controlled access.
 -   **SOAP Consultation System**: Full-stack implementation of medical consultations adhering to e-SUS PEC v5.3 standards, including subjective, objective, assessment, and plan (SOAP) fields, vital signs, CIAP-2/CID-10 codes, and integrated prescription management.
+-   **Medical Attendance Module**: Complete 3-column workflow integrating patient selection (column 1), SOAP consultation form with vital signs and diagnostic codes (column 2), and electronic prescriptions CRUD (column 3). Fully integrated with proper consultation/professional context, cache synchronization, and transactional integrity.
 -   **Searchable Selection (Combobox)**: System-wide implementation of searchable/autocomplete functionality for all selection fields using a reusable Combobox component.
 
 #### Next Development Priorities
