@@ -47,6 +47,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { PrescriptionForm, type PrescriptionFormData } from "@/components/PrescriptionForm";
+import { ReferralForm, type ReferralFormData } from "@/components/ReferralForm";
 
 // Icons
 import {
@@ -64,6 +65,7 @@ import {
   Plus,
   Trash2,
   Edit,
+  ArrowRightLeft,
 } from "lucide-react";
 
 // Helper para converter string vazia em undefined e strings numéricas em números
@@ -129,6 +131,11 @@ export default function MedicalAttendance() {
   const [editingPrescription, setEditingPrescription] = useState<any>(null);
   const [deletePrescriptionId, setDeletePrescriptionId] = useState<string | null>(null);
 
+  // Estados para encaminhamentos
+  const [referralDialogOpen, setReferralDialogOpen] = useState(false);
+  const [editingReferral, setEditingReferral] = useState<any>(null);
+  const [deleteReferralId, setDeleteReferralId] = useState<string | null>(null);
+
   // Buscar dados da consulta
   const { data: consultation, isLoading: loadingConsultation } = useQuery({
     queryKey: ["/api/consultations", consultationId],
@@ -171,6 +178,18 @@ export default function MedicalAttendance() {
       if (!consultationId) return [];
       const response = await fetch(`/api/prescriptions?consultationId=${consultationId}`);
       if (!response.ok) throw new Error("Erro ao carregar prescrições");
+      return response.json();
+    },
+    enabled: !!consultationId,
+  });
+
+  // Buscar encaminhamentos da consulta
+  const { data: referrals = [], isLoading: loadingReferrals } = useQuery({
+    queryKey: ["/api/medical-referrals", consultationId],
+    queryFn: async () => {
+      if (!consultationId) return [];
+      const response = await fetch(`/api/medical-referrals?consultationId=${consultationId}`);
+      if (!response.ok) throw new Error("Erro ao carregar encaminhamentos");
       return response.json();
     },
     enabled: !!consultationId,
@@ -411,6 +430,81 @@ export default function MedicalAttendance() {
     },
   });
 
+  // Mutations para encaminhamentos
+  const createReferralMutation = useMutation({
+    mutationFn: async (data: ReferralFormData) => {
+      if (!consultationId) {
+        throw new Error("ID da consulta não encontrado");
+      }
+      // Enviar apenas campos permitidos - servidor deriva cidadão/profissional/unidade da consulta
+      const result: any = await apiRequest("POST", "/api/medical-referrals", {
+        ...data,
+        consultationId: consultationId,
+      });
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/medical-referrals", consultationId] });
+      setReferralDialogOpen(false);
+      setEditingReferral(null);
+      toast({
+        title: "Encaminhamento Criado",
+        description: "O encaminhamento foi registrado com sucesso",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao Criar Encaminhamento",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateReferralMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<ReferralFormData> }) => {
+      const result: any = await apiRequest("PATCH", `/api/medical-referrals/${id}`, data);
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/medical-referrals", consultationId] });
+      setReferralDialogOpen(false);
+      setEditingReferral(null);
+      toast({
+        title: "Encaminhamento Atualizado",
+        description: "O encaminhamento foi atualizado com sucesso",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao Atualizar Encaminhamento",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteReferralMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/medical-referrals/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/medical-referrals", consultationId] });
+      setDeleteReferralId(null);
+      toast({
+        title: "Encaminhamento Removido",
+        description: "O encaminhamento foi removido com sucesso",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao Remover Encaminhamento",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: SOAPFormData) => {
     saveConsultationMutation.mutate(data);
   };
@@ -462,6 +556,25 @@ export default function MedicalAttendance() {
   const handleAddPrescription = () => {
     setEditingPrescription(null);
     setPrescriptionDialogOpen(true);
+  };
+
+  // Handlers para encaminhamentos
+  const handleSaveReferral = (data: ReferralFormData) => {
+    if (editingReferral) {
+      updateReferralMutation.mutate({ id: editingReferral.id, data });
+    } else {
+      createReferralMutation.mutate(data);
+    }
+  };
+
+  const handleEditReferral = (referral: any) => {
+    setEditingReferral(referral);
+    setReferralDialogOpen(true);
+  };
+
+  const handleAddReferral = () => {
+    setEditingReferral(null);
+    setReferralDialogOpen(true);
   };
 
   if (loadingConsultation || !consultation) {
@@ -1121,6 +1234,122 @@ export default function MedicalAttendance() {
               </ScrollArea>
             </CardContent>
           </Card>
+
+          {/* Encaminhamentos */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <ArrowRightLeft className="h-5 w-5" />
+                  Encaminhamentos
+                </CardTitle>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleAddReferral}
+                  data-testid="button-add-referral"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              <CardDescription>
+                {referrals.length} {referrals.length === 1 ? "encaminhamento" : "encaminhamentos"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[300px] pr-4">
+                {loadingReferrals ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Carregando encaminhamentos...
+                  </div>
+                ) : referrals.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <ArrowRightLeft className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>Nenhum encaminhamento adicionado</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {referrals.map((referral: any) => (
+                      <Card key={referral.id} className="p-3">
+                        <div className="space-y-2">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <p className="font-medium text-sm">{referral.destination}</p>
+                                <Badge 
+                                  variant={
+                                    referral.priority === "emergency" 
+                                      ? "destructive" 
+                                      : referral.priority === "urgent" 
+                                      ? "default" 
+                                      : "secondary"
+                                  }
+                                  className="text-xs"
+                                  data-testid={`badge-referral-priority-${referral.id}`}
+                                >
+                                  {referral.priority === "emergency" && "Emergência"}
+                                  {referral.priority === "urgent" && "Urgente"}
+                                  {referral.priority === "normal" && "Normal"}
+                                </Badge>
+                              </div>
+                              {referral.specialty && (
+                                <p className="text-xs text-muted-foreground">
+                                  <strong>Especialidade:</strong> {referral.specialty}
+                                </p>
+                              )}
+                              <p className="text-xs text-muted-foreground mt-1">
+                                <strong>Motivo:</strong> {referral.reason}
+                              </p>
+                              {referral.observations && (
+                                <p className="text-xs text-muted-foreground">
+                                  <strong>Obs:</strong> {referral.observations}
+                                </p>
+                              )}
+                              <Badge 
+                                variant={
+                                  referral.status === "completed" 
+                                    ? "default" 
+                                    : referral.status === "cancelled" 
+                                    ? "destructive" 
+                                    : "secondary"
+                                }
+                                className="mt-2"
+                                data-testid={`badge-referral-status-${referral.id}`}
+                              >
+                                {referral.status === "pending" && "Pendente"}
+                                {referral.status === "scheduled" && "Agendado"}
+                                {referral.status === "in_progress" && "Em Andamento"}
+                                {referral.status === "completed" && "Concluído"}
+                                {referral.status === "cancelled" && "Cancelado"}
+                              </Badge>
+                            </div>
+                            <div className="flex gap-1 ml-2">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleEditReferral(referral)}
+                                data-testid={`button-edit-referral-${referral.id}`}
+                              >
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setDeleteReferralId(referral.id)}
+                                data-testid={`button-delete-referral-${referral.id}`}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
@@ -1261,6 +1490,53 @@ export default function MedicalAttendance() {
               data-testid="alert-confirm"
             >
               {deletePrescriptionMutation.isPending ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog para Adicionar/Editar Encaminhamento */}
+      <ReferralForm
+        open={referralDialogOpen}
+        onOpenChange={setReferralDialogOpen}
+        referral={editingReferral}
+        onSave={handleSaveReferral}
+        isLoading={createReferralMutation.isPending || updateReferralMutation.isPending}
+      />
+
+      {/* AlertDialog para Confirmar Exclusão de Encaminhamento */}
+      <AlertDialog 
+        open={!!deleteReferralId} 
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteReferralId(null);
+          }
+        }}
+      >
+        <AlertDialogContent data-testid="alert-delete-referral">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este encaminhamento? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={() => setDeleteReferralId(null)}
+              data-testid="alert-cancel-referral"
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteReferralId) {
+                  deleteReferralMutation.mutate(deleteReferralId);
+                }
+              }}
+              disabled={deleteReferralMutation.isPending}
+              data-testid="alert-confirm-referral"
+            >
+              {deleteReferralMutation.isPending ? "Excluindo..." : "Excluir"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

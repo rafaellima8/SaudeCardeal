@@ -683,11 +683,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Medical Referrals API
   app.get("/api/medical-referrals", async (req, res) => {
     try {
-      const { citizenId, consultationId, unitId, status } = req.query;
+      const { citizenId, consultationId, status } = req.query;
+      
+      // Forçar filtro por unitId da sessão (multi-tenant) - ignorar unitId do cliente
+      const sessionUnitId = req.session?.user?.unitId;
+      if (!sessionUnitId) {
+        return res.status(401).json({ error: "Sessão inválida - unitId não encontrado" });
+      }
+      
+      // Se consultationId fornecida, validar que pertence à unidade da sessão
+      if (consultationId) {
+        const consultation = await storage.getConsultationById(consultationId as string);
+        if (!consultation) {
+          return res.status(404).json({ error: "Consulta não encontrada" });
+        }
+        if (consultation.unitId !== sessionUnitId) {
+          return res.status(403).json({ error: "Acesso negado: consulta de outra unidade" });
+        }
+      }
+      
       const referrals = await storage.getMedicalReferrals({
         citizenId: citizenId as string,
         consultationId: consultationId as string,
-        unitId: unitId as string,
+        unitId: sessionUnitId, // Sempre usar unitId da sessão
         status: status as string,
       });
       res.json(referrals);
@@ -702,6 +720,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!referral) {
         return res.status(404).json({ error: "Encaminhamento não encontrado" });
       }
+      
+      // Validação multi-tenant: verificar se referral pertence à unidade do usuário autenticado
+      const sessionUnitId = req.session?.user?.unitId;
+      if (sessionUnitId && referral.unitId !== sessionUnitId) {
+        return res.status(403).json({ error: "Acesso negado: encaminhamento de outra unidade" });
+      }
+      
       res.json(referral);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -710,8 +735,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/medical-referrals", async (req, res) => {
     try {
-      const data = insertMedicalReferralSchema.parse(req.body);
-      const referral = await storage.createMedicalReferral(data);
+      // Validar apenas campos permitidos do cliente
+      const allowedFields = z.object({
+        consultationId: z.string().uuid(),
+        destination: z.string().min(1),
+        specialty: z.string().optional(),
+        reason: z.string().min(10),
+        priority: z.enum(["normal", "urgent", "emergency"]),
+        observations: z.string().optional(),
+      });
+      
+      const clientData = allowedFields.parse(req.body);
+      
+      // Buscar consulta para validação e derivação de dados
+      const consultation = await storage.getConsultationById(clientData.consultationId);
+      if (!consultation) {
+        return res.status(404).json({ error: "Consulta não encontrada" });
+      }
+      
+      // Validação multi-tenant: verificar se consulta pertence à unidade do profissional autenticado
+      const sessionUnitId = req.session?.user?.unitId;
+      if (sessionUnitId && consultation.unitId !== sessionUnitId) {
+        return res.status(403).json({ error: "Acesso negado: consulta de outra unidade" });
+      }
+      
+      // Derivar dados da consulta (fonte confiável) ao invés de confiar no cliente
+      const referralData = {
+        ...clientData,
+        consultationId: consultation.id,
+        citizenId: consultation.citizenId,
+        professionalId: consultation.professionalId,
+        unitId: consultation.unitId,
+        referralDate: new Date(), // Sempre definido pelo servidor
+        status: "pending" as const, // Sempre inicia como pending
+      };
+      
+      const referral = await storage.createMedicalReferral(referralData);
       res.status(201).json(referral);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
@@ -723,18 +782,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/medical-referrals/:id", async (req, res) => {
     try {
-      const referral = await storage.updateMedicalReferral(req.params.id, req.body);
-      if (!referral) {
+      // Buscar referral existente para validação
+      const existingReferral = await storage.getMedicalReferralById(req.params.id);
+      if (!existingReferral) {
         return res.status(404).json({ error: "Encaminhamento não encontrado" });
       }
+      
+      // Validação multi-tenant: verificar se referral pertence à unidade do usuário autenticado
+      const sessionUnitId = req.session?.user?.unitId;
+      if (sessionUnitId && existingReferral.unitId !== sessionUnitId) {
+        return res.status(403).json({ error: "Acesso negado: encaminhamento de outra unidade" });
+      }
+      
+      // Validar campos permitidos para atualização
+      const allowedUpdateFields = z.object({
+        destination: z.string().min(1).optional(),
+        specialty: z.string().optional(),
+        reason: z.string().min(10).optional(),
+        priority: z.enum(["normal", "urgent", "emergency"]).optional(),
+        observations: z.string().optional(),
+        status: z.enum(["pending", "scheduled", "in_progress", "completed", "cancelled"]).optional(),
+        scheduledDate: z.coerce.date().optional(),
+      });
+      
+      const updateData = allowedUpdateFields.parse(req.body);
+      
+      // Estados finais (completed/cancelled) não podem ser atualizados de forma alguma
+      if (existingReferral.status === "completed" || existingReferral.status === "cancelled") {
+        return res.status(400).json({ 
+          error: `Encaminhamento ${existingReferral.status} não pode ser alterado` 
+        });
+      }
+      
+      // Validar transição de status se fornecido
+      if (updateData.status) {
+        // Validar transições permitidas (apenas progressão + cancelamento)
+        const validTransitions: Record<string, string[]> = {
+          pending: ["scheduled", "cancelled"],
+          scheduled: ["in_progress", "cancelled"],
+          in_progress: ["completed", "cancelled"],
+        };
+        
+        const allowedStatuses = validTransitions[existingReferral.status] || [];
+        if (!allowedStatuses.includes(updateData.status)) {
+          return res.status(400).json({ 
+            error: `Transição inválida: ${existingReferral.status} → ${updateData.status}. Transições permitidas: ${allowedStatuses.join(", ") || "nenhuma"}` 
+          });
+        }
+      }
+      
+      const referral = await storage.updateMedicalReferral(req.params.id, updateData);
       res.json(referral);
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
       res.status(500).json({ error: error.message });
     }
   });
 
   app.delete("/api/medical-referrals/:id", async (req, res) => {
     try {
+      // Buscar referral existente para validação multi-tenant
+      const existingReferral = await storage.getMedicalReferralById(req.params.id);
+      if (!existingReferral) {
+        return res.status(404).json({ error: "Encaminhamento não encontrado" });
+      }
+      
+      // Validação multi-tenant: verificar se referral pertence à unidade do usuário autenticado
+      const sessionUnitId = req.session?.user?.unitId;
+      if (sessionUnitId && existingReferral.unitId !== sessionUnitId) {
+        return res.status(403).json({ error: "Acesso negado: encaminhamento de outra unidade" });
+      }
+      
       const success = await storage.deleteMedicalReferral(req.params.id);
       if (!success) {
         return res.status(404).json({ error: "Encaminhamento não encontrado" });

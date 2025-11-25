@@ -27,7 +27,13 @@ The backend uses Express.js and TypeScript on Node.js, providing a RESTful API w
 -   **Reports & Indicators**: Aggregated health indicators with professional PDF export and customizable filters.
 -   **Appointment Scheduling**: Complete scheduling and queue management with calendar views.
 -   **Electronic Prescriptions**: Prescription management with transactional integrity and robust PDF export, fully integrated into the medical attendance workflow.
--   **Medical Referrals**: Structured referral system for specialized care, including destination tracking (UPA, CAPS, specialties), priority management (normal/urgent/emergency), status workflow (pending → scheduled → in_progress → completed), and full integration with consultations. Multi-tenant secure with unitId validation.
+-   **Medical Referrals**: Production-ready referral system for specialized care with comprehensive security. Features include:
+    -   **Multi-tenant Security**: All endpoints validate `req.session.user.unitId` to ensure data isolation per health unit. Consultation ownership verified before creating/accessing referrals.
+    -   **Destination & Priority Tracking**: Supports multiple destinations (UPA, CAPS, Hospital Regional, specialties) with priority levels (normal/urgent/emergency).
+    -   **Status Workflow**: Enforced state machine (pending → scheduled → in_progress → completed; cancellation allowed at any stage). Final states (completed/cancelled) are immutable.
+    -   **Backend Validation**: Server-controlled `referralDate` and `status` fields. Client sends only allowed fields (destination, specialty, reason, priority, observations). All metadata (citizenId, professionalId, unitId) derived from consultation.
+    -   **Frontend Integration**: Complete UI in medical-attendance.tsx with ReferralForm component, TanStack Query mutations/queries, and real-time cache synchronization.
+    -   **Known Limitations**: Storage layer lacks internal multi-tenant guards (applies to all entities, not specific to referrals). Future enhancement: Add unitId validation inside storage methods system-wide.
 -   **AI Medical Assistant**: A production-ready AI assistant powered by OpenAI GPT-5 for diagnostic suggestions (CIAP-2/CID-10), drug interaction checks, prescription validation, and care plan generation, with robust validation and RBAC-controlled access.
 -   **SOAP Consultation System**: Full-stack implementation of medical consultations adhering to e-SUS PEC v5.3 standards, including subjective, objective, assessment, and plan (SOAP) fields, vital signs, CIAP-2/CID-10 codes, and integrated prescription management.
 -   **Medical Attendance Module**: Complete 3-column workflow integrating patient selection (column 1), SOAP consultation form with vital signs and diagnostic codes (column 2), and electronic prescriptions CRUD (column 3). Fully integrated with proper consultation/professional context, cache synchronization, and transactional integrity.
