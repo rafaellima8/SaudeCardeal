@@ -927,10 +927,14 @@ export default function MedicalAttendance() {
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   <Tabs defaultValue="soap" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
+                    <TabsList className="grid w-full grid-cols-4">
                       <TabsTrigger value="soap" data-testid="tab-soap">SOAP</TabsTrigger>
                       <TabsTrigger value="vitals" data-testid="tab-vitals">Sinais Vitais</TabsTrigger>
                       <TabsTrigger value="notes" data-testid="tab-notes">Observações</TabsTrigger>
+                      <TabsTrigger value="history" data-testid="tab-history">
+                        <History className="h-4 w-4 mr-2" />
+                        Histórico
+                      </TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="soap" className="space-y-4 mt-4">
@@ -1215,6 +1219,17 @@ export default function MedicalAttendance() {
                           </FormItem>
                         )}
                       />
+                    </TabsContent>
+
+                    <TabsContent value="history" className="mt-4">
+                      {consultation?.citizenId ? (
+                        <MedicalHistory citizenId={consultation.citizenId} />
+                      ) : (
+                        <div className="flex items-center justify-center p-8 text-muted-foreground">
+                          <AlertCircle className="h-4 w-4 mr-2" />
+                          Carregando informações do paciente...
+                        </div>
+                      )}
                     </TabsContent>
                   </Tabs>
                 </form>
