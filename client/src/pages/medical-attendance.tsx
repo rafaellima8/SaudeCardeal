@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { PrescriptionForm, type PrescriptionFormData } from "@/components/PrescriptionForm";
 import { ReferralForm, type ReferralFormData } from "@/components/ReferralForm";
+import { MedicalHistory } from "@/components/MedicalHistory";
 
 // Icons
 import {
@@ -68,6 +69,7 @@ import {
   ArrowRightLeft,
   TestTube,
   ClipboardList,
+  History,
 } from "lucide-react";
 
 // Helper para converter string vazia em undefined e strings numéricas em números
@@ -119,6 +121,14 @@ const problemFormSchema = z.object({
 });
 
 type ProblemFormData = z.infer<typeof problemFormSchema>;
+
+const examFormSchema = z.object({
+  examType: z.string().min(3, "Tipo de exame é obrigatório"),
+  observations: z.string().optional(),
+  status: z.enum(["requested", "scheduled", "completed", "cancelled"]).default("requested"),
+});
+
+type ExamFormData = z.infer<typeof examFormSchema>;
 
 export default function MedicalAttendance() {
   const { consultationId } = useParams<{ consultationId: string }>();
@@ -238,6 +248,15 @@ export default function MedicalAttendance() {
       ciap2Code: "",
       cid10Code: "",
       status: "active",
+    },
+  });
+
+  const examForm = useForm<ExamFormData>({
+    resolver: zodResolver(examFormSchema),
+    defaultValues: {
+      examType: "",
+      observations: "",
+      status: "requested",
     },
   });
 
@@ -528,6 +547,85 @@ export default function MedicalAttendance() {
     },
   });
 
+  // Mutations para exames
+  const createExamMutation = useMutation({
+    mutationFn: async (data: ExamFormData) => {
+      if (!consultation?.citizenId || !consultation?.professionalId) {
+        throw new Error("Dados da consulta incompletos");
+      }
+      const result: any = await apiRequest("POST", "/api/exams", {
+        ...data,
+        consultationId: consultationId,
+        citizenId: consultation.citizenId,
+        professionalId: consultation.professionalId,
+        requestDate: new Date(),
+      });
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/exams", consultationId] });
+      setExamDialogOpen(false);
+      setEditingExam(null);
+      examForm.reset();
+      toast({
+        title: "Exame Solicitado",
+        description: "O exame foi registrado com sucesso",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao Solicitar Exame",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateExamMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<ExamFormData> }) => {
+      const result: any = await apiRequest("PATCH", `/api/exams/${id}`, data);
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/exams", consultationId] });
+      setExamDialogOpen(false);
+      setEditingExam(null);
+      examForm.reset();
+      toast({
+        title: "Exame Atualizado",
+        description: "O exame foi atualizado com sucesso",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao Atualizar Exame",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteExamMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/exams/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/exams", consultationId] });
+      setDeleteExamId(null);
+      toast({
+        title: "Exame Removido",
+        description: "O exame foi removido com sucesso",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao Remover Exame",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: SOAPFormData) => {
     saveConsultationMutation.mutate(data);
   };
@@ -537,6 +635,14 @@ export default function MedicalAttendance() {
       updateProblemMutation.mutate({ id: editingProblem.id, data });
     } else {
       createProblemMutation.mutate(data);
+    }
+  };
+
+  const onSubmitExam = (data: ExamFormData) => {
+    if (editingExam) {
+      updateExamMutation.mutate({ id: editingExam.id, data });
+    } else {
+      createExamMutation.mutate(data);
     }
   };
 
