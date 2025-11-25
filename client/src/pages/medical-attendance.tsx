@@ -69,6 +69,8 @@ import {
   TestTube,
   ClipboardList,
   History,
+  Printer,
+  FileCheck,
 } from "lucide-react";
 
 // Helper para converter string vazia em undefined e strings numéricas em números
@@ -155,6 +157,13 @@ export default function MedicalAttendance() {
   // Estados para procedimentos (armazenados em JSON na consulta)
   const [procedureDialogOpen, setProcedureDialogOpen] = useState(false);
   const [procedures, setProcedures] = useState<Array<{code?: string; description: string; observations?: string}>>([]);
+
+  // Estados para impressão de documentos
+  const [certificateDialogOpen, setCertificateDialogOpen] = useState(false);
+  const [certificateType, setCertificateType] = useState<'trabalho' | 'escola' | 'outros'>('trabalho');
+  const [certificateStartDate, setCertificateStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [certificateEndDate, setCertificateEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [certificateReason, setCertificateReason] = useState<string>('');
 
   // Buscar dados da consulta
   const { data: consultation, isLoading: loadingConsultation } = useQuery({
@@ -724,6 +733,66 @@ export default function MedicalAttendance() {
     setExamDialogOpen(true);
   };
 
+  // Handlers para impressão de documentos
+  const handlePrintPrescription = () => {
+    if (!consultationId) return;
+    
+    // Abrir PDF em nova aba
+    window.open(`/api/consultations/${consultationId}/print-prescription`, '_blank');
+  };
+
+  const handleOpenCertificateDialog = () => {
+    // Resetar valores padrão
+    const today = new Date().toISOString().split('T')[0];
+    setCertificateStartDate(today);
+    setCertificateEndDate(today);
+    setCertificateReason('');
+    setCertificateType('trabalho');
+    setCertificateDialogOpen(true);
+  };
+
+  const handlePrintCertificate = async () => {
+    if (!consultationId) return;
+    
+    try {
+      const response = await fetch(`/api/consultations/${consultationId}/print-medical-certificate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          type: certificateType,
+          startDate: certificateStartDate,
+          endDate: certificateEndDate,
+          reason: certificateReason,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erro ao gerar atestado');
+      }
+
+      // Criar URL do blob e abrir em nova aba
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      
+      setCertificateDialogOpen(false);
+      toast({
+        title: "Atestado Gerado",
+        description: "O atestado médico foi gerado com sucesso",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao Gerar Atestado",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loadingConsultation || !consultation) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -1289,6 +1358,21 @@ export default function MedicalAttendance() {
 
               <Separator />
 
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Documentos</p>
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  onClick={handleOpenCertificateDialog}
+                  data-testid="button-generate-certificate"
+                >
+                  <FileCheck className="mr-2 h-4 w-4" />
+                  Gerar Atestado Médico
+                </Button>
+              </div>
+
+              <Separator />
+
               <div className="text-sm text-muted-foreground space-y-2">
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
@@ -1312,14 +1396,26 @@ export default function MedicalAttendance() {
                   <Pill className="h-5 w-5" />
                   Prescrições
                 </CardTitle>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleAddPrescription}
-                  data-testid="button-add-prescription"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handlePrintPrescription}
+                    disabled={prescriptions.length === 0}
+                    title="Imprimir Receita Médica"
+                    data-testid="button-print-prescription"
+                  >
+                    <Printer className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleAddPrescription}
+                    data-testid="button-add-prescription"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               <CardDescription>
                 {prescriptions.length} {prescriptions.length === 1 ? "prescrição" : "prescrições"}
@@ -1956,6 +2052,91 @@ export default function MedicalAttendance() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para Gerar Atestado Médico */}
+      <Dialog open={certificateDialogOpen} onOpenChange={setCertificateDialogOpen}>
+        <DialogContent data-testid="dialog-medical-certificate">
+          <DialogHeader>
+            <DialogTitle>Gerar Atestado Médico</DialogTitle>
+            <DialogDescription>
+              Preencha os dados para gerar o atestado médico do paciente
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="certificate-type">Tipo de Atestado</Label>
+              <Select
+                value={certificateType}
+                onValueChange={(value: any) => setCertificateType(value)}
+              >
+                <SelectTrigger id="certificate-type" data-testid="select-certificate-type">
+                  <SelectValue placeholder="Selecione o tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="trabalho">Trabalho</SelectItem>
+                  <SelectItem value="escola">Escola</SelectItem>
+                  <SelectItem value="outros">Outros</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="start-date">Data Inicial</Label>
+                <Input
+                  id="start-date"
+                  type="date"
+                  value={certificateStartDate}
+                  onChange={(e) => setCertificateStartDate(e.target.value)}
+                  data-testid="input-start-date"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="end-date">Data Final</Label>
+                <Input
+                  id="end-date"
+                  type="date"
+                  value={certificateEndDate}
+                  onChange={(e) => setCertificateEndDate(e.target.value)}
+                  data-testid="input-end-date"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="reason">Motivo (Opcional)</Label>
+              <Textarea
+                id="reason"
+                placeholder="Descreva o motivo do afastamento..."
+                value={certificateReason}
+                onChange={(e) => setCertificateReason(e.target.value)}
+                rows={3}
+                data-testid="textarea-certificate-reason"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCertificateDialogOpen(false)}
+              data-testid="dialog-cancel-certificate"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handlePrintCertificate}
+              data-testid="dialog-generate-certificate"
+            >
+              <Printer className="mr-2 h-4 w-4" />
+              Gerar Atestado
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
