@@ -777,6 +777,168 @@ export const loginSchema = z.object({
 });
 
 // ============================================================================
+// SPECIALTY & CARE LINES MANAGEMENT (Dynamic Forms System)
+// ============================================================================
+
+// Specialties (Especialidades Médicas)
+export const specialties = sqliteTable("specialties", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  name: text("name").notNull().unique(), // "Endocrinologia", "Pediatria", etc
+  code: text("code").notNull().unique(), // "ENDO", "PEDI", etc
+  description: text("description"),
+  active: integer("active", { mode: "boolean" }).default(true).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Care Lines (Linhas de Cuidado - transversais a especialidades)
+export const careLines = sqliteTable("care_lines", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  name: text("name").notNull(), // "Diabetes", "Pré-natal", "Hipertensão"
+  code: text("code").notNull().unique(), // "DIABETES", "PRENATAL", etc
+  description: text("description"),
+  specialtyId: text("specialty_id").references(() => specialties.id), // Opcional
+  riskStratification: integer("risk_stratification", { mode: "boolean" }).default(false),
+  active: integer("active", { mode: "boolean" }).default(true).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Consultation Templates (Modelos de Formulário)
+export const consultationTemplates = sqliteTable("consultation_templates", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  name: text("name").notNull(), // "Consulta Pré-natal", "Puericultura"
+  specialtyId: text("specialty_id").references(() => specialties.id),
+  careLineId: text("care_line_id").references(() => careLines.id),
+  description: text("description"),
+  active: integer("active", { mode: "boolean" }).default(true).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Template Fields (Campos Dinâmicos do Formulário)
+export const templateFields = sqliteTable("template_fields", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  templateId: text("template_id").notNull().references(() => consultationTemplates.id, { onDelete: "cascade" }),
+  fieldName: text("field_name").notNull(), // "peso", "ig_semanas", "hba1c"
+  fieldLabel: text("field_label").notNull(), // "Peso (kg)", "Idade Gestacional"
+  fieldType: text("field_type", { 
+    enum: ["text", "number", "date", "select", "checkbox", "textarea", "range"] 
+  }).notNull(),
+  fieldOptions: text("field_options", { mode: "json" }).$type<string[]>(), // Para select/checkbox
+  required: integer("required", { mode: "boolean" }).default(false).notNull(),
+  order: integer("order").notNull(), // Ordem de exibição
+  validationRules: text("validation_rules", { mode: "json" }).$type<{
+    min?: number;
+    max?: number;
+    pattern?: string;
+    customMessage?: string;
+  }>(),
+  helperText: text("helper_text"), // Texto de ajuda
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Consultation Field Data (Dados Preenchidos do Formulário Dinâmico)
+export const consultationFieldData = sqliteTable("consultation_field_data", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  consultationId: text("consultation_id").notNull().references(() => consultations.id, { onDelete: "cascade" }),
+  fieldId: text("field_id").notNull().references(() => templateFields.id),
+  fieldValue: text("field_value"), // Armazena qualquer tipo como string/JSON
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Clinical Protocols (Protocolos Clínicos - Alertas Automáticos)
+export const clinicalProtocols = sqliteTable("clinical_protocols", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  name: text("name").notNull(), // "HbA1c descompensada", "VDRL pendente"
+  careLineId: text("care_line_id").references(() => careLines.id),
+  specialtyId: text("specialty_id").references(() => specialties.id),
+  triggerCondition: text("trigger_condition", { mode: "json" }).$type<{
+    field: string;
+    operator: "gt" | "lt" | "eq" | "gte" | "lte" | "contains";
+    value: any;
+  }[]>(), // Condições para disparar alerta
+  alertMessage: text("alert_message").notNull(),
+  alertLevel: text("alert_level", { enum: ["info", "warning", "critical"] }).notNull().default("info"),
+  action: text("action", { mode: "json" }).$type<{
+    type: "notify" | "auto_referral" | "schedule_followup";
+    target?: string;
+    days?: number;
+  }>(),
+  active: integer("active", { mode: "boolean" }).default(true).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Therapeutic Plans (Planos Terapêuticos Compartilhados)
+export const therapeuticPlans = sqliteTable("therapeutic_plans", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  citizenId: text("citizen_id").notNull().references(() => citizens.id, { onDelete: "cascade" }),
+  careLineId: text("care_line_id").references(() => careLines.id),
+  title: text("title").notNull(), // "Plano de cuidado - Diabetes tipo 2"
+  objective: text("objective"), // Objetivo terapêutico
+  status: text("status", { enum: ["active", "completed", "suspended"] }).notNull().default("active"),
+  startDate: integer("start_date", { mode: "timestamp" }).notNull(),
+  endDate: integer("end_date", { mode: "timestamp" }),
+  createdBy: text("created_by").notNull().references(() => professionals.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Therapeutic Plan Items (Itens/Tarefas do Plano Terapêutico)
+export const therapeuticPlanItems = sqliteTable("therapeutic_plan_items", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  planId: text("plan_id").notNull().references(() => therapeuticPlans.id, { onDelete: "cascade" }),
+  description: text("description").notNull(), // "Acompanhamento nutricional mensal"
+  responsibleProfessionalId: text("responsible_professional_id").references(() => professionals.id),
+  responsibleSpecialty: text("responsible_specialty"), // "Nutricionista", "Psicólogo"
+  status: text("status", { enum: ["pending", "in_progress", "completed", "cancelled"] }).notNull().default("pending"),
+  dueDate: integer("due_date", { mode: "timestamp" }),
+  completedDate: integer("completed_date", { mode: "timestamp" }),
+  notes: text("notes"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Insert Schemas for new tables
+export const insertSpecialtySchema = createInsertSchema(specialties).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCareLineSchema = createInsertSchema(careLines).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertConsultationTemplateSchema = createInsertSchema(consultationTemplates).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTemplateFieldSchema = createInsertSchema(templateFields).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertConsultationFieldDataSchema = createInsertSchema(consultationFieldData).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertClinicalProtocolSchema = createInsertSchema(clinicalProtocols).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTherapeuticPlanSchema = createInsertSchema(therapeuticPlans).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTherapeuticPlanItemSchema = createInsertSchema(therapeuticPlanItems).omit({
+  id: true,
+  createdAt: true,
+});
+
+// ============================================================================
 // TYPES
 // ============================================================================
 
@@ -871,3 +1033,28 @@ export type AceFocus = typeof aceFoci.$inferSelect;
 
 export type InsertAceAuditLog = z.infer<typeof insertAceAuditLogSchema>;
 export type AceAuditLog = typeof aceAuditLogs.$inferSelect;
+
+// Dynamic Forms System Types
+export type InsertSpecialty = z.infer<typeof insertSpecialtySchema>;
+export type Specialty = typeof specialties.$inferSelect;
+
+export type InsertCareLine = z.infer<typeof insertCareLineSchema>;
+export type CareLine = typeof careLines.$inferSelect;
+
+export type InsertConsultationTemplate = z.infer<typeof insertConsultationTemplateSchema>;
+export type ConsultationTemplate = typeof consultationTemplates.$inferSelect;
+
+export type InsertTemplateField = z.infer<typeof insertTemplateFieldSchema>;
+export type TemplateField = typeof templateFields.$inferSelect;
+
+export type InsertConsultationFieldData = z.infer<typeof insertConsultationFieldDataSchema>;
+export type ConsultationFieldData = typeof consultationFieldData.$inferSelect;
+
+export type InsertClinicalProtocol = z.infer<typeof insertClinicalProtocolSchema>;
+export type ClinicalProtocol = typeof clinicalProtocols.$inferSelect;
+
+export type InsertTherapeuticPlan = z.infer<typeof insertTherapeuticPlanSchema>;
+export type TherapeuticPlan = typeof therapeuticPlans.$inferSelect;
+
+export type InsertTherapeuticPlanItem = z.infer<typeof insertTherapeuticPlanItemSchema>;
+export type TherapeuticPlanItem = typeof therapeuticPlanItems.$inferSelect;
