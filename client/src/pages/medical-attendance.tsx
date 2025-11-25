@@ -36,6 +36,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { PrescriptionForm, type PrescriptionFormData } from "@/components/PrescriptionForm";
 
 // Icons
 import {
@@ -112,6 +123,11 @@ export default function MedicalAttendance() {
   
   const [problemDialogOpen, setProblemDialogOpen] = useState(false);
   const [editingProblem, setEditingProblem] = useState<any>(null);
+  
+  // Estados para prescrições
+  const [prescriptionDialogOpen, setPrescriptionDialogOpen] = useState(false);
+  const [editingPrescription, setEditingPrescription] = useState<any>(null);
+  const [deletePrescriptionId, setDeletePrescriptionId] = useState<string | null>(null);
 
   // Buscar dados da consulta
   const { data: consultation, isLoading: loadingConsultation } = useQuery({
@@ -146,6 +162,18 @@ export default function MedicalAttendance() {
       return response.json();
     },
     enabled: !!consultation?.citizenId,
+  });
+
+  // Buscar prescrições da consulta
+  const { data: prescriptions = [], isLoading: loadingPrescriptions } = useQuery({
+    queryKey: ["/api/prescriptions", consultationId],
+    queryFn: async () => {
+      if (!consultationId) return [];
+      const response = await fetch(`/api/prescriptions?consultationId=${consultationId}`);
+      if (!response.ok) throw new Error("Erro ao carregar prescrições");
+      return response.json();
+    },
+    enabled: !!consultationId,
   });
 
   // Form setup
@@ -307,6 +335,79 @@ export default function MedicalAttendance() {
     },
   });
 
+  // Mutations para prescrições
+  const createPrescriptionMutation = useMutation({
+    mutationFn: async (data: PrescriptionFormData) => {
+      const result: any = await apiRequest("POST", "/api/prescriptions", {
+        ...data,
+        consultationId,
+        citizenId: consultation?.citizenId,
+        professionalId: consultation?.professionalId,
+      });
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/prescriptions", consultationId] });
+      setPrescriptionDialogOpen(false);
+      setEditingPrescription(null);
+      toast({
+        title: "Prescrição Adicionada",
+        description: "A prescrição foi registrada com sucesso",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao Adicionar Prescrição",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updatePrescriptionMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<PrescriptionFormData> }) => {
+      const result: any = await apiRequest("PATCH", `/api/prescriptions/${id}`, data);
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/prescriptions", consultationId] });
+      setPrescriptionDialogOpen(false);
+      setEditingPrescription(null);
+      toast({
+        title: "Prescrição Atualizada",
+        description: "A prescrição foi atualizada com sucesso",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao Atualizar Prescrição",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deletePrescriptionMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/prescriptions/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/prescriptions", consultationId] });
+      setDeletePrescriptionId(null);
+      toast({
+        title: "Prescrição Removida",
+        description: "A prescrição foi removida com sucesso",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao Remover Prescrição",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: SOAPFormData) => {
     saveConsultationMutation.mutate(data);
   };
@@ -339,6 +440,25 @@ export default function MedicalAttendance() {
       status: "active",
     });
     setProblemDialogOpen(true);
+  };
+
+  // Handlers para prescrições
+  const handleSavePrescription = (data: PrescriptionFormData) => {
+    if (editingPrescription) {
+      updatePrescriptionMutation.mutate({ id: editingPrescription.id, data });
+    } else {
+      createPrescriptionMutation.mutate(data);
+    }
+  };
+
+  const handleEditPrescription = (prescription: any) => {
+    setEditingPrescription(prescription);
+    setPrescriptionDialogOpen(true);
+  };
+
+  const handleAddPrescription = () => {
+    setEditingPrescription(null);
+    setPrescriptionDialogOpen(true);
   };
 
   if (loadingConsultation || !consultation) {
@@ -906,7 +1026,7 @@ export default function MedicalAttendance() {
             </CardContent>
           </Card>
 
-          {/* Prescrições - Placeholder para ETAPA 7 */}
+          {/* Prescrições */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -917,18 +1037,85 @@ export default function MedicalAttendance() {
                 <Button
                   size="sm"
                   variant="ghost"
+                  onClick={handleAddPrescription}
                   data-testid="button-add-prescription"
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
+              <CardDescription>
+                {prescriptions.length} {prescriptions.length === 1 ? "prescrição" : "prescrições"}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                <Pill className="mx-auto h-8 w-8 mb-2 opacity-50" />
-                <p className="text-sm">Funcionalidade em desenvolvimento</p>
-                <p className="text-xs mt-1">(ETAPA 7)</p>
-              </div>
+              <ScrollArea className="h-[400px] pr-4">
+                {loadingPrescriptions ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Carregando prescrições...
+                  </div>
+                ) : prescriptions.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Pill className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>Nenhuma prescrição adicionada</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {prescriptions.map((prescription: any) => (
+                      <Card key={prescription.id} className="p-3">
+                        <div className="space-y-2">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <p className="font-medium text-sm">{prescription.medication}</p>
+                              <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                                <p><strong>Posologia:</strong> {prescription.dosage}</p>
+                                <p><strong>Frequência:</strong> {prescription.frequency}</p>
+                                <p><strong>Duração:</strong> {prescription.duration}</p>
+                                <p><strong>Quantidade:</strong> {prescription.quantity}</p>
+                                {prescription.instructions && (
+                                  <p><strong>Instruções:</strong> {prescription.instructions}</p>
+                                )}
+                              </div>
+                              <Badge 
+                                variant={
+                                  prescription.status === "dispensed" 
+                                    ? "default" 
+                                    : prescription.status === "cancelled" 
+                                    ? "destructive" 
+                                    : "secondary"
+                                }
+                                className="mt-2"
+                                data-testid={`badge-prescription-status-${prescription.id}`}
+                              >
+                                {prescription.status === "pending" && "Pendente"}
+                                {prescription.status === "dispensed" && "Dispensado"}
+                                {prescription.status === "cancelled" && "Cancelado"}
+                              </Badge>
+                            </div>
+                            <div className="flex gap-1 ml-2">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleEditPrescription(prescription)}
+                                data-testid={`button-edit-prescription-${prescription.id}`}
+                              >
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setDeletePrescriptionId(prescription.id)}
+                                data-testid={`button-delete-prescription-${prescription.id}`}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
             </CardContent>
           </Card>
         </div>
@@ -1028,6 +1215,40 @@ export default function MedicalAttendance() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog para Adicionar/Editar Prescrição */}
+      <PrescriptionForm
+        open={prescriptionDialogOpen}
+        onOpenChange={setPrescriptionDialogOpen}
+        prescription={editingPrescription}
+        onSave={handleSavePrescription}
+        isLoading={createPrescriptionMutation.isPending || updatePrescriptionMutation.isPending}
+      />
+
+      {/* AlertDialog para Confirmar Exclusão de Prescrição */}
+      <AlertDialog 
+        open={!!deletePrescriptionId} 
+        onOpenChange={(open) => !open && setDeletePrescriptionId(null)}
+      >
+        <AlertDialogContent data-testid="alert-delete-prescription">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta prescrição? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="alert-cancel">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletePrescriptionId && deletePrescriptionMutation.mutate(deletePrescriptionId)}
+              disabled={deletePrescriptionMutation.isPending}
+              data-testid="alert-confirm"
+            >
+              {deletePrescriptionMutation.isPending ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
