@@ -30,6 +30,7 @@ import seedSIGTAPMappings from "./seed-sigtap";
 import { authenticateUser, requireAuth, requireRole } from "./auth";
 import aiRoutes from "./routes-ai";
 import { generatePrescriptionPDF, generateMedicalCertificatePDF } from "./services/pdf-generator";
+import { CareLineResolutionService } from "./services/care-line-resolution";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
@@ -360,6 +361,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Consulta não encontrada" });
       }
       res.json(consultation);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // DYNAMIC FORMS - Auto-detect care line and template for consultation
+  app.get("/api/consultations/:id/dynamic-form", async (req, res) => {
+    try {
+      const sessionUnitId = req.session?.user?.unitId;
+      if (!sessionUnitId) {
+        return res.status(401).json({ error: "Unidade não identificada na sessão" });
+      }
+
+      // SECURITY: First verify consultation ownership via storage
+      const consultation = await storage.getConsultationById(req.params.id);
+      if (!consultation) {
+        return res.status(404).json({ error: "Consulta não encontrada" });
+      }
+
+      if (consultation.unitId !== sessionUnitId) {
+        return res.status(403).json({ error: "Acesso negado: consulta de outra unidade" });
+      }
+
+      // Resolve care line using server-side algorithm (MULTI-TENANT SECURE)
+      const resolution = await CareLineResolutionService.resolveForConsultation(
+        req.params.id,
+        sessionUnitId
+      );
+
+      // Fetch template fields if template exists (already scoped by care line which is unit-validated)
+      let fields: any[] = [];
+      if (resolution.template) {
+        fields = await storage.getTemplateFieldsByTemplateId(resolution.template.id);
+      }
+
+      // Fetch existing field data (scoped by consultation which is already validated)
+      const fieldData = await storage.getConsultationFieldData(req.params.id);
+
+      res.json({
+        careLine: resolution.careLine,
+        template: resolution.template,
+        fields,
+        fieldData,
+        matchReason: resolution.matchReason,
+        matchDetails: resolution.matchDetails,
+      });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

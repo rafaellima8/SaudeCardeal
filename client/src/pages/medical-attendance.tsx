@@ -208,29 +208,9 @@ export default function MedicalAttendance() {
     enabled: !!consultationId,
   });
 
-  // Buscar care lines disponíveis
-  const { data: careLines = [] } = useQuery({
-    queryKey: ["/api/care-lines"],
-    queryFn: () => apiRequest("GET", "/api/care-lines?active=true"),
-  });
-
-  // Buscar template da linha de cuidado (DEMO: usando pré-natal como exemplo)
-  const prenatalCareLine = careLines.find((cl: any) => cl.code === "PRENATAL");
-  
-  const { data: consultationTemplates = [] } = useQuery({
-    queryKey: ["/api/consultation-templates", prenatalCareLine?.id],
-    queryFn: () => apiRequest("GET", `/api/consultation-templates?careLineId=${prenatalCareLine.id}`),
-    enabled: !!prenatalCareLine?.id,
-  });
-
-  const activeTemplate = consultationTemplates[0];
-
-  // Buscar field data existente da consulta
-  const { data: existingFieldData = [] } = useQuery({
-    queryKey: ["/api/consultations", consultationId, "field-data"],
-    queryFn: () => apiRequest("GET", `/api/consultations/${consultationId}/field-data`),
-    enabled: !!consultationId && !!activeTemplate,
-  });
+  // Dynamic forms are now auto-detected server-side based on:
+  // 1. Consultation context (diagnosis, specialty, patient age/gender)
+  // 2. No more hard-coded templates - DynamicConsultationForm handles everything
 
   // Form setup
   const form = useForm<SOAPFormData>({
@@ -1361,40 +1341,10 @@ export default function MedicalAttendance() {
                     </TabsContent>
 
                     <TabsContent value="dynamic" className="space-y-4 mt-4">
-                      {activeTemplate && prenatalCareLine ? (
+                      {consultationId ? (
                         <div className="space-y-4">
-                          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-                            <div className="flex items-start gap-3">
-                              <ClipboardList className="h-5 w-5 text-primary mt-0.5" />
-                              <div className="flex-1">
-                                <h4 className="font-semibold text-sm mb-1">
-                                  {activeTemplate.name}
-                                </h4>
-                                <p className="text-sm text-muted-foreground">
-                                  {activeTemplate.description || "Formulário específico por especialidade"}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-
                           <DynamicConsultationForm
-                            templateId={activeTemplate.id}
-                            careLineId={prenatalCareLine.id}
-                            specialtyId={prenatalCareLine.specialtyId}
                             consultationId={consultationId}
-                            initialData={existingFieldData}
-                            onSubmit={(formData) => {
-                              // Convert form data to field data array format
-                              const fieldData = Object.entries(formData).map(([fieldId, value]) => ({
-                                fieldId,
-                                value,
-                              }));
-                              
-                              saveDynamicFormMutation.mutate({
-                                fieldData,
-                                templateId: activeTemplate.id,
-                              });
-                            }}
                             onProtocolsTriggered={(protocols) => {
                               if (protocols.length > 0) {
                                 const criticalCount = protocols.filter((p: any) => p.alertLevel === "critical").length;
@@ -1414,22 +1364,9 @@ export default function MedicalAttendance() {
                       ) : (
                         <div className="rounded-lg border p-6 text-center">
                           <ClipboardList className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                          <h3 className="font-semibold mb-2">Nenhuma Linha de Cuidado Detectada</h3>
-                          <p className="text-sm text-muted-foreground mb-4">
-                            O sistema de formulários específicos está disponível para consultas de:
-                          </p>
-                          <ul className="text-sm text-muted-foreground space-y-2 max-w-md mx-auto text-left">
-                            <li className="flex items-center gap-2">
-                              <CheckCircle2 className="h-4 w-4 text-green-600" />
-                              <strong>Pré-natal:</strong> DUM, IG, altura uterina, BCF, movimentos fetais
-                            </li>
-                            <li className="flex items-center gap-2">
-                              <CheckCircle2 className="h-4 w-4 text-green-600" />
-                              <strong>Diabetes:</strong> Glicemia, HbA1c, ajuste de insulina
-                            </li>
-                          </ul>
-                          <p className="text-xs text-muted-foreground mt-6">
-                            💡 Para usar os formulários específicos, vincule o paciente a uma linha de cuidado
+                          <h3 className="font-semibold mb-2">Aguardando Consulta</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Selecione um paciente da fila para iniciar o atendimento
                           </p>
                         </div>
                       )}

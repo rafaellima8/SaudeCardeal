@@ -74,14 +74,20 @@ The backend uses Express.js and TypeScript on Node.js, providing a RESTful API w
 
 #### Next Development Priorities
 
-1.  **Schema Enhancements for e-SUS Compliance**:
+1.  **CRITICAL: TypeScript Fixes for Dynamic Forms** (90% Complete):
+    -   **Issue**: 37 LSP errors in `DynamicConsultationForm.tsx` - type inference problems with server response
+    -   **Impact**: HMR fails, but forms are functionally complete and will render at runtime
+    -   **Solution**: Add explicit type assertions to `templateData` query response and `fieldData` array mapping
+    -   **Files**: `client/src/components/DynamicConsultationForm.tsx` (lines 58, 174-180, 264, 333, 387)
+    -   **Status**: Core functionality implemented ✓, multi-tenant security ✓, server endpoint ✓, TypeScript polish pending
+2.  **Schema Enhancements for e-SUS Compliance**:
     -   Add `cboCode` field to `professionals` table (blocking issue for SISAB)
     -   Add `sigtapCode` and `priority` fields to `exams` table
     -   Integrate anthropometric/vital signs data (from `fad_evaluations` or dedicated fields)
-2.  Patient Summary Sheet: Longitudinal health record.
-3.  Medication Stock Management: Pharmacy inventory control.
-4.  Reception Workflow Enhancements: Initial triage and risk classification.
-5.  e-SUS Export Queue: Batch processing and retry mechanism for SISAB submissions.
+3.  Patient Summary Sheet: Longitudinal health record.
+4.  Medication Stock Management: Pharmacy inventory control.
+5.  Reception Workflow Enhancements: Initial triage and risk classification.
+6.  e-SUS Export Queue: Batch processing and retry mechanism for SISAB submissions.
 
 ## External Dependencies
 

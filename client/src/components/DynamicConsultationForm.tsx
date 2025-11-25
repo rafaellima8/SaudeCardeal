@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { TemplateField, ConsultationTemplate, ClinicalProtocol } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
 import {
   Form,
   FormControl,
@@ -54,6 +55,7 @@ export function DynamicConsultationForm({
     matchDetails?: string;
   }>({
     queryKey: ["/api/consultations", consultationId, "dynamic-form"],
+    queryFn: () => apiRequest("GET", `/api/consultations/${consultationId}/dynamic-form`),
     enabled: !!consultationId,
   });
 
@@ -162,17 +164,34 @@ export function DynamicConsultationForm({
     return z.object(schemaFields);
   };
 
-  // Initialize form with dynamic schema
+  // Initialize form with dynamic schema and server-resolved field data
   const formSchema = templateData?.fields ? buildValidationSchema(templateData.fields) : z.object({});
   
-  const form = useForm<z.infer<typeof formSchema>>({
+  // Build defaultValues from templateData.fieldData
+  const buildDefaultValues = (): Record<string, any> => {
+    if (!templateData?.fieldData || !Array.isArray(templateData.fieldData)) return {};
+    
+    const defaults: Record<string, any> = {};
+    templateData.fieldData.forEach((item) => {
+      if (item && typeof item === 'object' && 'fieldId' in item && 'value' in item) {
+        defaults[item.fieldId as string] = item.value;
+      }
+    });
+    
+    return defaults;
+  };
+  
+  const form = useForm({
     resolver: zodResolver(formSchema),
-    defaultValues: initialData,
+    defaultValues: buildDefaultValues(),
   });
 
   // Evaluate clinical protocols whenever form data changes (with debounce)
   useEffect(() => {
-    if (!templateData?.fields || !careLineId) return;
+    if (!templateData?.fields || !templateData?.careLine?.id) return;
+
+    const careLineId = templateData.careLine.id;
+    const specialtyId = templateData.careLine.specialtyId || undefined;
 
     let timeoutId: NodeJS.Timeout;
 
@@ -208,7 +227,7 @@ export function DynamicConsultationForm({
       clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
-  }, [form, templateData, careLineId, specialtyId, onProtocolsTriggered]);
+  }, [form, templateData, onProtocolsTriggered]);
 
   // Handle form submission
   const handleSubmit = (data: Record<string, any>) => {
@@ -239,7 +258,7 @@ export function DynamicConsultationForm({
     );
   }
 
-  const { template, fields, matchReason, matchDetails, careLine } = templateData;
+  const { template, fields = [], matchReason, matchDetails, careLine } = templateData || {};
 
   // No template matched
   if (!template || matchReason === "none") {

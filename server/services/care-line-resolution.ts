@@ -79,36 +79,33 @@ export class CareLineResolutionService {
         .filter(Boolean) as string[];
 
       if (codes.length > 0) {
-        // SECURITY: First get matching diagnoses, then verify care line belongs to unit
-        const diagnosisMappings = await db.query.careLineDiagnoses.findMany({
-          where: and(
-            inArray(schema.careLineDiagnoses.diagnosisCode, codes),
-            inArray(
-              schema.careLineDiagnoses.diagnosisType,
-              problems.some(p => p.ciap2Code) ? ["ciap2"] : ["cid10"]
-            )
-          ),
-          orderBy: [desc(schema.careLineDiagnoses.priority)],
-        });
-
-        for (const mapping of diagnosisMappings) {
-          // Verify care line belongs to same unit
-          const careLine = await db.query.careLines.findFirst({
-            where: and(
-              eq(schema.careLines.id, mapping.careLineId),
-              eq(schema.careLines.unitId, unitId), // SECURITY: unit validation
+        // SECURITY: Get matching diagnoses, filtering by unit via JOIN
+        const diagnosisMappings = await db
+          .select({
+            careLineId: schema.careLineDiagnoses.careLineId,
+            diagnosisCode: schema.careLineDiagnoses.diagnosisCode,
+            priority: schema.careLineDiagnoses.priority,
+          })
+          .from(schema.careLineDiagnoses)
+          .innerJoin(
+            schema.careLines,
+            and(
+              eq(schema.careLines.id, schema.careLineDiagnoses.careLineId),
+              eq(schema.careLines.unitId, unitId), // SECURITY: unit filter via JOIN
               eq(schema.careLines.active, true)
-            ),
-          });
+            )
+          )
+          .where(inArray(schema.careLineDiagnoses.diagnosisCode, codes))
+          .orderBy(desc(schema.careLineDiagnoses.priority));
 
-          if (careLine) {
-            return await this.loadCareLineWithTemplate(
-              mapping.careLineId,
-              unitId,
-              "diagnosis",
-              `Matched diagnosis code: ${mapping.diagnosisCode}`
-            );
-          }
+        if (diagnosisMappings.length > 0) {
+          const mapping = diagnosisMappings[0];
+          return await this.loadCareLineWithTemplate(
+            mapping.careLineId,
+            unitId,
+            "diagnosis",
+            `Matched diagnosis code: ${mapping.diagnosisCode}`
+          );
         }
       }
     }
@@ -155,7 +152,7 @@ export class CareLineResolutionService {
       }
     }
 
-    // 4. Check age/gender triggers (MULTI-TENANT SECURE)
+    // 4. Check age/gender triggers (MULTI-TENANT SECURE with JOIN)
     const citizen = await db.query.citizens.findFirst({
       where: eq(schema.citizens.id, consultation.citizenId),
     });
@@ -164,27 +161,28 @@ export class CareLineResolutionService {
       const age = this.calculateAge(citizen.birthDate);
       const gender = citizen.gender;
 
-      const triggers = await db.query.careLineTriggers.findMany({
-        where: and(
-          eq(schema.careLineTriggers.active, true),
-          inArray(schema.careLineTriggers.triggerType, ["age_range", "gender"])
-        ),
-        orderBy: [desc(schema.careLineTriggers.priority)],
-      });
+      // SECURITY: Filter triggers by unit via JOIN to careLines
+      const triggers = await db
+        .select({
+          careLineId: schema.careLineTriggers.careLineId,
+          triggerType: schema.careLineTriggers.triggerType,
+          triggerValue: schema.careLineTriggers.triggerValue,
+          priority: schema.careLineTriggers.priority,
+        })
+        .from(schema.careLineTriggers)
+        .innerJoin(
+          schema.careLines,
+          and(
+            eq(schema.careLines.id, schema.careLineTriggers.careLineId),
+            eq(schema.careLines.unitId, unitId), // SECURITY: unit filter via JOIN
+            eq(schema.careLines.active, true)
+          )
+        )
+        .where(eq(schema.careLineTriggers.active, true))
+        .orderBy(desc(schema.careLineTriggers.priority));
 
       for (const trigger of triggers) {
         const criteria = JSON.parse(trigger.triggerValue);
-
-        // SECURITY: Verify trigger's care line belongs to unit before matching
-        const careLine = await db.query.careLines.findFirst({
-          where: and(
-            eq(schema.careLines.id, trigger.careLineId),
-            eq(schema.careLines.unitId, unitId), // SECURITY: unit validation
-            eq(schema.careLines.active, true)
-          ),
-        });
-
-        if (!careLine) continue; // Skip if care line not in this unit
 
         if (trigger.triggerType === "age_range") {
           if (age >= criteria.minAge && age <= criteria.maxAge) {
