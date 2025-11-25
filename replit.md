@@ -71,6 +71,17 @@ The backend uses Express.js and TypeScript on Node.js, providing a RESTful API w
     -   **Documentation**: Complete specification in `server/services/ESUS_EXPORT_README.md` detailing FAI structure, mandatory fields, and integration roadmap.
     -   **Known Gaps**: CBO professional field, anthropometric data, and SIGTAP exam codes require schema enhancements (documented with TODOs).
     -   **Future Roadmap**: Export queue system, batch processing, digital signature, direct DATASUS integration, and additional e-SUS forms (cadastro, visita domiciliar, atividade coletiva).
+-   **Care-Line Queue System**: Specialty-specific intelligent queue management for referrals and triagem:
+    -   **Database Schema**: `attendance_queue` table enhanced with `careLineId`, `referralReason`, `clinicalRisk` fields for care-line based routing.
+    -   **Storage Layer**: `getAttendanceQueueByCareLine()` method filters queue by unit + care line with multi-tenant security.
+    -   **API Endpoint**: `GET /api/care-line-queue/:careLineId` with sessionUnitId enforcement (prevents cross-unit access).
+    -   **Security**: All endpoints validate `req.session.user.unitId` at controller layer for data isolation.
+-   **Clinical Protocol Alerts**: Automated clinical decision support with real-time alert triggering:
+    -   **Protocol Evaluation**: `ProtocolAlertService` evaluates consultations against active clinical protocols (vital signs, age, gender, diagnoses CIAP-2/CID-10).
+    -   **Transactional Consistency**: Service uses shared SQLite instance (no database-locked errors, deterministic alert generation).
+    -   **Integration**: Wired into 4 consultation endpoints (`POST /api/consultations`, `POST /api/consultations-with-prescriptions`, `PUT /api/consultations/:id`, `POST /api/consultations/:id/finalize`).
+    -   **Response Format**: All endpoints return `alerts` array with triggered protocols (protocolId, alertLevel, message, triggeredData).
+    -   **Database Tables**: `clinical_protocols`, `protocol_alerts`, `specialty_indicators` ready for CRUD operations (UI integration pending).
 
 #### Next Development Priorities
 
