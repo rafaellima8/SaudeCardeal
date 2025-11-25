@@ -29,30 +29,32 @@ import { AlertCircle, AlertTriangle, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface DynamicConsultationFormProps {
-  templateId: string;
-  careLineId?: string;
-  specialtyId?: string;
+  consultationId: string;
   initialData?: Record<string, any>;
   onSubmit?: (data: Record<string, any>) => void;
   onProtocolsTriggered?: (protocols: ClinicalProtocol[]) => void;
 }
 
 export function DynamicConsultationForm({
-  templateId,
-  careLineId,
-  specialtyId,
+  consultationId,
   initialData = {},
   onSubmit,
   onProtocolsTriggered,
 }: DynamicConsultationFormProps) {
   const [triggeredProtocols, setTriggeredProtocols] = useState<ClinicalProtocol[]>([]);
 
-  // Fetch template with fields
+  // Fetch template with SERVER-SIDE resolution (no more hard-coded templateId!)
   const { data: templateData, isLoading } = useQuery<{
-    template: ConsultationTemplate;
+    careLineId: string | null;
+    careLine: any | null;
+    template: ConsultationTemplate | null;
     fields: TemplateField[];
+    fieldData: any[];
+    matchReason: "explicit" | "diagnosis" | "specialty" | "trigger" | "none";
+    matchDetails?: string;
   }>({
-    queryKey: ["/api/consultation-templates", templateId, "with-fields"],
+    queryKey: ["/api/consultations", consultationId, "dynamic-form"],
+    enabled: !!consultationId,
   });
 
   // Build dynamic Zod schema based on template fields
@@ -231,16 +233,50 @@ export function DynamicConsultationForm({
         <AlertCircle className="h-4 w-4" />
         <AlertTitle>Erro</AlertTitle>
         <AlertDescription>
-          Template não encontrado. Verifique se o sistema está configurado corretamente.
+          Não foi possível carregar o formulário dinâmico. Verifique sua conexão.
         </AlertDescription>
       </Alert>
     );
   }
 
-  const { template, fields } = templateData;
+  const { template, fields, matchReason, matchDetails, careLine } = templateData;
+
+  // No template matched
+  if (!template || matchReason === "none") {
+    return (
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertTitle>Formulário Específico Não Disponível</AlertTitle>
+        <AlertDescription>
+          Nenhuma linha de cuidado específica foi detectada para esta consulta.
+          Utilize os campos SOAP padrão para registro da consulta.
+          {matchDetails && <p className="mt-2 text-sm">{matchDetails}</p>}
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   return (
     <div className="space-y-6">
+      {/* Care Line Detection Banner */}
+      {matchReason !== "explicit" && careLine && (
+        <Alert variant="default" className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+          <Info className="h-4 w-4 text-blue-600" />
+          <AlertTitle className="text-blue-900 dark:text-blue-100">
+            Formulário Detectado Automaticamente
+          </AlertTitle>
+          <AlertDescription className="text-blue-800 dark:text-blue-200">
+            <strong>Linha de Cuidado:</strong> {careLine.name}
+            <br />
+            <strong>Motivo:</strong>{" "}
+            {matchReason === "diagnosis" && "Diagnóstico compatível identificado"}
+            {matchReason === "specialty" && "Especialidade do profissional"}
+            {matchReason === "trigger" && "Perfil do paciente (idade/gênero)"}
+            {matchDetails && <span className="ml-1">({matchDetails})</span>}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Template Header */}
       <div>
         <h3 className="text-lg font-semibold">{template.name}</h3>

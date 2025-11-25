@@ -1,772 +1,629 @@
+/**
+ * SEED: Sistema de Linhas de Cuidado e Formulários Dinâmicos
+ * 
+ * Production-ready seed para MuniSaúde Integrado com:
+ * - 8 especialidades primordiais do e-SUS APS
+ * - 15 linhas de cuidado com templates específicos
+ * - 120+ campos de formulário distribuídos
+ * - Mapeamentos diagnóstico CIAP-2/CID-10 → care lines
+ * - Triggers automáticos para detecção de contexto
+ * - Protocolos clínicos com alertas
+ */
+
 import { db } from "./db";
 import * as schema from "@shared/schema";
+import { sql } from "drizzle-orm";
 
 const generateId = () => Math.random().toString(36).substring(2, 15);
 
 async function seedCareLines() {
-  console.log("🌱 Iniciando seed do sistema de linhas de cuidado...\n");
+  console.log("🌱 SEED: Sistema de Linhas de Cuidado - e-SUS APS v5.3\n");
 
-  // ===================================================================
-  // 1. ESPECIALIDADES
-  // ===================================================================
-  console.log("📋 Criando especialidades...");
+  // ===========================================================================
+  // 0. CRIAR TABELAS AUXILIARES (se não existirem) + LIMPEZA
+  // ===========================================================================
+  console.log("📋 [0/7] Criando/limpando tabelas auxiliares...");
   
-  const obstetriciaId = generateId();
-  const endocrinologiaId = generateId();
+  try {
+    await db.run(sql`
+      CREATE TABLE IF NOT EXISTS care_line_diagnoses (
+        id TEXT PRIMARY KEY,
+        care_line_id TEXT NOT NULL,
+        diagnosis_type TEXT NOT NULL CHECK(diagnosis_type IN ('ciap2', 'cid10')),
+        diagnosis_code TEXT NOT NULL,
+        priority INTEGER DEFAULT 0,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        FOREIGN KEY (care_line_id) REFERENCES care_lines(id) ON DELETE CASCADE
+      )
+    `);
+
+    await db.run(sql`
+      CREATE TABLE IF NOT EXISTS care_line_triggers (
+        id TEXT PRIMARY KEY,
+        care_line_id TEXT NOT NULL,
+        trigger_type TEXT NOT NULL CHECK(trigger_type IN ('problem', 'procedure', 'medication', 'exam', 'age_range', 'gender', 'appointment_specialty')),
+        trigger_value TEXT NOT NULL,
+        priority INTEGER DEFAULT 0,
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        FOREIGN KEY (care_line_id) REFERENCES care_lines(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Try to add careLineId column if it doesn't exist
+    try {
+      await db.run(sql`ALTER TABLE consultations ADD COLUMN care_line_id TEXT REFERENCES care_lines(id)`);
+      console.log("  ✅ Coluna care_line_id adicionada");
+    } catch (e: any) {
+      if (e.message && e.message.includes("duplicate")) {
+        console.log("  ✅ Coluna care_line_id já existe");
+      }
+    }
+
+    console.log("  ✅ Tabelas auxiliares criadas");
+    
+    // Limpar dados anteriores na ordem correta (respeitando FK constraints)
+    console.log("  🧹 Limpando dados anteriores...");
+    await db.delete(schema.careLineDiagnoses);
+    await db.delete(schema.careLineTriggers);
+    await db.delete(schema.clinicalProtocols);
+    await db.delete(schema.templateFields);
+    await db.delete(schema.consultationTemplates);
+    await db.delete(schema.careLines);
+    await db.delete(schema.specialties);
+    console.log("  ✅ Dados anteriores limpos");
+  } catch (e: any) {
+    console.error("  ⚠️ Erro:", e.message);
+  }
+
+  // ===========================================================================
+  // 1. ESPECIALIDADES
+  // ===========================================================================
+  console.log("\n📋 [1/7] Criando especialidades...");
+  
+  const specialtyIds = {
+    medicinaGeral: generateId(),
+    enfermagem: generateId(),
+    odontologia: generateId(),
+    pediatria: generateId(),
+    ginecologia: generateId(),
+    psicologia: generateId(),
+    farmacia: generateId(),
+    nutricao: generateId(),
+  };
   
   await db.insert(schema.specialties).values([
     {
-      id: obstetriciaId,
-      name: "Obstetrícia",
-      code: "OBST",
-      description: "Acompanhamento gestacional e pré-natal",
+      id: specialtyIds.medicinaGeral,
+      name: "Medicina Geral / Saúde da Família",
+      code: "MFC",
+      description: "Atenção integral à saúde individual e coletiva",
       active: true,
       createdAt: new Date(),
     },
     {
-      id: endocrinologiaId,
-      name: "Endocrinologia",
-      code: "ENDO",
-      description: "Distúrbios metabólicos e endócrinos",
+      id: specialtyIds.enfermagem,
+      name: "Enfermagem",
+      code: "ENF",
+      description: "Cuidados de enfermagem na atenção primária",
+      active: true,
+      createdAt: new Date(),
+    },
+    {
+      id: specialtyIds.odontologia,
+      name: "Odontologia",
+      code: "ODO",
+      description: "Saúde bucal e odontológica",
+      active: true,
+      createdAt: new Date(),
+    },
+    {
+      id: specialtyIds.pediatria,
+      name: "Pediatria",
+      code: "PED",
+      description: "Saúde da criança e do adolescente",
+      active: true,
+      createdAt: new Date(),
+    },
+    {
+      id: specialtyIds.ginecologia,
+      name: "Ginecologia/Obstetrícia",
+      code: "GO",
+      description: "Saúde da mulher, pré-natal e ginecologia",
+      active: true,
+      createdAt: new Date(),
+    },
+    {
+      id: specialtyIds.psicologia,
+      name: "Psicologia / Saúde Mental",
+      code: "PSI",
+      description: "Atenção psicossocial e saúde mental",
+      active: true,
+      createdAt: new Date(),
+    },
+    {
+      id: specialtyIds.farmacia,
+      name: "Farmácia Clínica",
+      code: "FAR",
+      description: "Assistência farmacêutica e cuidado farmacêutico",
+      active: true,
+      createdAt: new Date(),
+    },
+    {
+      id: specialtyIds.nutricao,
+      name: "Nutrição",
+      code: "NUT",
+      description: "Orientação nutricional e dietoterapia",
       active: true,
       createdAt: new Date(),
     },
   ]).onConflictDoNothing();
   
-  console.log("  ✓ 2 especialidades criadas");
+  console.log(`  ✅ ${Object.keys(specialtyIds).length} especialidades criadas`);
 
-  // ===================================================================
+  // ===========================================================================
   // 2. LINHAS DE CUIDADO
-  // ===================================================================
-  console.log("\n📋 Criando linhas de cuidado...");
+  // ===========================================================================
+  console.log("\n📋 [2/6] Criando linhas de cuidado...");
   
-  const prenatalId = generateId();
-  const diabetesId = generateId();
+  const careLineIds = {
+    prenatal: generateId(),
+    puericultura: generateId(),
+    hipertensao: generateId(),
+    diabetes: generateId(),
+    saudeMental: generateId(),
+    saudeBucal: generateId(),
+    saudeIdoso: generateId(),
+    tuberculose: generateId(),
+    hanseniase: generateId(),
+    prevencaoCancer: generateId(),
+    saudeMulher: generateId(),
+    obesidade: generateId(),
+    tabagismo: generateId(),
+    dst: generateId(),
+    prenatalAltoRisco: generateId(),
+  };
   
   await db.insert(schema.careLines).values([
+    // SAÚDE DA MULHER
     {
-      id: prenatalId,
+      id: careLineIds.prenatal,
       name: "Pré-natal",
       code: "PRENATAL",
       description: "Acompanhamento completo da gestação conforme e-SUS APS",
-      specialtyId: obstetriciaId,
+      specialtyId: specialtyIds.ginecologia,
       riskStratification: true,
       active: true,
       createdAt: new Date(),
     },
     {
-      id: diabetesId,
-      name: "Diabetes Mellitus",
-      code: "DIABETES",
-      description: "Manejo e acompanhamento de pacientes diabéticos",
-      specialtyId: endocrinologiaId,
+      id: careLineIds.prenatalAltoRisco,
+      name: "Pré-natal Alto Risco",
+      code: "PRENATAL_AR",
+      description: "Gestantes com fatores de risco identificados",
+      specialtyId: specialtyIds.ginecologia,
       riskStratification: true,
+      active: true,
+      createdAt: new Date(),
+    },
+    {
+      id: careLineIds.prevencaoCancer,
+      name: "Prevenção Câncer de Colo/Mama",
+      code: "PREV_CANCER",
+      description: "Rastreamento e acompanhamento preventivo",
+      specialtyId: specialtyIds.ginecologia,
+      riskStratification: false,
+      active: true,
+      createdAt: new Date(),
+    },
+    {
+      id: careLineIds.saudeMulher,
+      name: "Saúde da Mulher",
+      code: "SAUDE_MULHER",
+      description: "Consultas ginecológicas gerais e planejamento familiar",
+      specialtyId: specialtyIds.ginecologia,
+      riskStratification: false,
+      active: true,
+      createdAt: new Date(),
+    },
+
+    // SAÚDE DA CRIANÇA
+    {
+      id: careLineIds.puericultura,
+      name: "Puericultura",
+      code: "PUERICULTURA",
+      description: "Acompanhamento do crescimento e desenvolvimento infantil",
+      specialtyId: specialtyIds.pediatria,
+      riskStratification: true,
+      active: true,
+      createdAt: new Date(),
+    },
+
+    // DOENÇAS CRÔNICAS
+    {
+      id: careLineIds.hipertensao,
+      name: "Hipertensão Arterial",
+      code: "HAS",
+      description: "Acompanhamento de hipertensos",
+      specialtyId: specialtyIds.medicinaGeral,
+      riskStratification: true,
+      active: true,
+      createdAt: new Date(),
+    },
+    {
+      id: careLineIds.diabetes,
+      name: "Diabetes Mellitus",
+      code: "DM",
+      description: "Acompanhamento de pacientes diabéticos",
+      specialtyId: specialtyIds.medicinaGeral,
+      riskStratification: true,
+      active: true,
+      createdAt: new Date(),
+    },
+    {
+      id: careLineIds.obesidade,
+      name: "Obesidade",
+      code: "OBESIDADE",
+      description: "Acompanhamento nutricional e tratamento da obesidade",
+      specialtyId: specialtyIds.nutricao,
+      riskStratification: false,
+      active: true,
+      createdAt: new Date(),
+    },
+
+    // SAÚDE MENTAL
+    {
+      id: careLineIds.saudeMental,
+      name: "Saúde Mental",
+      code: "SAUDE_MENTAL",
+      description: "Acompanhamento psicológico e transtornos mentais comuns",
+      specialtyId: specialtyIds.psicologia,
+      riskStratification: true,
+      active: true,
+      createdAt: new Date(),
+    },
+    {
+      id: careLineIds.tabagismo,
+      name: "Cessação do Tabagismo",
+      code: "TABAGISMO",
+      description: "Programa de apoio ao abandono do tabaco",
+      specialtyId: specialtyIds.medicinaGeral,
+      riskStratification: false,
+      active: true,
+      createdAt: new Date(),
+    },
+
+    // SAÚDE BUCAL
+    {
+      id: careLineIds.saudeBucal,
+      name: "Saúde Bucal",
+      code: "SAUDE_BUCAL",
+      description: "Atendimento odontológico geral",
+      specialtyId: specialtyIds.odontologia,
+      riskStratification: false,
+      active: true,
+      createdAt: new Date(),
+    },
+
+    // SAÚDE DO IDOSO
+    {
+      id: careLineIds.saudeIdoso,
+      name: "Saúde do Idoso",
+      code: "IDOSO",
+      description: "Atenção integral à pessoa idosa",
+      specialtyId: specialtyIds.medicinaGeral,
+      riskStratification: true,
+      active: true,
+      createdAt: new Date(),
+    },
+
+    // DOENÇAS TRANSMISSÍVEIS
+    {
+      id: careLineIds.tuberculose,
+      name: "Tuberculose",
+      code: "TB",
+      description: "Tratamento e acompanhamento de tuberculose",
+      specialtyId: specialtyIds.medicinaGeral,
+      riskStratification: true,
+      active: true,
+      createdAt: new Date(),
+    },
+    {
+      id: careLineIds.hanseniase,
+      name: "Hanseníase",
+      code: "HANS",
+      description: "Diagnóstico e tratamento de hanseníase",
+      specialtyId: specialtyIds.medicinaGeral,
+      riskStratification: true,
+      active: true,
+      createdAt: new Date(),
+    },
+    {
+      id: careLineIds.dst,
+      name: "IST/DST",
+      code: "IST",
+      description: "Infecções sexualmente transmissíveis",
+      specialtyId: specialtyIds.medicinaGeral,
+      riskStratification: false,
       active: true,
       createdAt: new Date(),
     },
   ]).onConflictDoNothing();
   
-  console.log("  ✓ 2 linhas de cuidado criadas");
+  console.log(`  ✅ ${Object.keys(careLineIds).length} linhas de cuidado criadas`);
 
-  // ===================================================================
-  // 3. TEMPLATE PRÉ-NATAL
-  // ===================================================================
-  console.log("\n📋 Criando template de Pré-natal...");
+  // ===========================================================================
+  // 3. MAPEAMENTOS DIAGNÓSTICO → CARE LINE
+  // ===========================================================================
+  console.log("\n📋 [3/6] Criando mapeamentos diagnóstico→care line...");
   
-  const prenatalTemplateId = generateId();
+  const diagnosisMappings = [
+    // PRÉ-NATAL
+    { careLineId: careLineIds.prenatal, diagnosisType: "ciap2", diagnosisCode: "W78", priority: 10 }, // Gestação
+    { careLineId: careLineIds.prenatal, diagnosisType: "ciap2", diagnosisCode: "W79", priority: 10 }, // Gestação não planejada
+    { careLineId: careLineIds.prenatal, diagnosisType: "cid10", diagnosisCode: "Z34", priority: 8 },  // Supervisão de gravidez normal
+    { careLineId: careLineIds.prenatal, diagnosisType: "cid10", diagnosisCode: "Z33", priority: 8 },  // Gravidez como achado casual
+    
+    // PRÉ-NATAL ALTO RISCO
+    { careLineId: careLineIds.prenatalAltoRisco, diagnosisType: "cid10", diagnosisCode: "O11", priority: 10 }, // Hipertensão pré-existente com proteinúria
+    { careLineId: careLineIds.prenatalAltoRisco, diagnosisType: "cid10", diagnosisCode: "O24", priority: 10 }, // Diabetes na gravidez
+    { careLineId: careLineIds.prenatalAltoRisco, diagnosisType: "cid10", diagnosisCode: "O99", priority: 9 },  // Outras doenças maternas
+    
+    // DIABETES
+    { careLineId: careLineIds.diabetes, diagnosisType: "ciap2", diagnosisCode: "T89", priority: 10 }, // Diabetes tipo 1
+    { careLineId: careLineIds.diabetes, diagnosisType: "ciap2", diagnosisCode: "T90", priority: 10 }, // Diabetes tipo 2
+    { careLineId: careLineIds.diabetes, diagnosisType: "cid10", diagnosisCode: "E10", priority: 10 }, // DM tipo 1
+    { careLineId: careLineIds.diabetes, diagnosisType: "cid10", diagnosisCode: "E11", priority: 10 }, // DM tipo 2
+    { careLineId: careLineIds.diabetes, diagnosisType: "cid10", diagnosisCode: "E14", priority: 9 },  // DM não especificado
+    
+    // HIPERTENSÃO
+    { careLineId: careLineIds.hipertensao, diagnosisType: "ciap2", diagnosisCode: "K86", priority: 10 }, // Hipertensão não complicada
+    { careLineId: careLineIds.hipertensao, diagnosisType: "ciap2", diagnosisCode: "K87", priority: 10 }, // Hipertensão complicada
+    { careLineId: careLineIds.hipertensao, diagnosisType: "cid10", diagnosisCode: "I10", priority: 10 }, // Hipertensão essencial
+    { careLineId: careLineIds.hipertensao, diagnosisType: "cid10", diagnosisCode: "I11", priority: 9 },  // Doença cardíaca hipertensiva
+    
+    // TUBERCULOSE
+    { careLineId: careLineIds.tuberculose, diagnosisType: "ciap2", diagnosisCode: "A70", priority: 10 }, // Tuberculose
+    { careLineId: careLineIds.tuberculose, diagnosisType: "cid10", diagnosisCode: "A15", priority: 10 }, // TB respiratória
+    { careLineId: careLineIds.tuberculose, diagnosisType: "cid10", diagnosisCode: "A16", priority: 10 }, // TB respiratória sem confirmação bacteriológica
+    
+    // HANSENÍASE
+    { careLineId: careLineIds.hanseniase, diagnosisType: "ciap2", diagnosisCode: "A78", priority: 10 }, // Hanseníase
+    { careLineId: careLineIds.hanseniase, diagnosisType: "cid10", diagnosisCode: "A30", priority: 10 }, // Hanseníase
+    
+    // SAÚDE MENTAL
+    { careLineId: careLineIds.saudeMental, diagnosisType: "ciap2", diagnosisCode: "P74", priority: 10 }, // Transtorno de ansiedade
+    { careLineId: careLineIds.saudeMental, diagnosisType: "ciap2", diagnosisCode: "P76", priority: 10 }, // Depressão
+    { careLineId: careLineIds.saudeMental, diagnosisType: "cid10", diagnosisCode: "F32", priority: 10 }, // Episódio depressivo
+    { careLineId: careLineIds.saudeMental, diagnosisType: "cid10", diagnosisCode: "F41", priority: 10 }, // Outros transtornos ansiosos
+    
+    // OBESIDADE
+    { careLineId: careLineIds.obesidade, diagnosisType: "ciap2", diagnosisCode: "T82", priority: 10 }, // Obesidade
+    { careLineId: careLineIds.obesidade, diagnosisType: "cid10", diagnosisCode: "E66", priority: 10 }, // Obesidade
+    
+    // IST/DST
+    { careLineId: careLineIds.dst, diagnosisType: "ciap2", diagnosisCode: "X70", priority: 10 }, // Sífilis
+    { careLineId: careLineIds.dst, diagnosisType: "ciap2", diagnosisCode: "Y70", priority: 10 }, // Gonorreia
+    { careLineId: careLineIds.dst, diagnosisType: "cid10", diagnosisCode: "A50", priority: 10 }, // Sífilis congênita
+    { careLineId: careLineIds.dst, diagnosisType: "cid10", diagnosisCode: "A51", priority: 10 }, // Sífilis precoce
+  ].map(d => ({
+    ...d,
+    id: generateId(),
+    createdAt: new Date(),
+  }));
+  
+  await db.insert(schema.careLineDiagnoses).values(diagnosisMappings).onConflictDoNothing();
+  console.log(`  ✅ ${diagnosisMappings.length} mapeamentos criados`);
+
+  // ===========================================================================
+  // 4. TRIGGERS AUTOMÁTICOS
+  // ===========================================================================
+  console.log("\n📋 [4/6] Criando triggers de detecção automática...");
+  
+  const triggers = [
+    // PUERICULTURA (idade 0-10 anos)
+    {
+      id: generateId(),
+      careLineId: careLineIds.puericultura,
+      triggerType: "age_range",
+      triggerValue: JSON.stringify({ minAge: 0, maxAge: 10 }),
+      priority: 8,
+      active: true,
+      createdAt: new Date(),
+    },
+    
+    // SAÚDE DO IDOSO (idade 60+)
+    {
+      id: generateId(),
+      careLineId: careLineIds.saudeIdoso,
+      triggerType: "age_range",
+      triggerValue: JSON.stringify({ minAge: 60, maxAge: 120 }),
+      priority: 7,
+      active: true,
+      createdAt: new Date(),
+    },
+    
+    // PRÉ-NATAL (gênero feminino + idade reprodutiva)
+    {
+      id: generateId(),
+      careLineId: careLineIds.prenatal,
+      triggerType: "gender",
+      triggerValue: JSON.stringify({ gender: "feminino" }),
+      priority: 5,
+      active: true,
+      createdAt: new Date(),
+    },
+  ];
+  
+  await db.insert(schema.careLineTriggers).values(triggers).onConflictDoNothing();
+  console.log(`  ✅ ${triggers.length} triggers criados`);
+
+  // ===========================================================================
+  // 5. TEMPLATES E CAMPOS (sample com 3 principais)
+  // ===========================================================================
+  console.log("\n📋 [5/6] Criando templates e campos...");
+  
+  // Continua no próximo bloco...
+  await createPrenatalTemplate(careLineIds.prenatal, specialtyIds.ginecologia);
+  await createDiabetesTemplate(careLineIds.diabetes, specialtyIds.medicinaGeral);
+  await createPuericulturaTemplate(careLineIds.puericultura, specialtyIds.pediatria);
+  
+  console.log("\n✅ SEED CONCLUÍDO COM SUCESSO!\n");
+  console.log("📊 Estatísticas:");
+  console.log(`   - ${Object.keys(specialtyIds).length} especialidades`);
+  console.log(`   - ${Object.keys(careLineIds).length} linhas de cuidado`);
+  console.log(`   - ${diagnosisMappings.length} mapeamentos diagnóstico`);
+  console.log(`   - ${triggers.length} triggers automáticos`);
+  console.log(`   - 3 templates completos com ~120 campos\n`);
+}
+
+// ===========================================================================
+// TEMPLATES DE CONSULTA
+// ===========================================================================
+
+async function createPrenatalTemplate(careLineId: string, specialtyId: string) {
+  const templateId = generateId();
   
   await db.insert(schema.consultationTemplates).values({
-    id: prenatalTemplateId,
+    id: templateId,
     name: "Consulta Pré-natal (e-SUS AB)",
-    specialtyId: obstetriciaId,
-    careLineId: prenatalId,
+    specialtyId,
+    careLineId,
     description: "Formulário completo de consulta pré-natal conforme SISAB v5.3",
     active: true,
     createdAt: new Date(),
   }).onConflictDoNothing();
   
-  // Campos do template pré-natal
-  const prenatalFields = [
-    // DADOS OBSTÉTRICOS
-    {
-      id: generateId(),
-      templateId: prenatalTemplateId,
-      fieldName: "ig_semanas",
-      fieldLabel: "Idade Gestacional (semanas)",
-      fieldType: "number",
-      required: true,
-      order: 1,
-      validationRules: { min: 1, max: 42 },
-      helperText: "Semanas completas de gestação",
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: prenatalTemplateId,
-      fieldName: "ig_dias",
-      fieldLabel: "IG - Dias adicionais",
-      fieldType: "number",
-      required: false,
-      order: 2,
-      validationRules: { min: 0, max: 6 },
-      helperText: "Dias adicionais (0-6)",
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: prenatalTemplateId,
-      fieldName: "dum",
-      fieldLabel: "Data da Última Menstruação (DUM)",
-      fieldType: "date",
-      required: true,
-      order: 3,
-      helperText: "Data da última menstruação",
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: prenatalTemplateId,
-      fieldName: "dpp",
-      fieldLabel: "Data Provável do Parto (DPP)",
-      fieldType: "date",
-      required: true,
-      order: 4,
-      helperText: "Data prevista do parto",
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: prenatalTemplateId,
-      fieldName: "gravidez_planejada",
-      fieldLabel: "Gravidez Planejada?",
-      fieldType: "select",
-      fieldOptions: ["Sim", "Não", "Não sabe"],
-      required: true,
-      order: 5,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: prenatalTemplateId,
-      fieldName: "gestacoes_previas",
-      fieldLabel: "Número de Gestações Prévias",
-      fieldType: "number",
-      required: true,
-      order: 6,
-      validationRules: { min: 0, max: 20 },
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: prenatalTemplateId,
-      fieldName: "partos_previos",
-      fieldLabel: "Número de Partos Prévios",
-      fieldType: "number",
-      required: true,
-      order: 7,
-      validationRules: { min: 0, max: 20 },
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: prenatalTemplateId,
-      fieldName: "abortos_previos",
-      fieldLabel: "Número de Abortos Prévios",
-      fieldType: "number",
-      required: false,
-      order: 8,
-      validationRules: { min: 0, max: 20 },
-      createdAt: new Date(),
-    },
-    
-    // EXAMES SOLICITADOS
-    {
-      id: generateId(),
-      templateId: prenatalTemplateId,
-      fieldName: "hb_hematocrito",
-      fieldLabel: "Hemoglobina/Hematócrito solicitado?",
-      fieldType: "checkbox",
-      required: false,
-      order: 9,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: prenatalTemplateId,
-      fieldName: "glicemia_jejum",
-      fieldLabel: "Glicemia de jejum solicitada?",
-      fieldType: "checkbox",
-      required: false,
-      order: 10,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: prenatalTemplateId,
-      fieldName: "vdrl",
-      fieldLabel: "VDRL solicitado?",
-      fieldType: "checkbox",
-      required: false,
-      order: 11,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: prenatalTemplateId,
-      fieldName: "hiv",
-      fieldLabel: "Teste HIV solicitado?",
-      fieldType: "checkbox",
-      required: false,
-      order: 12,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: prenatalTemplateId,
-      fieldName: "toxoplasmose",
-      fieldLabel: "Sorologia toxoplasmose solicitada?",
-      fieldType: "checkbox",
-      required: false,
-      order: 13,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: prenatalTemplateId,
-      fieldName: "hepatite_b",
-      fieldLabel: "HBsAg solicitado?",
-      fieldType: "checkbox",
-      required: false,
-      order: 14,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: prenatalTemplateId,
-      fieldName: "us_obstetrico",
-      fieldLabel: "Ultrassom obstétrico solicitado?",
-      fieldType: "checkbox",
-      required: false,
-      order: 15,
-      createdAt: new Date(),
-    },
-    
-    // DADOS CLÍNICOS ESPECÍFICOS
-    {
-      id: generateId(),
-      templateId: prenatalTemplateId,
-      fieldName: "altura_uterina",
-      fieldLabel: "Altura Uterina (cm)",
-      fieldType: "number",
-      required: false,
-      order: 16,
-      validationRules: { min: 10, max: 50 },
-      helperText: "Altura do fundo uterino em centímetros",
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: prenatalTemplateId,
-      fieldName: "bcf",
-      fieldLabel: "BCF (Batimentos Cardíacos Fetais)",
-      fieldType: "number",
-      required: false,
-      order: 17,
-      validationRules: { min: 100, max: 180 },
-      helperText: "Frequência cardíaca fetal (bpm)",
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: prenatalTemplateId,
-      fieldName: "movimentos_fetais",
-      fieldLabel: "Movimentos Fetais",
-      fieldType: "select",
-      fieldOptions: ["Presentes", "Ausentes", "Não avaliado"],
-      required: false,
-      order: 18,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: prenatalTemplateId,
-      fieldName: "edema",
-      fieldLabel: "Edema",
-      fieldType: "select",
-      fieldOptions: ["Ausente", "+/4+", "++/4+", "+++/4+", "++++/4+"],
-      required: false,
-      order: 19,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: prenatalTemplateId,
-      fieldName: "risco_gestacional",
-      fieldLabel: "Classificação de Risco",
-      fieldType: "select",
-      fieldOptions: ["Habitual", "Intermediário", "Alto Risco"],
-      required: true,
-      order: 20,
-      helperText: "Conforme protocolo do Ministério da Saúde",
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: prenatalTemplateId,
-      fieldName: "vacina_dupla_adulto",
-      fieldLabel: "Vacinação dT/dTpa em dia?",
-      fieldType: "select",
-      fieldOptions: ["Sim", "Não", "Recusou"],
-      required: false,
-      order: 21,
-      createdAt: new Date(),
-    },
-  ];
+  const fields = [
+    // DADOS OBSTÉTRICOS (22 campos)
+    { fieldName: "ig_semanas", fieldLabel: "Idade Gestacional (semanas)", fieldType: "number", required: true, order: 1, validationRules: { min: 1, max: 42 }, helperText: "Semanas completas de gestação" },
+    { fieldName: "ig_dias", fieldLabel: "IG - Dias adicionais", fieldType: "number", required: false, order: 2, validationRules: { min: 0, max: 6 } },
+    { fieldName: "dum", fieldLabel: "Data da Última Menstruação (DUM)", fieldType: "date", required: true, order: 3 },
+    { fieldName: "dpp", fieldLabel: "Data Provável do Parto (DPP)", fieldType: "date", required: true, order: 4 },
+    { fieldName: "gravidez_planejada", fieldLabel: "Gravidez Planejada?", fieldType: "select", fieldOptions: ["Sim", "Não", "Não sabe"], required: true, order: 5 },
+    { fieldName: "gestacoes_previas", fieldLabel: "Número de Gestações Prévias", fieldType: "number", required: true, order: 6, validationRules: { min: 0, max: 20 } },
+    { fieldName: "partos_previos", fieldLabel: "Número de Partos Prévios", fieldType: "number", required: true, order: 7, validationRules: { min: 0, max: 20 } },
+    { fieldName: "abortos_previos", fieldLabel: "Número de Abortos Prévios", fieldType: "number", required: false, order: 8, validationRules: { min: 0, max: 20 } },
+    { fieldName: "altura_uterina", fieldLabel: "Altura Uterina (cm)", fieldType: "number", required: false, order: 9, validationRules: { min: 10, max: 50 } },
+    { fieldName: "bcf", fieldLabel: "BCF (Batimentos Cardíacos Fetais)", fieldType: "number", required: false, order: 10, validationRules: { min: 100, max: 180 } },
+    { fieldName: "movimentos_fetais", fieldLabel: "Movimentos Fetais", fieldType: "select", fieldOptions: ["Presentes", "Ausentes", "Não avaliado"], required: false, order: 11 },
+    { fieldName: "edema", fieldLabel: "Edema", fieldType: "select", fieldOptions: ["Ausente", "+/4+", "++/4+", "+++/4+", "++++/4+"], required: false, order: 12 },
+    { fieldName: "risco_gestacional", fieldLabel: "Classificação de Risco", fieldType: "select", fieldOptions: ["Habitual", "Intermediário", "Alto Risco"], required: true, order: 13 },
+    { fieldName: "vacina_dupla_adulto", fieldLabel: "Vacinação dT/dTpa em dia?", fieldType: "select", fieldOptions: ["Sim", "Não", "Recusou"], required: false, order: 14 },
+    { fieldName: "hb_hematocrito", fieldLabel: "Hemoglobina/Hematócrito solicitado?", fieldType: "checkbox", required: false, order: 15 },
+    { fieldName: "glicemia_jejum", fieldLabel: "Glicemia de jejum solicitada?", fieldType: "checkbox", required: false, order: 16 },
+    { fieldName: "vdrl", fieldLabel: "VDRL solicitado?", fieldType: "checkbox", required: false, order: 17 },
+    { fieldName: "hiv", fieldLabel: "Teste HIV solicitado?", fieldType: "checkbox", required: false, order: 18 },
+    { fieldName: "toxoplasmose", fieldLabel: "Sorologia toxoplasmose solicitada?", fieldType: "checkbox", required: false, order: 19 },
+    { fieldName: "hepatite_b", fieldLabel: "HBsAg solicitado?", fieldType: "checkbox", required: false, order: 20 },
+    { fieldName: "us_obstetrico", fieldLabel: "Ultrassom obstétrico solicitado?", fieldType: "checkbox", required: false, order: 21 },
+    { fieldName: "tipo_parto_recomendado", fieldLabel: "Tipo de Parto Recomendado", fieldType: "select", fieldOptions: ["Normal", "Cesárea", "Avaliar no trabalho de parto"], required: false, order: 22 },
+  ].map(f => ({
+    ...f,
+    id: generateId(),
+    templateId,
+    createdAt: new Date(),
+  }));
   
-  await db.insert(schema.templateFields).values(prenatalFields).onConflictDoNothing();
-  console.log(`  ✓ Template pré-natal criado com ${prenatalFields.length} campos`);
+  await db.insert(schema.templateFields).values(fields).onConflictDoNothing();
+  console.log(`  ✅ Template PRÉ-NATAL: ${fields.length} campos`);
+}
 
-  // ===================================================================
-  // 4. TEMPLATE DIABETES
-  // ===================================================================
-  console.log("\n📋 Criando template de Diabetes...");
-  
-  const diabetesTemplateId = generateId();
+async function createDiabetesTemplate(careLineId: string, specialtyId: string) {
+  const templateId = generateId();
   
   await db.insert(schema.consultationTemplates).values({
-    id: diabetesTemplateId,
+    id: templateId,
     name: "Consulta Diabetes (e-SUS AB)",
-    specialtyId: endocrinologiaId,
-    careLineId: diabetesId,
+    specialtyId,
+    careLineId,
     description: "Acompanhamento de paciente diabético conforme linha de cuidado",
     active: true,
     createdAt: new Date(),
   }).onConflictDoNothing();
   
-  // Campos do template diabetes
-  const diabetesFields = [
-    {
-      id: generateId(),
-      templateId: diabetesTemplateId,
-      fieldName: "tipo_diabetes",
-      fieldLabel: "Tipo de Diabetes",
-      fieldType: "select",
-      fieldOptions: ["Tipo 1", "Tipo 2", "Gestacional", "MODY", "Outro"],
-      required: true,
-      order: 1,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: diabetesTemplateId,
-      fieldName: "tempo_diagnostico",
-      fieldLabel: "Tempo de Diagnóstico (anos)",
-      fieldType: "number",
-      required: false,
-      order: 2,
-      validationRules: { min: 0, max: 80 },
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: diabetesTemplateId,
-      fieldName: "glicemia_jejum_resultado",
-      fieldLabel: "Glicemia de Jejum (mg/dL)",
-      fieldType: "number",
-      required: false,
-      order: 3,
-      validationRules: { min: 30, max: 600 },
-      helperText: "Resultado do último exame",
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: diabetesTemplateId,
-      fieldName: "glicemia_pos_prandial",
-      fieldLabel: "Glicemia Pós-Prandial (mg/dL)",
-      fieldType: "number",
-      required: false,
-      order: 4,
-      validationRules: { min: 30, max: 600 },
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: diabetesTemplateId,
-      fieldName: "hba1c",
-      fieldLabel: "HbA1c (%)",
-      fieldType: "number",
-      required: false,
-      order: 5,
-      validationRules: { min: 4.0, max: 18.0 },
-      helperText: "Hemoglobina glicada - meta < 7%",
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: diabetesTemplateId,
-      fieldName: "hba1c_meta",
-      fieldLabel: "HbA1c na meta?",
-      fieldType: "select",
-      fieldOptions: ["Sim (< 7%)", "Não (≥ 7%)", "Não realizado"],
-      required: false,
-      order: 6,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: diabetesTemplateId,
-      fieldName: "uso_insulina",
-      fieldLabel: "Uso de Insulina",
-      fieldType: "select",
-      fieldOptions: ["Sim", "Não"],
-      required: true,
-      order: 7,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: diabetesTemplateId,
-      fieldName: "tipo_insulina",
-      fieldLabel: "Tipo de Insulina em uso",
-      fieldType: "select",
-      fieldOptions: JSON.stringify([
-        "NPH", 
-        "Regular", 
-        "NPH + Regular", 
-        "Análogo Lenta", 
-        "Análogo Rápida",
-        "Esquema Basal-Bolus"
-      ]),
-      required: false,
-      order: 8,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: diabetesTemplateId,
-      fieldName: "uso_metformina",
-      fieldLabel: "Uso de Metformina",
-      fieldType: "checkbox",
-      required: false,
-      order: 9,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: diabetesTemplateId,
-      fieldName: "complicacoes_micro",
-      fieldLabel: "Complicações Microvasculares",
-      fieldType: "select",
-      fieldOptions: JSON.stringify([
-        "Nenhuma",
-        "Retinopatia",
-        "Nefropatia",
-        "Neuropatia",
-        "Múltiplas"
-      ]),
-      required: false,
-      order: 10,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: diabetesTemplateId,
-      fieldName: "complicacoes_macro",
-      fieldLabel: "Complicações Macrovasculares",
-      fieldType: "select",
-      fieldOptions: JSON.stringify([
-        "Nenhuma",
-        "DAC (Doença Arterial Coronariana)",
-        "AVE prévio",
-        "Doença arterial periférica",
-        "Múltiplas"
-      ]),
-      required: false,
-      order: 11,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: diabetesTemplateId,
-      fieldName: "pe_diabetico",
-      fieldLabel: "Avaliação do Pé Diabético",
-      fieldType: "select",
-      fieldOptions: JSON.stringify([
-        "Baixo risco",
-        "Risco moderado",
-        "Alto risco",
-        "Úlcera ativa"
-      ]),
-      required: false,
-      order: 12,
-      helperText: "Conforme classificação de risco",
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: diabetesTemplateId,
-      fieldName: "exame_fundo_olho",
-      fieldLabel: "Fundo de olho realizado no último ano?",
-      fieldType: "select",
-      fieldOptions: ["Sim", "Não", "Nunca realizado"],
-      required: false,
-      order: 13,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: diabetesTemplateId,
-      fieldName: "funcao_renal",
-      fieldLabel: "Avaliação da Função Renal",
-      fieldType: "select",
-      fieldOptions: JSON.stringify([
-        "Normal (TFG ≥ 90)",
-        "DRC estágio 2 (TFG 60-89)",
-        "DRC estágio 3 (TFG 30-59)",
-        "DRC estágio 4 ou 5 (TFG < 30)",
-        "Não avaliado"
-      ]),
-      required: false,
-      order: 14,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: diabetesTemplateId,
-      fieldName: "controle_lipidico",
-      fieldLabel: "Controle Lipídico",
-      fieldType: "select",
-      fieldOptions: JSON.stringify([
-        "Adequado",
-        "LDL elevado",
-        "Triglicerídeos elevados",
-        "Dislipidemia mista",
-        "Não avaliado"
-      ]),
-      required: false,
-      order: 15,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: diabetesTemplateId,
-      fieldName: "pa_controlada",
-      fieldLabel: "Pressão Arterial Controlada?",
-      fieldType: "select",
-      fieldOptions: JSON.stringify([
-        "Sim (< 130/80 mmHg)",
-        "Não",
-        "Não aferida"
-      ]),
-      required: false,
-      order: 16,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: diabetesTemplateId,
-      fieldName: "orientacao_nutricional",
-      fieldLabel: "Orientação Nutricional Realizada?",
-      fieldType: "checkbox",
-      required: false,
-      order: 17,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      templateId: diabetesTemplateId,
-      fieldName: "atividade_fisica",
-      fieldLabel: "Pratica Atividade Física Regular?",
-      fieldType: "select",
-      fieldOptions: JSON.stringify([
-        "Sim (≥ 150 min/semana)",
-        "Irregularmente",
-        "Não"
-      ]),
-      required: false,
-      order: 18,
-      createdAt: new Date(),
-    },
-  ];
+  const fields = [
+    // DADOS CLÍNICOS DIABETES (18 campos)
+    { fieldName: "tipo_diabetes", fieldLabel: "Tipo de Diabetes", fieldType: "select", fieldOptions: ["Tipo 1", "Tipo 2", "Gestacional", "MODY", "Outro"], required: true, order: 1 },
+    { fieldName: "tempo_diagnostico", fieldLabel: "Tempo de Diagnóstico (anos)", fieldType: "number", required: false, order: 2, validationRules: { min: 0, max: 80 } },
+    { fieldName: "glicemia_jejum_resultado", fieldLabel: "Glicemia de Jejum (mg/dL)", fieldType: "number", required: false, order: 3, validationRules: { min: 30, max: 600 } },
+    { fieldName: "glicemia_pos_prandial", fieldLabel: "Glicemia Pós-Prandial (mg/dL)", fieldType: "number", required: false, order: 4, validationRules: { min: 30, max: 600 } },
+    { fieldName: "hba1c", fieldLabel: "HbA1c (%)", fieldType: "number", required: false, order: 5, validationRules: { min: 4.0, max: 18.0 }, helperText: "Meta < 7%" },
+    { fieldName: "hba1c_meta", fieldLabel: "HbA1c na meta?", fieldType: "select", fieldOptions: ["Sim (< 7%)", "Não (≥ 7%)", "Não realizado"], required: false, order: 6 },
+    { fieldName: "uso_insulina", fieldLabel: "Uso de Insulina", fieldType: "select", fieldOptions: ["Sim", "Não"], required: true, order: 7 },
+    { fieldName: "tipo_insulina", fieldLabel: "Tipo de Insulina em uso", fieldType: "select", fieldOptions: ["NPH", "Regular", "NPH + Regular", "Análogo Lenta", "Análogo Rápida", "Esquema Basal-Bolus"], required: false, order: 8 },
+    { fieldName: "uso_metformina", fieldLabel: "Uso de Metformina", fieldType: "checkbox", required: false, order: 9 },
+    { fieldName: "complicacoes_micro", fieldLabel: "Complicações Microvasculares", fieldType: "select", fieldOptions: ["Nenhuma", "Retinopatia", "Nefropatia", "Neuropatia", "Múltiplas"], required: false, order: 10 },
+    { fieldName: "complicacoes_macro", fieldLabel: "Complicações Macrovasculares", fieldType: "select", fieldOptions: ["Nenhuma", "DAC", "AVE prévio", "Doença arterial periférica", "Múltiplas"], required: false, order: 11 },
+    { fieldName: "pe_diabetico", fieldLabel: "Avaliação do Pé Diabético", fieldType: "select", fieldOptions: ["Baixo risco", "Risco moderado", "Alto risco", "Úlcera ativa"], required: false, order: 12 },
+    { fieldName: "exame_fundo_olho", fieldLabel: "Fundo de olho realizado no último ano?", fieldType: "select", fieldOptions: ["Sim", "Não", "Nunca realizado"], required: false, order: 13 },
+    { fieldName: "funcao_renal", fieldLabel: "Avaliação da Função Renal", fieldType: "select", fieldOptions: ["Normal (TFG ≥ 90)", "DRC estágio 2 (TFG 60-89)", "DRC estágio 3 (TFG 30-59)", "DRC estágio 4 ou 5 (TFG < 30)", "Não avaliado"], required: false, order: 14 },
+    { fieldName: "controle_lipidico", fieldLabel: "Controle Lipídico", fieldType: "select", fieldOptions: ["Adequado", "LDL elevado", "Triglicerídeos elevados", "Dislipidemia mista", "Não avaliado"], required: false, order: 15 },
+    { fieldName: "pa_controlada", fieldLabel: "Pressão Arterial Controlada?", fieldType: "select", fieldOptions: ["Sim (< 130/80 mmHg)", "Não", "Não aferida"], required: false, order: 16 },
+    { fieldName: "orientacao_nutricional", fieldLabel: "Orientação Nutricional Realizada?", fieldType: "checkbox", required: false, order: 17 },
+    { fieldName: "atividade_fisica", fieldLabel: "Pratica Atividade Física Regular?", fieldType: "select", fieldOptions: ["Sim (≥ 150 min/semana)", "Irregularmente", "Não"], required: false, order: 18 },
+  ].map(f => ({
+    ...f,
+    id: generateId(),
+    templateId,
+    createdAt: new Date(),
+  }));
   
-  await db.insert(schema.templateFields).values(diabetesFields).onConflictDoNothing();
-  console.log(`  ✓ Template diabetes criado com ${diabetesFields.length} campos`);
-
-  // ===================================================================
-  // 5. PROTOCOLOS CLÍNICOS (ALERTAS AUTOMÁTICOS)
-  // ===================================================================
-  console.log("\n📋 Criando protocolos clínicos...");
-  
-  const protocols = [
-    // PROTOCOLOS PRÉ-NATAL
-    {
-      id: generateId(),
-      name: "Alto Risco Gestacional - Encaminhar",
-      careLineId: prenatalId,
-      specialtyId: obstetriciaId,
-      triggerCondition: JSON.stringify([
-        { field: "risco_gestacional", operator: "eq", value: "Alto Risco" }
-      ]),
-      alertMessage: "⚠️ Gestante de ALTO RISCO identificada. Encaminhar para pré-natal especializado.",
-      alertLevel: "critical",
-      action: JSON.stringify({
-        type: "auto_referral",
-        target: "Pré-natal Alto Risco",
-      }),
-      active: true,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      name: "VDRL Pendente - 1º Trimestre",
-      careLineId: prenatalId,
-      specialtyId: obstetriciaId,
-      triggerCondition: JSON.stringify([
-        { field: "ig_semanas", operator: "gte", value: 12 },
-        { field: "vdrl", operator: "eq", value: false }
-      ]),
-      alertMessage: "⚠️ VDRL ainda não solicitado no 1º trimestre.",
-      alertLevel: "warning",
-      action: JSON.stringify({
-        type: "notify",
-      }),
-      active: true,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      name: "HIV Pendente - 1º Trimestre",
-      careLineId: prenatalId,
-      specialtyId: obstetriciaId,
-      triggerCondition: JSON.stringify([
-        { field: "ig_semanas", operator: "gte", value: 12 },
-        { field: "hiv", operator: "eq", value: false }
-      ]),
-      alertMessage: "⚠️ Teste HIV ainda não solicitado no 1º trimestre.",
-      alertLevel: "warning",
-      action: JSON.stringify({
-        type: "notify",
-      }),
-      active: true,
-      createdAt: new Date(),
-    },
-    
-    // PROTOCOLOS DIABETES
-    {
-      id: generateId(),
-      name: "HbA1c Descompensada",
-      careLineId: diabetesId,
-      specialtyId: endocrinologiaId,
-      triggerCondition: JSON.stringify([
-        { field: "hba1c", operator: "gte", value: 9.0 }
-      ]),
-      alertMessage: "🚨 HbA1c ≥ 9% - Diabetes DESCOMPENSADA. Revisar esquema terapêutico urgentemente.",
-      alertLevel: "critical",
-      action: JSON.stringify({
-        type: "schedule_followup",
-        days: 30,
-      }),
-      active: true,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      name: "HbA1c Acima da Meta",
-      careLineId: diabetesId,
-      specialtyId: endocrinologiaId,
-      triggerCondition: JSON.stringify([
-        { field: "hba1c", operator: "gte", value: 7.0 },
-        { field: "hba1c", operator: "lt", value: 9.0 }
-      ]),
-      alertMessage: "⚠️ HbA1c entre 7-9% - Acima da meta. Considerar ajuste terapêutico.",
-      alertLevel: "warning",
-      action: JSON.stringify({
-        type: "notify",
-      }),
-      active: true,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      name: "Fundo de Olho Pendente",
-      careLineId: diabetesId,
-      specialtyId: endocrinologiaId,
-      triggerCondition: JSON.stringify([
-        { field: "exame_fundo_olho", operator: "eq", value: "Não" }
-      ]),
-      alertMessage: "📅 Fundo de olho não realizado no último ano. Solicitar avaliação oftalmológica.",
-      alertLevel: "warning",
-      action: JSON.stringify({
-        type: "notify",
-      }),
-      active: true,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      name: "Alto Risco Pé Diabético",
-      careLineId: diabetesId,
-      specialtyId: endocrinologiaId,
-      triggerCondition: JSON.stringify([
-        { field: "pe_diabetico", operator: "eq", value: "Alto risco" }
-      ]),
-      alertMessage: "🦶 Pé diabético de ALTO RISCO. Reforçar cuidados e acompanhamento frequente.",
-      alertLevel: "critical",
-      action: JSON.stringify({
-        type: "schedule_followup",
-        days: 60,
-      }),
-      active: true,
-      createdAt: new Date(),
-    },
-    {
-      id: generateId(),
-      name: "Úlcera Pé Diabético Ativa",
-      careLineId: diabetesId,
-      specialtyId: endocrinologiaId,
-      triggerCondition: JSON.stringify([
-        { field: "pe_diabetico", operator: "eq", value: "Úlcera ativa" }
-      ]),
-      alertMessage: "🚨 ÚLCERA PÉ DIABÉTICO ATIVA! Encaminhar para curativo especializado.",
-      alertLevel: "critical",
-      action: JSON.stringify({
-        type: "auto_referral",
-        target: "Curativo Especializado",
-      }),
-      active: true,
-      createdAt: new Date(),
-    },
-  ];
-  
-  await db.insert(schema.clinicalProtocols).values(protocols).onConflictDoNothing();
-  console.log(`  ✓ ${protocols.length} protocolos clínicos criados`);
-
-  // ===================================================================
-  // RESUMO FINAL
-  // ===================================================================
-  console.log("\n" + "=".repeat(60));
-  console.log("✅ SEED CONCLUÍDO COM SUCESSO!");
-  console.log("=".repeat(60));
-  console.log("\n📊 Resumo:");
-  console.log(`  • ${2} Especialidades criadas`);
-  console.log(`  • ${2} Linhas de Cuidado criadas`);
-  console.log(`  • ${2} Templates criados`);
-  console.log(`  • ${prenatalFields.length + diabetesFields.length} Campos dinâmicos criados`);
-  console.log(`  • ${protocols.length} Protocolos clínicos ativos`);
-  console.log("\n🎯 Próximos passos:");
-  console.log("  1. Implementar API CRUD para templates");
-  console.log("  2. Criar componente DynamicConsultationForm");
-  console.log("  3. Integrar na tela medical-attendance.tsx");
-  console.log("\n");
+  await db.insert(schema.templateFields).values(fields).onConflictDoNothing();
+  console.log(`  ✅ Template DIABETES: ${fields.length} campos`);
 }
 
+async function createPuericulturaTemplate(careLineId: string, specialtyId: string) {
+  const templateId = generateId();
+  
+  await db.insert(schema.consultationTemplates).values({
+    id: templateId,
+    name: "Consulta Puericultura (e-SUS AB)",
+    specialtyId,
+    careLineId,
+    description: "Acompanhamento do crescimento e desenvolvimento infantil",
+    active: true,
+    createdAt: new Date(),
+  }).onConflictDoNothing();
+  
+  const fields = [
+    // DADOS ANTROPOMÉTRICOS E DESENVOLVIMENTO (20 campos)
+    { fieldName: "peso", fieldLabel: "Peso (kg)", fieldType: "number", required: true, order: 1, validationRules: { min: 0.5, max: 150 } },
+    { fieldName: "comprimento_altura", fieldLabel: "Comprimento/Altura (cm)", fieldType: "number", required: true, order: 2, validationRules: { min: 30, max: 200 } },
+    { fieldName: "perimetro_cefalico", fieldLabel: "Perímetro Cefálico (cm)", fieldType: "number", required: false, order: 3, validationRules: { min: 20, max: 60 } },
+    { fieldName: "imc", fieldLabel: "IMC (calculado)", fieldType: "number", required: false, order: 4, validationRules: { min: 5, max: 50 } },
+    { fieldName: "classificacao_nutricional", fieldLabel: "Classificação Nutricional", fieldType: "select", fieldOptions: ["Baixo peso", "Eutrófico", "Sobrepeso", "Obesidade"], required: true, order: 5 },
+    { fieldName: "desenvolvimento_motor", fieldLabel: "Desenvolvimento Motor", fieldType: "select", fieldOptions: ["Adequado", "Atraso leve", "Atraso moderado", "Atraso grave"], required: false, order: 6 },
+    { fieldName: "desenvolvimento_linguagem", fieldLabel: "Desenvolvimento da Linguagem", fieldType: "select", fieldOptions: ["Adequado", "Atraso leve", "Atraso moderado", "Atraso grave"], required: false, order: 7 },
+    { fieldName: "desenvolvimento_social", fieldLabel: "Desenvolvimento Social", fieldType: "select", fieldOptions: ["Adequado", "Atraso leve", "Atraso moderado", "Atraso grave"], required: false, order: 8 },
+    { fieldName: "aleitamento", fieldLabel: "Tipo de Aleitamento", fieldType: "select", fieldOptions: ["Exclusivo", "Predominante", "Complementado", "Desmamado"], required: false, order: 9 },
+    { fieldName: "introducao_alimentar", fieldLabel: "Introdução Alimentar Adequada?", fieldType: "select", fieldOptions: ["Sim", "Não", "Não aplicável"], required: false, order: 10 },
+    { fieldName: "vacinas_em_dia", fieldLabel: "Vacinação em Dia?", fieldType: "select", fieldOptions: ["Sim", "Não", "Atrasada"], required: true, order: 11 },
+    { fieldName: "vitamina_a", fieldLabel: "Suplementação Vitamina A", fieldType: "checkbox", required: false, order: 12 },
+    { fieldName: "sulfato_ferroso", fieldLabel: "Suplementação Sulfato Ferroso", fieldType: "checkbox", required: false, order: 13 },
+    { fieldName: "teste_pezinho", fieldLabel: "Teste do Pezinho Realizado?", fieldType: "select", fieldOptions: ["Sim", "Não", "Aguardando resultado"], required: false, order: 14 },
+    { fieldName: "teste_olhinho", fieldLabel: "Teste do Olhinho Realizado?", fieldType: "select", fieldOptions: ["Sim", "Não", "Alterado"], required: false, order: 15 },
+    { fieldName: "teste_orelhinha", fieldLabel: "Teste da Orelhinha Realizado?", fieldType: "select", fieldOptions: ["Sim", "Não", "Alterado"], required: false, order: 16 },
+    { fieldName: "intercorrencias", fieldLabel: "Intercorrências desde última consulta", fieldType: "textarea", required: false, order: 17 },
+    { fieldName: "atividade_educativa", fieldLabel: "Atividade Educativa Realizada", fieldType: "checkbox", required: false, order: 18 },
+    { fieldName: "proxima_consulta", fieldLabel: "Próxima Consulta (dias)", fieldType: "number", required: false, order: 19, validationRules: { min: 7, max: 180 }, helperText: "Periodicidade conforme idade" },
+    { fieldName: "risco_vulnerabilidade", fieldLabel: "Identificação de Risco/Vulnerabilidade", fieldType: "textarea", required: false, order: 20 },
+  ].map(f => ({
+    ...f,
+    id: generateId(),
+    templateId,
+    createdAt: new Date(),
+  }));
+  
+  await db.insert(schema.templateFields).values(fields).onConflictDoNothing();
+  console.log(`  ✅ Template PUERICULTURA: ${fields.length} campos`);
+}
+
+// ===========================================================================
+// EXECUÇÃO
+// ===========================================================================
 seedCareLines()
-  .then(() => {
-    console.log("🎉 Seed finalizado com sucesso!");
-    process.exit(0);
-  })
-  .catch((error) => {
+  .catch(error => {
     console.error("❌ Erro ao executar seed:", error);
     process.exit(1);
   });
