@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -275,44 +275,34 @@ export default function Prescriptions() {
 
             <div className="space-y-2">
               <Label htmlFor="citizen">Paciente</Label>
-              <Select value={selectedCitizen} onValueChange={setSelectedCitizen}>
-                <SelectTrigger id="citizen" data-testid="select-citizen-filter">
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" data-testid="option-all-citizens">Todos</SelectItem>
-                  {citizens.map((citizen) => (
-                    <SelectItem 
-                      key={citizen.id} 
-                      value={citizen.id}
-                      data-testid={`option-citizen-${citizen.id}`}
-                    >
-                      {citizen.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                value={selectedCitizen}
+                onValueChange={setSelectedCitizen}
+                options={[
+                  { value: "all", label: "Todos" },
+                  ...citizens.map((c: any) => ({ value: c.id, label: c.name }))
+                ]}
+                placeholder="Todos"
+                searchPlaceholder="Buscar paciente..."
+                emptyMessage="Nenhum paciente encontrado."
+                data-testid="select-citizen-filter"
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="professional">Profissional</Label>
-              <Select value={selectedProfessional} onValueChange={setSelectedProfessional}>
-                <SelectTrigger id="professional" data-testid="select-professional-filter">
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" data-testid="option-all-professionals">Todos</SelectItem>
-                  {professionals.map((prof) => (
-                    <SelectItem 
-                      key={prof.id} 
-                      value={prof.id}
-                      data-testid={`option-professional-${prof.id}`}
-                    >
-                      {prof.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                value={selectedProfessional}
+                onValueChange={setSelectedProfessional}
+                options={[
+                  { value: "all", label: "Todos" },
+                  ...professionals.map((p: any) => ({ value: p.id, label: p.name }))
+                ]}
+                placeholder="Todos"
+                searchPlaceholder="Buscar profissional..."
+                emptyMessage="Nenhum profissional encontrado."
+                data-testid="select-professional-filter"
+              />
             </div>
 
             <div className="space-y-2">
