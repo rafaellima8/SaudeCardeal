@@ -171,6 +171,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get patient medical history (for medical attendance sidebar)
+  app.get("/api/citizens/:id/medical-history", async (req, res) => {
+    try {
+      const citizenId = req.params.id;
+      
+      // SECURITY: Multi-tenant validation
+      const sessionUnitId = req.session?.user?.unitId;
+      if (!sessionUnitId) {
+        return res.status(401).json({ error: "Sessão inválida - unitId não encontrado" });
+      }
+
+      const history = await storage.getPatientHistory(citizenId, sessionUnitId);
+      res.json(history);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Appointments API
   app.get("/api/appointments", async (req, res) => {
     try {
@@ -998,14 +1016,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Exams API
+  // ============================================================================
+  // EXAMS API (Exames) ✅
+  // ============================================================================
+
   app.get("/api/exams", async (req, res) => {
     try {
-      const { citizenId } = req.query;
-      if (!citizenId) {
-        return res.status(400).json({ error: "citizenId é obrigatório" });
+      const { citizenId, consultationId, unitId } = req.query;
+      
+      // SECURITY: Multi-tenant validation
+      const sessionUnitId = req.session?.user?.unitId;
+      if (sessionUnitId && unitId && unitId !== sessionUnitId) {
+        return res.status(403).json({ error: "Acesso negado: unidade diferente da sessão" });
       }
-      const exams = await storage.getExams(citizenId as string);
+
+      const exams = await storage.getExams({
+        citizenId: citizenId as string,
+        consultationId: consultationId as string,
+        unitId: (unitId || sessionUnitId) as string,
+      });
       res.json(exams);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/exams/:id", async (req, res) => {
+    try {
+      const exam = await storage.getExamById(req.params.id);
+      if (!exam) {
+        return res.status(404).json({ error: "Exame não encontrado" });
+      }
+
+      // SECURITY: Multi-tenant validation
+      const sessionUnitId = req.session?.user?.unitId;
+      if (sessionUnitId && exam.unitId !== sessionUnitId) {
+        return res.status(403).json({ error: "Acesso negado: exame de outra unidade" });
+      }
+
+      res.json(exam);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -1013,7 +1062,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/exams", async (req, res) => {
     try {
-      const data = insertExamSchema.parse(req.body);
+      // Merge session unitId if not provided
+      const dataWithUnit = {
+        ...req.body,
+        unitId: req.body.unitId || req.session?.user?.unitId,
+      };
+
+      const data = insertExamSchema.parse(dataWithUnit);
       const exam = await storage.createExam(data);
       res.status(201).json(exam);
     } catch (error: any) {
@@ -1026,10 +1081,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/exams/:id", async (req, res) => {
     try {
-      const exam = await storage.updateExam(req.params.id, req.body);
-      if (!exam) {
+      // Verify ownership before update
+      const existing = await storage.getExamById(req.params.id);
+      if (!existing) {
         return res.status(404).json({ error: "Exame não encontrado" });
       }
+
+      // SECURITY: Multi-tenant validation
+      const sessionUnitId = req.session?.user?.unitId;
+      if (sessionUnitId && existing.unitId !== sessionUnitId) {
+        return res.status(403).json({ error: "Acesso negado: exame de outra unidade" });
+      }
+
+      const exam = await storage.updateExam(req.params.id, req.body);
       res.json(exam);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1038,10 +1102,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/exams/:id", async (req, res) => {
     try {
-      const success = await storage.deleteExam(req.params.id);
-      if (!success) {
+      // Verify ownership before delete
+      const existing = await storage.getExamById(req.params.id);
+      if (!existing) {
         return res.status(404).json({ error: "Exame não encontrado" });
       }
+
+      // SECURITY: Multi-tenant validation
+      const sessionUnitId = req.session?.user?.unitId;
+      if (sessionUnitId && existing.unitId !== sessionUnitId) {
+        return res.status(403).json({ error: "Acesso negado: exame de outra unidade" });
+      }
+
+      const success = await storage.deleteExam(req.params.id);
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ error: error.message });

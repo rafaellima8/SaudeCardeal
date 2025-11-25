@@ -142,7 +142,8 @@ export interface IStorage {
   getReports(days: number, unitId?: string): Promise<any>;
 
   // Exams
-  getExams(citizenId: string): Promise<Exam[]>;
+  getExams(params: { citizenId?: string; consultationId?: string; unitId?: string }): Promise<Exam[]>;
+  getExamById(id: string): Promise<Exam | undefined>;
   createExam(exam: InsertExam): Promise<Exam>;
   updateExam(id: string, exam: Partial<InsertExam>): Promise<Exam | undefined>;
   deleteExam(id: string): Promise<boolean>;
@@ -655,11 +656,23 @@ export class DbStorage implements IStorage {
   }
 
   // Exams
-  async getExams(citizenId: string): Promise<Exam[]> {
+  async getExams(params: { citizenId?: string; consultationId?: string; unitId?: string }): Promise<Exam[]> {
+    const conditions = [];
+    if (params.citizenId) conditions.push(eq(schema.exams.citizenId, params.citizenId));
+    if (params.consultationId) conditions.push(eq(schema.exams.consultationId, params.consultationId));
+    if (params.unitId) conditions.push(eq(schema.exams.unitId, params.unitId));
+
     return db.select()
       .from(schema.exams)
-      .where(eq(schema.exams.citizenId, citizenId))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(schema.exams.requestDate));
+  }
+
+  async getExamById(id: string): Promise<Exam | undefined> {
+    const [exam] = await db.select()
+      .from(schema.exams)
+      .where(eq(schema.exams.id, id));
+    return exam;
   }
 
   async createExam(exam: InsertExam): Promise<Exam> {
