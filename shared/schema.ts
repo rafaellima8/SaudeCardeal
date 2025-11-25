@@ -109,6 +109,8 @@ export const attendanceQueue = sqliteTable("attendance_queue", {
   arrivedAt: integer("arrived_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
   calledAt: integer("called_at", { mode: "timestamp" }),
   completedAt: integer("completed_at", { mode: "timestamp" }),
+  consultationId: text("consultation_id").references(() => consultations.id), // Vincula fila ao atendimento médico
+  professionalId: text("professional_id").references(() => professionals.id), // Profissional que chamou o paciente
 });
 
 // Consultations (Consultas Médicas) - COM CAMPOS SOAP COMPLETOS ✅
@@ -119,7 +121,13 @@ export const consultations = sqliteTable("consultations", {
   unitId: text("unit_id").notNull().references(() => healthUnits.id),
   appointmentId: text("appointment_id").references(() => appointments.id),
   consultationDate: integer("consultation_date", { mode: "timestamp" }).notNull(),
-  type: text("type").notNull(),
+  
+  // e-SUS PEC Attendance Type (replaces legacy 'type') ✅
+  attendanceType: text("attendance_type", { 
+    enum: ["consulta", "procedimento", "vacina", "visita_domiciliar", "grupo", "atendimento_odonto"] 
+  }).notNull().default("consulta"), // Tipo de atendimento
+  
+  type: text("type"), // DEPRECATED - Mantido para compatibilidade, usar attendanceType
   
   // SOAP Fields (e-SUS PEC v5.3 compliant) ✅
   subjective: text("subjective"), // S - Subjetivo (queixa, história)
@@ -144,6 +152,15 @@ export const consultations = sqliteTable("consultations", {
   ciap2Codes: text("ciap2_codes", { mode: "json" }).$type<string[]>(), // Códigos CIAP-2
   cid10Codes: text("cid10_codes", { mode: "json" }).$type<string[]>(), // Códigos CID-10
   
+  // e-SUS PEC Additional Fields (Atendimento Individual) ✅
+  allergies: text("allergies", { mode: "json" }).$type<string[]>(), // Lista de alergias
+  chronicConditions: text("chronic_conditions", { mode: "json" }).$type<string[]>(), // Problemas crônicos
+  
+  familyHistory: text("family_history"), // História familiar
+  socialHistory: text("social_history"), // História social (tabagismo, etilismo, etc)
+  
+  prescriptionRationale: text("prescription_rationale"), // Racionalização de medicamento (e-SUS PEC)
+  
   // Legacy fields (mantidos para compatibilidade)
   chiefComplaint: text("chief_complaint"),
   historyOfPresentIllness: text("history_of_present_illness"),
@@ -153,6 +170,22 @@ export const consultations = sqliteTable("consultations", {
   notes: text("notes"),
   
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Citizen Problems/Conditions (Problemas/Condições do Cidadão - CIAP-2) ✅
+export const citizenProblems = sqliteTable("citizen_problems", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  citizenId: text("citizen_id").notNull().references(() => citizens.id, { onDelete: "cascade" }),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id), // Multi-tenant safety ✅
+  ciap2Code: text("ciap2_code").notNull(), // Código CIAP-2
+  description: text("description").notNull(), // Descrição do problema
+  status: text("status", { 
+    enum: ["active", "resolved", "controlled"] 
+  }).notNull().default("active"), // Ativo, Resolvido, Controlado
+  diagnosedAt: integer("diagnosed_at", { mode: "timestamp" }).notNull(), // Data do diagnóstico
+  notes: text("notes"), // Observações
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
 // ============================================================================
@@ -515,6 +548,12 @@ export const insertConsultationSchema = createInsertSchema(consultations).omit({
   createdAt: true,
 });
 
+export const insertCitizenProblemSchema = createInsertSchema(citizenProblems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertMedicationSchema = createInsertSchema(medications).omit({
   id: true,
   createdAt: true,
@@ -733,6 +772,9 @@ export type AttendanceQueue = typeof attendanceQueue.$inferSelect;
 
 export type InsertConsultation = z.infer<typeof insertConsultationSchema>;
 export type Consultation = typeof consultations.$inferSelect;
+
+export type InsertCitizenProblem = z.infer<typeof insertCitizenProblemSchema>;
+export type CitizenProblem = typeof citizenProblems.$inferSelect;
 
 export type InsertMedication = z.infer<typeof insertMedicationSchema>;
 export type Medication = typeof medications.$inferSelect;

@@ -33,6 +33,8 @@ import type {
   FamilyMember,
   InsertHomeVisit,
   HomeVisit,
+  InsertCitizenProblem,
+  CitizenProblem,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -61,6 +63,7 @@ export interface IStorage {
 
   // Attendance Queue
   getAttendanceQueue(unitId: string, status?: string): Promise<AttendanceQueue[]>;
+  getQueueEntry(id: string): Promise<AttendanceQueue | undefined>; // Get single queue entry by ID ✅
   createQueueEntry(entry: InsertAttendanceQueue): Promise<AttendanceQueue>;
   updateQueueEntry(id: string, entry: Partial<InsertAttendanceQueue>): Promise<AttendanceQueue | undefined>;
   deleteQueueEntry(id: string): Promise<boolean>;
@@ -74,6 +77,31 @@ export interface IStorage {
     prescriptions: Omit<InsertPrescription, 'consultationId' | 'citizenId' | 'professionalId'>[]
   ): Promise<{ consultation: Consultation; prescriptions: Prescription[] }>;
   deleteConsultation(id: string): Promise<boolean>;
+
+  // Medical Attendance (Atendimento Médico - e-SUS PEC) ✅
+  getNextPatientInQueue(unitId: string, professionalId?: string): Promise<AttendanceQueue | undefined>;
+  startConsultation(queueId: string, professionalId: string, unitId: string): Promise<{ // Multi-tenant safety ✅
+    consultation: Consultation;
+    patient: Citizen;
+    history: {
+      consultations: Consultation[];
+      prescriptions: Prescription[];
+      exams: Exam[];
+      problems: CitizenProblem[];
+    };
+  }>;
+  getPatientHistory(citizenId: string, unitId: string): Promise<{ // Multi-tenant safety ✅
+    consultations: Consultation[];
+    prescriptions: Prescription[];
+    exams: Exam[];
+    problems: CitizenProblem[];
+  }>;
+
+  // Citizen Problems/Conditions (Problemas do Cidadão - CIAP-2) ✅
+  getCitizenProblems(citizenId: string, unitId: string): Promise<CitizenProblem[]>; // Multi-tenant safety ✅
+  createCitizenProblem(problem: InsertCitizenProblem): Promise<CitizenProblem>;
+  updateCitizenProblem(id: string, citizenId: string, problem: Partial<InsertCitizenProblem>): Promise<CitizenProblem | undefined>; // Security ✅
+  deleteCitizenProblem(id: string, citizenId: string): Promise<boolean>; // Security ✅
 
   // Prescriptions
   getPrescriptions(params: { 
@@ -336,6 +364,14 @@ export class DbStorage implements IStorage {
         desc(schema.attendanceQueue.priority),
         asc(schema.attendanceQueue.arrivedAt)
       );
+  }
+
+  async getQueueEntry(id: string): Promise<AttendanceQueue | undefined> {
+    const result = await db.select()
+      .from(schema.attendanceQueue)
+      .where(eq(schema.attendanceQueue.id, id))
+      .limit(1);
+    return result[0];
   }
 
   async createQueueEntry(entry: InsertAttendanceQueue): Promise<AttendanceQueue> {
@@ -987,6 +1023,229 @@ export class DbStorage implements IStorage {
 
   async deleteConsultation(id: string): Promise<boolean> {
     const result = await db.delete(schema.consultations).where(eq(schema.consultations.id, id));
+    return result.changes > 0;
+  }
+
+  // ============================================================================
+  // MEDICAL ATTENDANCE METHODS (Atendimento Médico - e-SUS PEC) ✅
+  // ============================================================================
+
+  async getNextPatientInQueue(unitId: string, professionalId?: string): Promise<AttendanceQueue | undefined> {
+    const conditions: any[] = [
+      eq(schema.attendanceQueue.unitId, unitId),
+      eq(schema.attendanceQueue.status, 'waiting'), // APENAS waiting - exclui in_progress, completed, cancelled ✅
+    ];
+
+    if (professionalId) {
+      // Se especificado profissional, busca pacientes vinculados a ele ou sem profissional definido
+      conditions.push(
+        or(
+          eq(schema.attendanceQueue.professionalId, professionalId),
+          isNull(schema.attendanceQueue.professionalId)
+        )!
+      );
+    }
+
+    const results = await db.select()
+      .from(schema.attendanceQueue)
+      .where(and(...conditions))
+      .orderBy(
+        desc(schema.attendanceQueue.priority), // Urgências primeiro
+        asc(schema.attendanceQueue.arrivedAt)   // Depois por ordem de chegada
+      )
+      .limit(1);
+
+    return results[0];
+  }
+
+  async startConsultation(queueId: string, professionalId: string, unitId: string): Promise<{ // Multi-tenant safety ✅
+    consultation: Consultation;
+    patient: Citizen;
+    history: {
+      consultations: Consultation[];
+      prescriptions: Prescription[];
+      exams: Exam[];
+      problems: CitizenProblem[];
+    };
+  }> {
+    // 1. Buscar item da fila - SECURITY: validate unitId ✅
+    const queueItem = await db.select()
+      .from(schema.attendanceQueue)
+      .where(and(
+        eq(schema.attendanceQueue.id, queueId),
+        eq(schema.attendanceQueue.unitId, unitId) // Multi-tenant safety
+      ))
+      .limit(1)
+      .then(r => r[0]);
+
+    if (!queueItem) {
+      throw new Error('Item da fila não encontrado ou não pertence à unidade');
+    }
+
+    // 2. Buscar dados do paciente
+    const patient = await db.select()
+      .from(schema.citizens)
+      .where(eq(schema.citizens.id, queueItem.citizenId))
+      .limit(1)
+      .then(r => r[0]);
+
+    if (!patient) {
+      throw new Error('Paciente não encontrado');
+    }
+
+    // 3. Criar consulta
+    const consultation = await this.createConsultation({
+      citizenId: queueItem.citizenId,
+      professionalId,
+      unitId: queueItem.unitId,
+      consultationDate: new Date(),
+      attendanceType: 'consulta',
+    });
+
+    // 4. Atualizar fila: status = in_progress e vincular consulta
+    await this.updateQueueEntry(queueId, {
+      status: 'in_progress',
+      calledAt: new Date(),
+      consultationId: consultation.id,
+      professionalId,
+    });
+
+    // 5. Buscar histórico do paciente
+    const history = await this.getPatientHistory(queueItem.citizenId, queueItem.unitId);
+
+    return {
+      consultation,
+      patient,
+      history,
+    };
+  }
+
+  async getPatientHistory(citizenId: string, unitId: string): Promise<{ // Multi-tenant safety ✅
+    consultations: Consultation[];
+    prescriptions: Prescription[];
+    exams: Exam[];
+    problems: CitizenProblem[];
+  }> {
+    // SECURITY: Multi-tenant validation - verify citizen belongs to unit ✅
+    const citizen = await db.select()
+      .from(schema.citizens)
+      .where(and(
+        eq(schema.citizens.id, citizenId),
+        eq(schema.citizens.unitId, unitId) // Multi-tenant safety
+      ))
+      .limit(1)
+      .then(r => r[0]);
+
+    if (!citizen) {
+      throw new Error('Paciente não encontrado ou não pertence à unidade');
+    }
+
+    // Buscar consultas anteriores (últimas 10) - FILTRADO POR UNIT ID ✅
+    const consultations = await db.select()
+      .from(schema.consultations)
+      .where(and(
+        eq(schema.consultations.citizenId, citizenId),
+        eq(schema.consultations.unitId, citizen.unitId) // Multi-tenant safety
+      ))
+      .orderBy(desc(schema.consultations.consultationDate))
+      .limit(10);
+
+    // Buscar prescrições (últimas 20) - FILTRADO POR UNIT via JOIN com consultations ✅
+    const prescriptions = await db
+      .select({
+        id: schema.prescriptions.id,
+        consultationId: schema.prescriptions.consultationId,
+        citizenId: schema.prescriptions.citizenId,
+        professionalId: schema.prescriptions.professionalId,
+        medication: schema.prescriptions.medication,
+        dosage: schema.prescriptions.dosage,
+        frequency: schema.prescriptions.frequency,
+        duration: schema.prescriptions.duration,
+        quantity: schema.prescriptions.quantity,
+        instructions: schema.prescriptions.instructions,
+        createdAt: schema.prescriptions.createdAt,
+      })
+      .from(schema.prescriptions)
+      .innerJoin(schema.consultations, eq(schema.prescriptions.consultationId, schema.consultations.id)) // INNER JOIN - somente com consulta válida ✅
+      .where(and(
+        eq(schema.prescriptions.citizenId, citizenId),
+        eq(schema.consultations.unitId, unitId) // Multi-tenant safety - apenas da unidade correta
+      ))
+      .orderBy(desc(schema.prescriptions.createdAt))
+      .limit(20);
+
+    // Buscar exames (últimos 10) - FILTRADO POR UNIT ID ✅
+    const exams = await db.select()
+      .from(schema.exams)
+      .where(and(
+        eq(schema.exams.citizenId, citizenId),
+        eq(schema.exams.unitId, citizen.unitId) // Multi-tenant safety
+      ))
+      .orderBy(desc(schema.exams.createdAt))
+      .limit(10);
+
+    // Buscar problemas ativos - FILTRADO POR UNIT ID ✅
+    const problems = await db.select()
+      .from(schema.citizenProblems)
+      .where(and(
+        eq(schema.citizenProblems.citizenId, citizenId),
+        eq(schema.citizenProblems.unitId, citizen.unitId) // Multi-tenant safety
+      ))
+      .orderBy(desc(schema.citizenProblems.diagnosedAt));
+
+    return {
+      consultations,
+      prescriptions,
+      exams,
+      problems,
+    };
+  }
+
+  // ============================================================================
+  // CITIZEN PROBLEMS METHODS (Problemas do Cidadão - CIAP-2) ✅
+  // ============================================================================
+
+  async getCitizenProblems(citizenId: string, unitId: string): Promise<CitizenProblem[]> {
+    // SECURITY: Multi-tenant safety - MUST filter by unitId ✅
+    return await db.select()
+      .from(schema.citizenProblems)
+      .where(and(
+        eq(schema.citizenProblems.citizenId, citizenId),
+        eq(schema.citizenProblems.unitId, unitId) // Multi-tenant safety
+      ))
+      .orderBy(
+        desc(schema.citizenProblems.status), // Ativos primeiro
+        desc(schema.citizenProblems.diagnosedAt)
+      );
+  }
+
+  async createCitizenProblem(problem: InsertCitizenProblem): Promise<CitizenProblem> {
+    const result = await db.insert(schema.citizenProblems).values(problem).returning();
+    return result[0];
+  }
+
+  async updateCitizenProblem(id: string, citizenId: string, problem: Partial<InsertCitizenProblem>): Promise<CitizenProblem | undefined> {
+    // SECURITY: Remove citizenId and unitId from payload to prevent takeover ✅
+    const { citizenId: _, unitId: __, ...safePayload } = problem;
+    
+    // SECURITY: WHERE clause MUST include both id AND citizenId to prevent cross-citizen updates ✅
+    const result = await db.update(schema.citizenProblems)
+      .set({ ...safePayload, updatedAt: new Date() })
+      .where(and(
+        eq(schema.citizenProblems.id, id),
+        eq(schema.citizenProblems.citizenId, citizenId) // Security: prevent cross-citizen updates
+      ))
+      .returning();
+    return result[0];
+  }
+
+  async deleteCitizenProblem(id: string, citizenId: string): Promise<boolean> {
+    // SECURITY: WHERE clause MUST include both id AND citizenId to prevent cross-citizen deletes ✅
+    const result = await db.delete(schema.citizenProblems)
+      .where(and(
+        eq(schema.citizenProblems.id, id),
+        eq(schema.citizenProblems.citizenId, citizenId) // Security: prevent cross-citizen deletes
+      ));
     return result.changes > 0;
   }
 

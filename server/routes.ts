@@ -21,6 +21,7 @@ import {
   insertFadEvaluationSchema,
   insertFocusSchema,
   insertFocalTreatmentSchema,
+  insertCitizenProblemSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { generateExport } from "./integrations/esus/exporter";
@@ -239,6 +240,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Attendance Queue API
   app.get("/api/queue/:unitId", async (req, res) => {
     try {
+      // SECURITY: Multi-tenant validation - verify session user belongs to requested unit ✅
+      if (req.session.user?.unitId !== req.params.unitId) {
+        return res.status(403).json({ 
+          error: "Acesso negado: usuário não pertence à unidade solicitada" 
+        });
+      }
+
       const { status } = req.query;
       const queue = await storage.getAttendanceQueue(req.params.unitId, status as string);
       res.json(queue);
@@ -250,6 +258,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/queue", async (req, res) => {
     try {
       const data = insertAttendanceQueueSchema.parse(req.body);
+      
+      // SECURITY: Multi-tenant validation - verify user is creating in their own unit ✅
+      if (req.session.user?.unitId !== data.unitId) {
+        return res.status(403).json({ 
+          error: "Acesso negado: usuário não pode criar entradas em outra unidade" 
+        });
+      }
+
       const entry = await storage.createQueueEntry(data);
       res.status(201).json(entry);
     } catch (error: any) {
@@ -262,10 +278,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/queue/:id", async (req, res) => {
     try {
-      const entry = await storage.updateQueueEntry(req.params.id, req.body);
-      if (!entry) {
+      // SECURITY: Multi-tenant validation - verify queue belongs to user's unit ✅
+      const queueEntry = await storage.getQueueEntry(req.params.id);
+      if (!queueEntry) {
         return res.status(404).json({ error: "Entrada na fila não encontrada" });
       }
+
+      if (req.session.user?.unitId !== queueEntry.unitId) {
+        return res.status(403).json({ 
+          error: "Acesso negado: entrada pertence a outra unidade" 
+        });
+      }
+
+      const entry = await storage.updateQueueEntry(req.params.id, req.body);
       res.json(entry);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -274,10 +299,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/queue/:id", async (req, res) => {
     try {
-      const success = await storage.deleteQueueEntry(req.params.id);
-      if (!success) {
+      // SECURITY: Multi-tenant validation - verify queue belongs to user's unit ✅
+      const queueEntry = await storage.getQueueEntry(req.params.id);
+      if (!queueEntry) {
         return res.status(404).json({ error: "Entrada na fila não encontrada" });
       }
+
+      if (req.session.user?.unitId !== queueEntry.unitId) {
+        return res.status(403).json({ 
+          error: "Acesso negado: entrada pertence a outra unidade" 
+        });
+      }
+
+      const success = await storage.deleteQueueEntry(req.params.id);
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -358,6 +392,232 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const success = await storage.deleteConsultation(req.params.id);
       if (!success) {
         return res.status(404).json({ error: "Consulta não encontrada" });
+      }
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // MEDICAL ATTENDANCE API (Atendimento Médico - e-SUS PEC) ✅
+  // ============================================================================
+
+  // Buscar próximo paciente da fila
+  app.get("/api/attendance/next", async (req, res) => {
+    try {
+      const { unitId, professionalId } = req.query;
+      
+      if (!unitId) {
+        return res.status(400).json({ error: "unitId é obrigatório" });
+      }
+
+      // SECURITY: Multi-tenant validation - verify session user belongs to requested unit ✅
+      if (req.session.user?.unitId !== unitId) {
+        return res.status(403).json({ 
+          error: "Acesso negado: usuário não pertence à unidade solicitada" 
+        });
+      }
+
+      const nextPatient = await storage.getNextPatientInQueue(
+        unitId as string,
+        professionalId as string | undefined
+      );
+      
+      if (!nextPatient) {
+        return res.status(404).json({ error: "Nenhum paciente aguardando" });
+      }
+
+      res.json(nextPatient);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Iniciar atendimento médico (cria consulta a partir da fila)
+  app.post("/api/attendance/start", async (req, res) => {
+    try {
+      const { queueId, professionalId } = req.body;
+
+      if (!queueId || !professionalId) {
+        return res.status(400).json({ error: "queueId e professionalId são obrigatórios" });
+      }
+
+      // SECURITY: Multi-tenant validation - verify queue belongs to user's unit ✅
+      const queueEntry = await storage.getQueueEntry(queueId);
+      if (!queueEntry) {
+        return res.status(404).json({ error: "Entrada da fila não encontrada" });
+      }
+
+      if (req.session.user?.unitId !== queueEntry.unitId) {
+        return res.status(403).json({ 
+          error: "Acesso negado: paciente pertence a outra unidade" 
+        });
+      }
+
+      const result = await storage.startConsultation(queueId, professionalId, queueEntry.unitId);
+      res.status(201).json(result);
+    } catch (error: any) {
+      if (error.message.includes('não encontrado')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Buscar histórico completo do paciente
+  app.get("/api/citizens/:id/history", async (req, res) => {
+    try {
+      // SECURITY: Multi-tenant validation - verify session user belongs to citizen's unit ✅
+      const citizen = await storage.getCitizenById(req.params.id);
+      if (!citizen) {
+        return res.status(404).json({ error: "Cidadão não encontrado" });
+      }
+
+      if (req.session.user?.unitId !== citizen.unitId) {
+        return res.status(403).json({ 
+          error: "Acesso negado: cidadão pertence a outra unidade" 
+        });
+      }
+
+      const history = await storage.getPatientHistory(req.params.id, citizen.unitId);
+      res.json(history);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // CITIZEN PROBLEMS API (Problemas do Cidadão - CIAP-2) ✅
+  // ============================================================================
+
+  // Listar problemas/condições do cidadão
+  app.get("/api/citizens/:id/problems", async (req, res) => {
+    try {
+      // SECURITY: Multi-tenant validation - verify session user belongs to citizen's unit ✅
+      const citizen = await storage.getCitizenById(req.params.id);
+      if (!citizen) {
+        return res.status(404).json({ error: "Cidadão não encontrado" });
+      }
+
+      if (req.session.user?.unitId !== citizen.unitId) {
+        return res.status(403).json({ 
+          error: "Acesso negado: cidadão pertence a outra unidade" 
+        });
+      }
+
+      const problems = await storage.getCitizenProblems(req.params.id, citizen.unitId);
+      res.json(problems);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Criar problema/condição do cidadão
+  app.post("/api/citizens/:id/problems", async (req, res) => {
+    try {
+      // SECURITY: Multi-tenant validation - verify session user belongs to citizen's unit ✅
+      const citizen = await storage.getCitizenById(req.params.id);
+      if (!citizen) {
+        return res.status(404).json({ error: "Cidadão não encontrado" });
+      }
+
+      if (req.session.user?.unitId !== citizen.unitId) {
+        return res.status(403).json({ 
+          error: "Acesso negado: cidadão pertence a outra unidade" 
+        });
+      }
+
+      const data = insertCitizenProblemSchema.parse({
+        ...req.body,
+        citizenId: req.params.id,
+        unitId: citizen.unitId, // Multi-tenant safety
+      });
+      const problem = await storage.createCitizenProblem(data);
+      res.status(201).json(problem);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Atualizar problema/condição do cidadão
+  app.patch("/api/citizens/:citizenId/problems/:problemId", async (req, res) => {
+    try {
+      // SECURITY: Multi-tenant validation - verify session user belongs to citizen's unit ✅
+      const citizen = await storage.getCitizenById(req.params.citizenId);
+      if (!citizen) {
+        return res.status(404).json({ error: "Cidadão não encontrado" });
+      }
+
+      if (req.session.user?.unitId !== citizen.unitId) {
+        return res.status(403).json({ 
+          error: "Acesso negado: cidadão pertence a outra unidade" 
+        });
+      }
+
+      // Validar schema (excluindo citizenId, unitId e campos auto-gerenciados)
+      const data = insertCitizenProblemSchema
+        .omit({ citizenId: true, unitId: true, createdAt: true, updatedAt: true })
+        .partial()
+        .parse(req.body);
+
+      // SEGURANÇA: Garantir que citizenId do path não pode ser alterado
+      if (req.body.citizenId && req.body.citizenId !== req.params.citizenId) {
+        return res.status(400).json({ 
+          error: "Não é permitido alterar o cidadão do problema" 
+        });
+      }
+
+      // STORAGE-LAYER SECURITY: Passa citizenId para WHERE clause ✅
+      const problem = await storage.updateCitizenProblem(
+        req.params.problemId,
+        req.params.citizenId,
+        data
+      );
+      
+      if (!problem) {
+        return res.status(404).json({ 
+          error: "Problema não encontrado ou não pertence ao cidadão" 
+        });
+      }
+
+      res.json(problem);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Deletar problema/condição do cidadão
+  app.delete("/api/citizens/:citizenId/problems/:problemId", async (req, res) => {
+    try {
+      // SECURITY: Multi-tenant validation - verify session user belongs to citizen's unit ✅
+      const citizen = await storage.getCitizenById(req.params.citizenId);
+      if (!citizen) {
+        return res.status(404).json({ error: "Cidadão não encontrado" });
+      }
+
+      if (req.session.user?.unitId !== citizen.unitId) {
+        return res.status(403).json({ 
+          error: "Acesso negado: cidadão pertence a outra unidade" 
+        });
+      }
+
+      // STORAGE-LAYER SECURITY: Passa citizenId para WHERE clause ✅
+      const success = await storage.deleteCitizenProblem(
+        req.params.problemId,
+        req.params.citizenId
+      );
+      
+      if (!success) {
+        return res.status(404).json({ 
+          error: "Problema não encontrado ou não pertence ao cidadão" 
+        });
       }
       res.status(204).send();
     } catch (error: any) {
