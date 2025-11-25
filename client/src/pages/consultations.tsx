@@ -7,6 +7,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -551,20 +552,20 @@ export default function ConsultationsPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Paciente *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-citizen">
-                              <SelectValue placeholder="Selecione o paciente" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {citizens.map((citizen) => (
-                              <SelectItem key={citizen.id} value={citizen.id}>
-                                {citizen.name} {citizen.cns && `- CNS: ${citizen.cns}`}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <FormControl>
+                          <Combobox
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            options={citizens.map(citizen => ({
+                              value: citizen.id,
+                              label: `${citizen.name}${citizen.cns ? ` - CNS: ${citizen.cns}` : ''}`
+                            }))}
+                            placeholder="Selecione o paciente"
+                            searchPlaceholder="Buscar paciente..."
+                            emptyMessage="Nenhum paciente encontrado"
+                            data-testid="select-citizen"
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -576,20 +577,20 @@ export default function ConsultationsPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Profissional *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-professional">
-                              <SelectValue placeholder="Selecione o profissional" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {professionals.map((prof) => (
-                              <SelectItem key={prof.id} value={prof.id}>
-                                {prof.name} - {prof.role}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <FormControl>
+                          <Combobox
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            options={professionals.map(prof => ({
+                              value: prof.id,
+                              label: `${prof.name} - ${prof.role}`
+                            }))}
+                            placeholder="Selecione o profissional"
+                            searchPlaceholder="Buscar profissional..."
+                            emptyMessage="Nenhum profissional encontrado"
+                            data-testid="select-professional"
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -601,20 +602,20 @@ export default function ConsultationsPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Unidade de Saúde *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-unit">
-                              <SelectValue placeholder="Selecione a unidade" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {units.map((unit) => (
-                              <SelectItem key={unit.id} value={unit.id}>
-                                {unit.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <FormControl>
+                          <Combobox
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            options={units.map(unit => ({
+                              value: unit.id,
+                              label: unit.name
+                            }))}
+                            placeholder="Selecione a unidade"
+                            searchPlaceholder="Buscar unidade..."
+                            emptyMessage="Nenhuma unidade encontrada"
+                            data-testid="select-unit"
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}

@@ -13,6 +13,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Pencil, Trash2, MapPin, Activity } from "lucide-react";
 import { format } from "date-fns";
@@ -297,20 +298,20 @@ export default function AceVisitsPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Imóvel *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} disabled={dwellingsLoading}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-dwelling">
-                              <SelectValue placeholder="Selecione o imóvel" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {dwellings.map((dwelling: any) => (
-                              <SelectItem key={dwelling.id} value={dwelling.id} data-testid={`option-dwelling-${dwelling.id}`}>
-                                {dwelling.street} {dwelling.number} - {dwelling.neighborhood}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <FormControl>
+                          <Combobox
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            options={dwellings.map((dwelling: any) => ({
+                              value: dwelling.id,
+                              label: `${dwelling.street} ${dwelling.number} - ${dwelling.neighborhood}`
+                            }))}
+                            placeholder="Selecione o imóvel"
+                            searchPlaceholder="Buscar imóvel..."
+                            emptyMessage="Nenhum imóvel encontrado"
+                            data-testid="select-dwelling"
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -323,20 +324,20 @@ export default function AceVisitsPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Profissional *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} disabled={professionalsLoading}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-professional">
-                              <SelectValue placeholder="Selecione o profissional" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {professionals.map((prof: any) => (
-                              <SelectItem key={prof.id} value={prof.id} data-testid={`option-professional-${prof.id}`}>
-                                {prof.name} - {prof.specialty}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <FormControl>
+                          <Combobox
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            options={professionals.map((prof: any) => ({
+                              value: prof.id,
+                              label: `${prof.name} - ${prof.specialty}`
+                            }))}
+                            placeholder="Selecione o profissional"
+                            searchPlaceholder="Buscar profissional..."
+                            emptyMessage="Nenhum profissional encontrado"
+                            data-testid="select-professional"
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -349,20 +350,20 @@ export default function AceVisitsPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Unidade *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} disabled={unitsLoading}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-unit">
-                              <SelectValue placeholder="Selecione a unidade" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {units.map((unit: any) => (
-                              <SelectItem key={unit.id} value={unit.id} data-testid={`option-unit-${unit.id}`}>
-                                {unit.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <FormControl>
+                          <Combobox
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            options={units.map((unit: any) => ({
+                              value: unit.id,
+                              label: unit.name
+                            }))}
+                            placeholder="Selecione a unidade"
+                            searchPlaceholder="Buscar unidade..."
+                            emptyMessage="Nenhuma unidade encontrada"
+                            data-testid="select-unit"
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}

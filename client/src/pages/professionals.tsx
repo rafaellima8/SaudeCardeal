@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -270,20 +271,19 @@ export default function Professionals() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Unidade de Saúde</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione uma unidade" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {units.map((unit) => (
-                            <SelectItem key={unit.id} value={unit.id}>
-                              {unit.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <Combobox
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          options={units.map((unit) => ({
+                            value: unit.id,
+                            label: unit.name
+                          }))}
+                          placeholder="Selecione uma unidade"
+                          searchPlaceholder="Buscar unidade..."
+                          emptyMessage="Nenhuma unidade encontrada"
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -305,19 +305,21 @@ export default function Professionals() {
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2 flex-1">
           <Building2 className="h-5 w-5 text-muted-foreground" />
-          <Select value={selectedUnit} onValueChange={setSelectedUnit}>
-            <SelectTrigger className="w-[300px]">
-              <SelectValue placeholder="Filtrar por unidade" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas as unidades</SelectItem>
-              {units.map((unit) => (
-                <SelectItem key={unit.id} value={unit.id}>
-                  {unit.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Combobox
+            value={selectedUnit}
+            onValueChange={setSelectedUnit}
+            options={[
+              { value: "all", label: "Todas as unidades" },
+              ...units.map((unit) => ({
+                value: unit.id,
+                label: unit.name
+              }))
+            ]}
+            placeholder="Filtrar por unidade"
+            searchPlaceholder="Buscar unidade..."
+            emptyMessage="Nenhuma unidade encontrada"
+            className="w-[300px]"
+          />
         </div>
       </div>
 

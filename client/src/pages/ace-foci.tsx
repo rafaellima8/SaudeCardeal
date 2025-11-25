@@ -12,6 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -307,24 +308,20 @@ export default function AceFociPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Visita *</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        disabled={visitsLoading}
-                      >
-                        <FormControl>
-                          <SelectTrigger data-testid="select-visit">
-                            <SelectValue placeholder={visitsLoading ? "Carregando..." : "Selecione uma visita"} />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {visits.map((visit) => (
-                            <SelectItem key={visit.id} value={visit.id} data-testid={`option-visit-${visit.id}`}>
-                              {format(new Date(visit.visitDate * 1000), "dd/MM/yyyy HH:mm")}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <Combobox
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          options={visits.map((visit) => ({
+                            value: visit.id,
+                            label: format(new Date(visit.visitDate * 1000), "dd/MM/yyyy HH:mm")
+                          }))}
+                          placeholder={visitsLoading ? "Carregando..." : "Selecione uma visita"}
+                          searchPlaceholder="Buscar visita..."
+                          emptyMessage="Nenhuma visita encontrada"
+                          data-testid="select-visit"
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -336,24 +333,20 @@ export default function AceFociPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Imóvel *</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        disabled={dwellingsLoading}
-                      >
-                        <FormControl>
-                          <SelectTrigger data-testid="select-dwelling">
-                            <SelectValue placeholder={dwellingsLoading ? "Carregando..." : "Selecione um imóvel"} />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {dwellings.map((dwelling) => (
-                            <SelectItem key={dwelling.id} value={dwelling.id} data-testid={`option-dwelling-${dwelling.id}`}>
-                              {dwelling.street}, {dwelling.number} - {dwelling.neighborhood}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <Combobox
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          options={dwellings.map((dwelling) => ({
+                            value: dwelling.id,
+                            label: `${dwelling.street}, ${dwelling.number} - ${dwelling.neighborhood}`
+                          }))}
+                          placeholder={dwellingsLoading ? "Carregando..." : "Selecione um imóvel"}
+                          searchPlaceholder="Buscar imóvel..."
+                          emptyMessage="Nenhum imóvel encontrado"
+                          data-testid="select-dwelling"
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}

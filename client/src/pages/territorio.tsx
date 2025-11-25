@@ -10,6 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -694,20 +695,20 @@ export default function TerritoryPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Domicílio</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-dwelling">
-                                <SelectValue placeholder="Selecione o domicílio" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {dwellings?.map((dwelling) => (
-                                <SelectItem key={dwelling.id} value={dwelling.id}>
-                                  {dwelling.address} {dwelling.number} - {dwelling.neighborhood}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <FormControl>
+                            <Combobox
+                              value={field.value}
+                              onValueChange={field.onChange}
+                              options={dwellings?.map((dwelling) => ({
+                                value: dwelling.id,
+                                label: `${dwelling.address} ${dwelling.number} - ${dwelling.neighborhood}`
+                              })) || []}
+                              placeholder="Selecione o domicílio"
+                              searchPlaceholder="Buscar domicílio..."
+                              emptyMessage="Nenhum domicílio encontrado"
+                              data-testid="select-dwelling"
+                            />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -719,20 +720,20 @@ export default function TerritoryPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Profissional</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-professional">
-                                <SelectValue placeholder="Selecione o profissional" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {professionals.map((prof) => (
-                                <SelectItem key={prof.id} value={prof.id}>
-                                  {prof.name} - {prof.role}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <FormControl>
+                            <Combobox
+                              value={field.value}
+                              onValueChange={field.onChange}
+                              options={professionals.map((prof) => ({
+                                value: prof.id,
+                                label: `${prof.name} - ${prof.role}`
+                              }))}
+                              placeholder="Selecione o profissional"
+                              searchPlaceholder="Buscar profissional..."
+                              emptyMessage="Nenhum profissional encontrado"
+                              data-testid="select-professional"
+                            />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}

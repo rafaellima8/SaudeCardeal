@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -330,20 +331,20 @@ export default function AceDwellings() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Unidade de Saúde</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={!!selectedDwelling}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-unit">
-                          <SelectValue placeholder="Selecione a unidade" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {units?.map((unit) => (
-                          <SelectItem key={unit.id} value={unit.id}>
-                            {unit.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <Combobox
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        options={units?.map((unit) => ({
+                          value: unit.id,
+                          label: unit.name
+                        })) || []}
+                        placeholder="Selecione a unidade"
+                        searchPlaceholder="Buscar unidade..."
+                        emptyMessage="Nenhuma unidade encontrada"
+                        data-testid="select-unit"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

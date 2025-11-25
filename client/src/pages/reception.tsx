@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { useToast } from "@/hooks/use-toast";
 import type { AttendanceQueue, Citizen, Professional, HealthUnit } from "@shared/schema";
 
@@ -347,18 +348,17 @@ export default function Reception() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Label htmlFor="citizenId">Paciente *</Label>
-              <Select value={formData.citizenId} onValueChange={(value) => setFormData({ ...formData, citizenId: value })} required>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o paciente" />
-                </SelectTrigger>
-                <SelectContent>
-                  {citizens.map((citizen) => (
-                    <SelectItem key={citizen.id} value={citizen.id}>
-                      {citizen.name} - {citizen.cns}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                value={formData.citizenId}
+                onValueChange={(value) => setFormData({ ...formData, citizenId: value })}
+                options={citizens.map((citizen) => ({
+                  value: citizen.id,
+                  label: `${citizen.name} - ${citizen.cns}`
+                }))}
+                placeholder="Selecione o paciente"
+                searchPlaceholder="Buscar paciente..."
+                emptyMessage="Nenhum paciente encontrado"
+              />
             </div>
             <div>
               <Label htmlFor="type">Tipo de Atendimento *</Label>
