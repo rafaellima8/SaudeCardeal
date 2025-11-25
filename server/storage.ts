@@ -1082,15 +1082,18 @@ export class DbStorage implements IStorage {
       throw new Error('Item da fila não encontrado ou não pertence à unidade');
     }
 
-    // 2. Buscar dados do paciente
+    // 2. Buscar dados do paciente - SECURITY: re-validate unitId ✅
     const patient = await db.select()
       .from(schema.citizens)
-      .where(eq(schema.citizens.id, queueItem.citizenId))
+      .where(and(
+        eq(schema.citizens.id, queueItem.citizenId),
+        eq(schema.citizens.unitId, unitId) // Security: double-check tenant boundary
+      ))
       .limit(1)
       .then(r => r[0]);
 
     if (!patient) {
-      throw new Error('Paciente não encontrado');
+      throw new Error('Paciente não encontrado ou não pertence à unidade');
     }
 
     // 3. Criar consulta
@@ -1163,6 +1166,7 @@ export class DbStorage implements IStorage {
         duration: schema.prescriptions.duration,
         quantity: schema.prescriptions.quantity,
         instructions: schema.prescriptions.instructions,
+        status: schema.prescriptions.status,
         createdAt: schema.prescriptions.createdAt,
       })
       .from(schema.prescriptions)
