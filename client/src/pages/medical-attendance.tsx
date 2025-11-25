@@ -706,6 +706,27 @@ export default function MedicalAttendance() {
     setReferralDialogOpen(true);
   };
 
+  // Handlers para exames
+  const handleEditExam = (exam: any) => {
+    setEditingExam(exam);
+    examForm.reset({
+      examType: exam.examType,
+      observations: exam.observations || "",
+      status: exam.status,
+    });
+    setExamDialogOpen(true);
+  };
+
+  const handleAddExam = () => {
+    setEditingExam(null);
+    examForm.reset({
+      examType: "",
+      observations: "",
+      status: "requested",
+    });
+    setExamDialogOpen(true);
+  };
+
   if (loadingConsultation || !consultation) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -1506,7 +1527,7 @@ export default function MedicalAttendance() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => setExamDialogOpen(true)}
+                  onClick={handleAddExam}
                   data-testid="button-add-exam"
                 >
                   <Plus className="h-4 w-4" />
@@ -1557,14 +1578,24 @@ export default function MedicalAttendance() {
                                 {exam.status === "cancelled" && "Cancelado"}
                               </Badge>
                             </div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => setDeleteExamId(exam.id)}
-                              data-testid={`button-delete-exam-${exam.id}`}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleEditExam(exam)}
+                                data-testid={`button-edit-exam-${exam.id}`}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setDeleteExamId(exam.id)}
+                                data-testid={`button-delete-exam-${exam.id}`}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </Card>
@@ -1826,6 +1857,144 @@ export default function MedicalAttendance() {
               data-testid="alert-confirm-referral"
             >
               {deleteReferralMutation.isPending ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog para Adicionar/Editar Exame */}
+      <Dialog open={examDialogOpen} onOpenChange={setExamDialogOpen}>
+        <DialogContent data-testid="dialog-exam">
+          <DialogHeader>
+            <DialogTitle>
+              {editingExam ? "Editar Exame" : "Solicitar Exame"}
+            </DialogTitle>
+            <DialogDescription>
+              Registre um exame solicitado para o paciente
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...examForm}>
+            <form onSubmit={examForm.handleSubmit(onSubmitExam)} className="space-y-4">
+              <FormField
+                control={examForm.control}
+                name="examType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo de Exame *</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Ex: Hemograma Completo"
+                        {...field}
+                        data-testid="input-exam-type"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={examForm.control}
+                name="observations"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Observações</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Informações adicionais sobre o exame..."
+                        rows={3}
+                        {...field}
+                        data-testid="textarea-exam-observations"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={examForm.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-exam-status">
+                          <SelectValue placeholder="Selecione o status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="requested">Solicitado</SelectItem>
+                        <SelectItem value="scheduled">Agendado</SelectItem>
+                        <SelectItem value="completed">Concluído</SelectItem>
+                        <SelectItem value="cancelled">Cancelado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setExamDialogOpen(false);
+                    setEditingExam(null);
+                    examForm.reset();
+                  }}
+                  data-testid="dialog-cancel"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createExamMutation.isPending || updateExamMutation.isPending}
+                  data-testid="dialog-submit"
+                >
+                  {editingExam ? "Atualizar" : "Adicionar"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* AlertDialog para Confirmar Exclusão de Exame */}
+      <AlertDialog 
+        open={!!deleteExamId} 
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteExamId(null);
+          }
+        }}
+      >
+        <AlertDialogContent data-testid="alert-delete-exam">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este exame? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={() => setDeleteExamId(null)}
+              data-testid="alert-cancel-exam"
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteExamId) {
+                  deleteExamMutation.mutate(deleteExamId);
+                }
+              }}
+              disabled={deleteExamMutation.isPending}
+              data-testid="alert-confirm-exam"
+            >
+              {deleteExamMutation.isPending ? "Excluindo..." : "Excluir"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
