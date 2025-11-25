@@ -2400,6 +2400,171 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.warn("ACE module routes already mounted or failed to load:", error.message);
   }
 
+  // ===================================================================
+  // DYNAMIC FORMS SYSTEM ROUTES
+  // ===================================================================
+
+  // Specialties
+  app.get("/api/specialties", async (req, res) => {
+    try {
+      const { active } = req.query;
+      const specialties = await storage.getSpecialties({ 
+        active: active ? active === 'true' : undefined 
+      });
+      res.json(specialties);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Care Lines
+  app.get("/api/care-lines", async (req, res) => {
+    try {
+      const { specialtyId, active } = req.query;
+      const careLines = await storage.getCareLines({ 
+        specialtyId: specialtyId as string,
+        active: active ? active === 'true' : undefined 
+      });
+      res.json(careLines);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Consultation Templates
+  app.get("/api/consultation-templates", async (req, res) => {
+    try {
+      const { specialtyId, careLineId, active } = req.query;
+      const templates = await storage.getConsultationTemplates({ 
+        specialtyId: specialtyId as string,
+        careLineId: careLineId as string,
+        active: active ? active === 'true' : undefined 
+      });
+      res.json(templates);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get template with fields (commonly used endpoint)
+  app.get("/api/consultation-templates/:id/with-fields", async (req, res) => {
+    try {
+      const template = await storage.getConsultationTemplateById(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Template não encontrado" });
+      }
+      
+      const fields = await storage.getTemplateFields(req.params.id);
+      
+      res.json({ template, fields });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Consultation Field Data (get field data for a consultation)
+  app.get("/api/consultations/:consultationId/field-data", async (req, res) => {
+    try {
+      const fieldData = await storage.getConsultationFieldData(req.params.consultationId);
+      res.json(fieldData);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Save consultation field data
+  app.post("/api/consultations/:consultationId/field-data", async (req, res) => {
+    try {
+      const { fieldData } = req.body;
+      
+      if (!Array.isArray(fieldData)) {
+        return res.status(400).json({ error: "fieldData deve ser um array" });
+      }
+      
+      const saved = await storage.saveConsultationFieldData(req.params.consultationId, fieldData);
+      res.status(201).json(saved);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Clinical Protocols - Evaluate protocols against field data
+  app.post("/api/clinical-protocols/evaluate", async (req, res) => {
+    try {
+      const { fieldData, careLineId, specialtyId } = req.body;
+      
+      if (!fieldData || typeof fieldData !== 'object') {
+        return res.status(400).json({ error: "fieldData deve ser um objeto" });
+      }
+      
+      const triggeredProtocols = await storage.evaluateProtocols(
+        fieldData, 
+        careLineId, 
+        specialtyId
+      );
+      
+      res.json(triggeredProtocols);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Therapeutic Plans
+  app.get("/api/therapeutic-plans", async (req, res) => {
+    try {
+      const { citizenId, careLineId, status, unitId } = req.query;
+      const plans = await storage.getTherapeuticPlans({ 
+        citizenId: citizenId as string,
+        careLineId: careLineId as string,
+        status: status as string,
+        unitId: unitId as string,
+      });
+      res.json(plans);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/therapeutic-plans", async (req, res) => {
+    try {
+      const plan = await storage.createTherapeuticPlan(req.body);
+      res.status(201).json(plan);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/therapeutic-plans/:id", async (req, res) => {
+    try {
+      const plan = await storage.updateTherapeuticPlan(req.params.id, req.body);
+      if (!plan) {
+        return res.status(404).json({ error: "Plano terapêutico não encontrado" });
+      }
+      res.json(plan);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Therapeutic Plan Items
+  app.get("/api/therapeutic-plans/:planId/items", async (req, res) => {
+    try {
+      const items = await storage.getTherapeuticPlanItems(req.params.planId);
+      res.json(items);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/therapeutic-plans/:planId/items", async (req, res) => {
+    try {
+      const item = await storage.createTherapeuticPlanItem({ ...req.body, planId: req.params.planId });
+      res.status(201).json(item);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // 404 handler for undefined API routes
   app.use("/api/*", (req, res) => {
     res.status(404).json({ error: "Endpoint não encontrado" });

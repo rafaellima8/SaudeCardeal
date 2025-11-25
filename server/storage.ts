@@ -253,6 +253,58 @@ export interface IStorage {
 
   // Endemic Control - Statistics & Indicators
   getEndemicStats(params: { unitId?: string; cycleId?: string; startDate?: Date; endDate?: Date }): Promise<any>;
+
+  // Dynamic Forms System - Specialties
+  getSpecialties(params?: { active?: boolean }): Promise<schema.Specialty[]>;
+  getSpecialtyById(id: string): Promise<schema.Specialty | undefined>;
+  getSpecialtyByCode(code: string): Promise<schema.Specialty | undefined>;
+  createSpecialty(specialty: schema.InsertSpecialty): Promise<schema.Specialty>;
+  updateSpecialty(id: string, specialty: Partial<schema.InsertSpecialty>): Promise<schema.Specialty | undefined>;
+
+  // Dynamic Forms System - Care Lines
+  getCareLines(params?: { specialtyId?: string; active?: boolean }): Promise<schema.CareLine[]>;
+  getCareLineById(id: string): Promise<schema.CareLine | undefined>;
+  getCareLineByCode(code: string): Promise<schema.CareLine | undefined>;
+  createCareLine(careLine: schema.InsertCareLine): Promise<schema.CareLine>;
+  updateCareLine(id: string, careLine: Partial<schema.InsertCareLine>): Promise<schema.CareLine | undefined>;
+
+  // Dynamic Forms System - Consultation Templates
+  getConsultationTemplates(params?: { specialtyId?: string; careLineId?: string; active?: boolean }): Promise<schema.ConsultationTemplate[]>;
+  getConsultationTemplateById(id: string): Promise<schema.ConsultationTemplate | undefined>;
+  createConsultationTemplate(template: schema.InsertConsultationTemplate): Promise<schema.ConsultationTemplate>;
+  updateConsultationTemplate(id: string, template: Partial<schema.InsertConsultationTemplate>): Promise<schema.ConsultationTemplate | undefined>;
+
+  // Dynamic Forms System - Template Fields
+  getTemplateFields(templateId: string): Promise<schema.TemplateField[]>;
+  getTemplateFieldById(id: string): Promise<schema.TemplateField | undefined>;
+  createTemplateField(field: schema.InsertTemplateField): Promise<schema.TemplateField>;
+  updateTemplateField(id: string, field: Partial<schema.InsertTemplateField>): Promise<schema.TemplateField | undefined>;
+  deleteTemplateField(id: string): Promise<boolean>;
+
+  // Dynamic Forms System - Consultation Field Data
+  getConsultationFieldData(consultationId: string): Promise<schema.ConsultationFieldData[]>;
+  saveConsultationFieldData(consultationId: string, fieldData: Array<{ fieldId: string; fieldValue: string }>): Promise<schema.ConsultationFieldData[]>;
+  deleteConsultationFieldData(consultationId: string): Promise<boolean>;
+
+  // Dynamic Forms System - Clinical Protocols
+  getClinicalProtocols(params?: { careLineId?: string; specialtyId?: string; active?: boolean }): Promise<schema.ClinicalProtocol[]>;
+  getClinicalProtocolById(id: string): Promise<schema.ClinicalProtocol | undefined>;
+  evaluateProtocols(fieldData: Record<string, any>, careLineId?: string, specialtyId?: string): Promise<schema.ClinicalProtocol[]>;
+  createClinicalProtocol(protocol: schema.InsertClinicalProtocol): Promise<schema.ClinicalProtocol>;
+  updateClinicalProtocol(id: string, protocol: Partial<schema.InsertClinicalProtocol>): Promise<schema.ClinicalProtocol | undefined>;
+
+  // Dynamic Forms System - Therapeutic Plans
+  getTherapeuticPlans(params: { citizenId?: string; careLineId?: string; status?: string; unitId?: string }): Promise<schema.TherapeuticPlan[]>;
+  getTherapeuticPlanById(id: string): Promise<schema.TherapeuticPlan | undefined>;
+  createTherapeuticPlan(plan: schema.InsertTherapeuticPlan): Promise<schema.TherapeuticPlan>;
+  updateTherapeuticPlan(id: string, plan: Partial<schema.InsertTherapeuticPlan>): Promise<schema.TherapeuticPlan | undefined>;
+  deleteTherapeuticPlan(id: string): Promise<boolean>;
+
+  // Dynamic Forms System - Therapeutic Plan Items
+  getTherapeuticPlanItems(planId: string): Promise<schema.TherapeuticPlanItem[]>;
+  createTherapeuticPlanItem(item: schema.InsertTherapeuticPlanItem): Promise<schema.TherapeuticPlanItem>;
+  updateTherapeuticPlanItem(id: string, item: Partial<schema.InsertTherapeuticPlanItem>): Promise<schema.TherapeuticPlanItem | undefined>;
+  deleteTherapeuticPlanItem(id: string): Promise<boolean>;
 }
 
 export class DbStorage implements IStorage {
@@ -2049,6 +2101,372 @@ export class DbStorage implements IStorage {
         count: Number(t.count)
       })),
     };
+  }
+
+  // ===================================================================
+  // DYNAMIC FORMS SYSTEM - IMPLEMENTATION
+  // ===================================================================
+
+  // Specialties
+  async getSpecialties(params?: { active?: boolean }): Promise<schema.Specialty[]> {
+    let query = db.select().from(schema.specialties);
+    
+    if (params?.active !== undefined) {
+      query = query.where(eq(schema.specialties.active, params.active)) as any;
+    }
+    
+    return query.orderBy(asc(schema.specialties.name));
+  }
+
+  async getSpecialtyById(id: string): Promise<schema.Specialty | undefined> {
+    const [specialty] = await db.select().from(schema.specialties).where(eq(schema.specialties.id, id));
+    return specialty;
+  }
+
+  async getSpecialtyByCode(code: string): Promise<schema.Specialty | undefined> {
+    const [specialty] = await db.select().from(schema.specialties).where(eq(schema.specialties.code, code));
+    return specialty;
+  }
+
+  async createSpecialty(specialty: schema.InsertSpecialty): Promise<schema.Specialty> {
+    const [created] = await db.insert(schema.specialties).values(specialty).returning();
+    return created;
+  }
+
+  async updateSpecialty(id: string, specialty: Partial<schema.InsertSpecialty>): Promise<schema.Specialty | undefined> {
+    const [updated] = await db
+      .update(schema.specialties)
+      .set(specialty)
+      .where(eq(schema.specialties.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Care Lines
+  async getCareLines(params?: { specialtyId?: string; active?: boolean }): Promise<schema.CareLine[]> {
+    let query = db.select().from(schema.careLines);
+    
+    const conditions = [];
+    if (params?.specialtyId) {
+      conditions.push(eq(schema.careLines.specialtyId, params.specialtyId));
+    }
+    if (params?.active !== undefined) {
+      conditions.push(eq(schema.careLines.active, params.active));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return query.orderBy(asc(schema.careLines.name));
+  }
+
+  async getCareLineById(id: string): Promise<schema.CareLine | undefined> {
+    const [careLine] = await db.select().from(schema.careLines).where(eq(schema.careLines.id, id));
+    return careLine;
+  }
+
+  async getCareLineByCode(code: string): Promise<schema.CareLine | undefined> {
+    const [careLine] = await db.select().from(schema.careLines).where(eq(schema.careLines.code, code));
+    return careLine;
+  }
+
+  async createCareLine(careLine: schema.InsertCareLine): Promise<schema.CareLine> {
+    const [created] = await db.insert(schema.careLines).values(careLine).returning();
+    return created;
+  }
+
+  async updateCareLine(id: string, careLine: Partial<schema.InsertCareLine>): Promise<schema.CareLine | undefined> {
+    const [updated] = await db
+      .update(schema.careLines)
+      .set(careLine)
+      .where(eq(schema.careLines.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Consultation Templates
+  async getConsultationTemplates(params?: { specialtyId?: string; careLineId?: string; active?: boolean }): Promise<schema.ConsultationTemplate[]> {
+    let query = db.select().from(schema.consultationTemplates);
+    
+    const conditions = [];
+    if (params?.specialtyId) {
+      conditions.push(eq(schema.consultationTemplates.specialtyId, params.specialtyId));
+    }
+    if (params?.careLineId) {
+      conditions.push(eq(schema.consultationTemplates.careLineId, params.careLineId));
+    }
+    if (params?.active !== undefined) {
+      conditions.push(eq(schema.consultationTemplates.active, params.active));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return query.orderBy(asc(schema.consultationTemplates.name));
+  }
+
+  async getConsultationTemplateById(id: string): Promise<schema.ConsultationTemplate | undefined> {
+    const [template] = await db.select().from(schema.consultationTemplates).where(eq(schema.consultationTemplates.id, id));
+    return template;
+  }
+
+  async createConsultationTemplate(template: schema.InsertConsultationTemplate): Promise<schema.ConsultationTemplate> {
+    const [created] = await db.insert(schema.consultationTemplates).values(template).returning();
+    return created;
+  }
+
+  async updateConsultationTemplate(id: string, template: Partial<schema.InsertConsultationTemplate>): Promise<schema.ConsultationTemplate | undefined> {
+    const [updated] = await db
+      .update(schema.consultationTemplates)
+      .set(template)
+      .where(eq(schema.consultationTemplates.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Template Fields
+  async getTemplateFields(templateId: string): Promise<schema.TemplateField[]> {
+    return db
+      .select()
+      .from(schema.templateFields)
+      .where(eq(schema.templateFields.templateId, templateId))
+      .orderBy(asc(schema.templateFields.order));
+  }
+
+  async getTemplateFieldById(id: string): Promise<schema.TemplateField | undefined> {
+    const [field] = await db.select().from(schema.templateFields).where(eq(schema.templateFields.id, id));
+    return field;
+  }
+
+  async createTemplateField(field: schema.InsertTemplateField): Promise<schema.TemplateField> {
+    const [created] = await db.insert(schema.templateFields).values(field).returning();
+    return created;
+  }
+
+  async updateTemplateField(id: string, field: Partial<schema.InsertTemplateField>): Promise<schema.TemplateField | undefined> {
+    const [updated] = await db
+      .update(schema.templateFields)
+      .set(field)
+      .where(eq(schema.templateFields.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTemplateField(id: string): Promise<boolean> {
+    const result = await db.delete(schema.templateFields).where(eq(schema.templateFields.id, id));
+    return result.changes > 0;
+  }
+
+  // Consultation Field Data
+  async getConsultationFieldData(consultationId: string): Promise<schema.ConsultationFieldData[]> {
+    return db
+      .select()
+      .from(schema.consultationFieldData)
+      .where(eq(schema.consultationFieldData.consultationId, consultationId));
+  }
+
+  async saveConsultationFieldData(
+    consultationId: string, 
+    fieldData: Array<{ fieldId: string; fieldValue: string }>
+  ): Promise<schema.ConsultationFieldData[]> {
+    // Delete existing data for this consultation
+    await db.delete(schema.consultationFieldData).where(eq(schema.consultationFieldData.consultationId, consultationId));
+    
+    // Insert new data
+    if (fieldData.length === 0) {
+      return [];
+    }
+    
+    const dataToInsert = fieldData.map(item => ({
+      consultationId,
+      fieldId: item.fieldId,
+      fieldValue: item.fieldValue,
+      createdAt: new Date(),
+    }));
+    
+    return db.insert(schema.consultationFieldData).values(dataToInsert).returning();
+  }
+
+  async deleteConsultationFieldData(consultationId: string): Promise<boolean> {
+    const result = await db.delete(schema.consultationFieldData).where(eq(schema.consultationFieldData.consultationId, consultationId));
+    return result.changes > 0;
+  }
+
+  // Clinical Protocols
+  async getClinicalProtocols(params?: { careLineId?: string; specialtyId?: string; active?: boolean }): Promise<schema.ClinicalProtocol[]> {
+    let query = db.select().from(schema.clinicalProtocols);
+    
+    const conditions = [];
+    if (params?.careLineId) {
+      conditions.push(eq(schema.clinicalProtocols.careLineId, params.careLineId));
+    }
+    if (params?.specialtyId) {
+      conditions.push(eq(schema.clinicalProtocols.specialtyId, params.specialtyId));
+    }
+    if (params?.active !== undefined) {
+      conditions.push(eq(schema.clinicalProtocols.active, params.active));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return query.orderBy(asc(schema.clinicalProtocols.name));
+  }
+
+  async getClinicalProtocolById(id: string): Promise<schema.ClinicalProtocol | undefined> {
+    const [protocol] = await db.select().from(schema.clinicalProtocols).where(eq(schema.clinicalProtocols.id, id));
+    return protocol;
+  }
+
+  async evaluateProtocols(
+    fieldData: Record<string, any>, 
+    careLineId?: string, 
+    specialtyId?: string
+  ): Promise<schema.ClinicalProtocol[]> {
+    // Get all active protocols for this care line/specialty
+    const protocols = await this.getClinicalProtocols({ 
+      careLineId, 
+      specialtyId, 
+      active: true 
+    });
+    
+    const triggeredProtocols: schema.ClinicalProtocol[] = [];
+    
+    for (const protocol of protocols) {
+      if (!protocol.triggerCondition) continue;
+      
+      const conditions = protocol.triggerCondition as Array<{
+        field: string;
+        operator: "gt" | "lt" | "eq" | "gte" | "lte" | "contains";
+        value: any;
+      }>;
+      
+      // Check if all conditions are met (AND logic)
+      const allConditionsMet = conditions.every(condition => {
+        const fieldValue = fieldData[condition.field];
+        
+        if (fieldValue === undefined || fieldValue === null) {
+          return false;
+        }
+        
+        switch (condition.operator) {
+          case "gt":
+            return Number(fieldValue) > Number(condition.value);
+          case "gte":
+            return Number(fieldValue) >= Number(condition.value);
+          case "lt":
+            return Number(fieldValue) < Number(condition.value);
+          case "lte":
+            return Number(fieldValue) <= Number(condition.value);
+          case "eq":
+            return fieldValue === condition.value;
+          case "contains":
+            return String(fieldValue).includes(String(condition.value));
+          default:
+            return false;
+        }
+      });
+      
+      if (allConditionsMet) {
+        triggeredProtocols.push(protocol);
+      }
+    }
+    
+    return triggeredProtocols;
+  }
+
+  async createClinicalProtocol(protocol: schema.InsertClinicalProtocol): Promise<schema.ClinicalProtocol> {
+    const [created] = await db.insert(schema.clinicalProtocols).values(protocol).returning();
+    return created;
+  }
+
+  async updateClinicalProtocol(id: string, protocol: Partial<schema.InsertClinicalProtocol>): Promise<schema.ClinicalProtocol | undefined> {
+    const [updated] = await db
+      .update(schema.clinicalProtocols)
+      .set(protocol)
+      .where(eq(schema.clinicalProtocols.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Therapeutic Plans
+  async getTherapeuticPlans(params: { citizenId?: string; careLineId?: string; status?: string; unitId?: string }): Promise<schema.TherapeuticPlan[]> {
+    let query = db.select().from(schema.therapeuticPlans);
+    
+    const conditions = [];
+    if (params.citizenId) {
+      conditions.push(eq(schema.therapeuticPlans.citizenId, params.citizenId));
+    }
+    if (params.careLineId) {
+      conditions.push(eq(schema.therapeuticPlans.careLineId, params.careLineId));
+    }
+    if (params.status) {
+      conditions.push(eq(schema.therapeuticPlans.status, params.status as "active" | "completed" | "suspended"));
+    }
+    if (params.unitId) {
+      conditions.push(eq(schema.therapeuticPlans.unitId, params.unitId));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return query.orderBy(desc(schema.therapeuticPlans.createdAt));
+  }
+
+  async getTherapeuticPlanById(id: string): Promise<schema.TherapeuticPlan | undefined> {
+    const [plan] = await db.select().from(schema.therapeuticPlans).where(eq(schema.therapeuticPlans.id, id));
+    return plan;
+  }
+
+  async createTherapeuticPlan(plan: schema.InsertTherapeuticPlan): Promise<schema.TherapeuticPlan> {
+    const [created] = await db.insert(schema.therapeuticPlans).values(plan).returning();
+    return created;
+  }
+
+  async updateTherapeuticPlan(id: string, plan: Partial<schema.InsertTherapeuticPlan>): Promise<schema.TherapeuticPlan | undefined> {
+    const [updated] = await db
+      .update(schema.therapeuticPlans)
+      .set({ ...plan, updatedAt: new Date() })
+      .where(eq(schema.therapeuticPlans.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTherapeuticPlan(id: string): Promise<boolean> {
+    const result = await db.delete(schema.therapeuticPlans).where(eq(schema.therapeuticPlans.id, id));
+    return result.changes > 0;
+  }
+
+  // Therapeutic Plan Items
+  async getTherapeuticPlanItems(planId: string): Promise<schema.TherapeuticPlanItem[]> {
+    return db
+      .select()
+      .from(schema.therapeuticPlanItems)
+      .where(eq(schema.therapeuticPlanItems.planId, planId))
+      .orderBy(asc(schema.therapeuticPlanItems.createdAt));
+  }
+
+  async createTherapeuticPlanItem(item: schema.InsertTherapeuticPlanItem): Promise<schema.TherapeuticPlanItem> {
+    const [created] = await db.insert(schema.therapeuticPlanItems).values(item).returning();
+    return created;
+  }
+
+  async updateTherapeuticPlanItem(id: string, item: Partial<schema.InsertTherapeuticPlanItem>): Promise<schema.TherapeuticPlanItem | undefined> {
+    const [updated] = await db
+      .update(schema.therapeuticPlanItems)
+      .set(item)
+      .where(eq(schema.therapeuticPlanItems.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTherapeuticPlanItem(id: string): Promise<boolean> {
+    const result = await db.delete(schema.therapeuticPlanItems).where(eq(schema.therapeuticPlanItems.id, id));
+    return result.changes > 0;
   }
 }
 
