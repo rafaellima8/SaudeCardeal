@@ -66,6 +66,8 @@ import {
   Trash2,
   Edit,
   ArrowRightLeft,
+  TestTube,
+  ClipboardList,
 } from "lucide-react";
 
 // Helper para converter string vazia em undefined e strings numéricas em números
@@ -136,6 +138,15 @@ export default function MedicalAttendance() {
   const [editingReferral, setEditingReferral] = useState<any>(null);
   const [deleteReferralId, setDeleteReferralId] = useState<string | null>(null);
 
+  // Estados para exames
+  const [examDialogOpen, setExamDialogOpen] = useState(false);
+  const [editingExam, setEditingExam] = useState<any>(null);
+  const [deleteExamId, setDeleteExamId] = useState<string | null>(null);
+
+  // Estados para procedimentos (armazenados em JSON na consulta)
+  const [procedureDialogOpen, setProcedureDialogOpen] = useState(false);
+  const [procedures, setProcedures] = useState<Array<{code?: string; description: string; observations?: string}>>([]);
+
   // Buscar dados da consulta
   const { data: consultation, isLoading: loadingConsultation } = useQuery({
     queryKey: ["/api/consultations", consultationId],
@@ -190,6 +201,18 @@ export default function MedicalAttendance() {
       if (!consultationId) return [];
       const response = await fetch(`/api/medical-referrals?consultationId=${consultationId}`);
       if (!response.ok) throw new Error("Erro ao carregar encaminhamentos");
+      return response.json();
+    },
+    enabled: !!consultationId,
+  });
+
+  // Buscar exames da consulta
+  const { data: exams = [], isLoading: loadingExams } = useQuery({
+    queryKey: ["/api/exams", consultationId],
+    queryFn: async () => {
+      if (!consultationId) return [];
+      const response = await fetch(`/api/exams?consultationId=${consultationId}`);
+      if (!response.ok) throw new Error("Erro ao carregar exames");
       return response.json();
     },
     enabled: !!consultationId,
@@ -1341,6 +1364,151 @@ export default function MedicalAttendance() {
                                 <Trash2 className="h-3 w-3" />
                               </Button>
                             </div>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            </CardContent>
+          </Card>
+
+          {/* Exames */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <TestTube className="h-5 w-5" />
+                  Exames
+                </CardTitle>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setExamDialogOpen(true)}
+                  data-testid="button-add-exam"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              <CardDescription>
+                {exams.length} {exams.length === 1 ? "exame" : "exames"} solicitado{exams.length === 1 ? "" : "s"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[250px] pr-4">
+                {loadingExams ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Carregando exames...
+                  </div>
+                ) : exams.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <TestTube className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>Nenhum exame solicitado</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {exams.map((exam: any) => (
+                      <Card key={exam.id} className="p-3">
+                        <div className="space-y-2">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <p className="font-medium text-sm">{exam.examType}</p>
+                              {exam.observations && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {exam.observations}
+                                </p>
+                              )}
+                              <Badge 
+                                variant={
+                                  exam.status === "completed" 
+                                    ? "default" 
+                                    : exam.status === "cancelled" 
+                                    ? "destructive" 
+                                    : "secondary"
+                                }
+                                className="mt-2"
+                                data-testid={`badge-exam-status-${exam.id}`}
+                              >
+                                {exam.status === "requested" && "Solicitado"}
+                                {exam.status === "scheduled" && "Agendado"}
+                                {exam.status === "completed" && "Concluído"}
+                                {exam.status === "cancelled" && "Cancelado"}
+                              </Badge>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setDeleteExamId(exam.id)}
+                              data-testid={`button-delete-exam-${exam.id}`}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            </CardContent>
+          </Card>
+
+          {/* Procedimentos */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <ClipboardList className="h-5 w-5" />
+                  Procedimentos
+                </CardTitle>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setProcedureDialogOpen(true)}
+                  data-testid="button-add-procedure"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              <CardDescription>
+                {procedures.length} {procedures.length === 1 ? "procedimento" : "procedimentos"} realizado{procedures.length === 1 ? "" : "s"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[200px] pr-4">
+                {procedures.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <ClipboardList className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>Nenhum procedimento registrado</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {procedures.map((procedure, index) => (
+                      <Card key={index} className="p-3">
+                        <div className="space-y-2">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <p className="font-medium text-sm">{procedure.description}</p>
+                              {procedure.code && (
+                                <p className="text-xs text-muted-foreground">Código: {procedure.code}</p>
+                              )}
+                              {procedure.observations && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {procedure.observations}
+                                </p>
+                              )}
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setProcedures(procedures.filter((_, i) => i !== index));
+                              }}
+                              data-testid={`button-delete-procedure-${index}`}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
                           </div>
                         </div>
                       </Card>
