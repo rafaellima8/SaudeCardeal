@@ -253,6 +253,28 @@ export const exams = sqliteTable("exams", {
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
+// Medical Referrals (Encaminhamentos Médicos)
+export const medicalReferrals = sqliteTable("medical_referrals", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  consultationId: text("consultation_id").references(() => consultations.id),
+  citizenId: text("citizen_id").notNull().references(() => citizens.id),
+  professionalId: text("professional_id").notNull().references(() => professionals.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  destination: text("destination").notNull(),
+  specialty: text("specialty"),
+  reason: text("reason").notNull(),
+  priority: text("priority", { enum: ["normal", "urgent", "emergency"] }).notNull().default("normal"),
+  status: text("status", { 
+    enum: ["pending", "scheduled", "in_progress", "completed", "cancelled"] 
+  }).notNull().default("pending"),
+  referralDate: integer("referral_date", { mode: "timestamp" }).notNull(),
+  scheduledDate: integer("scheduled_date", { mode: "timestamp" }),
+  completedDate: integer("completed_date", { mode: "timestamp" }),
+  observations: text("observations"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
 // TFD Requests (Solicitações de Transporte Intermunicipal)
 export const tfdRequests = sqliteTable("tfd_requests", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
@@ -575,6 +597,12 @@ export const insertExamSchema = createInsertSchema(exams).omit({
   createdAt: true,
 });
 
+export const insertMedicalReferralSchema = createInsertSchema(medicalReferrals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertTfdRequestSchema = createInsertSchema(tfdRequests).omit({
   id: true,
   createdAt: true,
@@ -787,6 +815,9 @@ export type Prescription = typeof prescriptions.$inferSelect;
 
 export type InsertExam = z.infer<typeof insertExamSchema>;
 export type Exam = typeof exams.$inferSelect;
+
+export type InsertMedicalReferral = z.infer<typeof insertMedicalReferralSchema>;
+export type MedicalReferral = typeof medicalReferrals.$inferSelect;
 
 export type InsertTfdRequest = z.infer<typeof insertTfdRequestSchema>;
 export type TfdRequest = typeof tfdRequests.$inferSelect;
