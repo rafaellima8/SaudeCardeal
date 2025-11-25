@@ -122,6 +122,9 @@ export const consultations = sqliteTable("consultations", {
   appointmentId: text("appointment_id").references(() => appointments.id),
   consultationDate: integer("consultation_date", { mode: "timestamp" }).notNull(),
   
+  // Dynamic Forms - Care Line Assignment
+  careLineId: text("care_line_id").references(() => careLines.id),
+  
   // e-SUS PEC Attendance Type (replaces legacy 'type') ✅
   attendanceType: text("attendance_type", { 
     enum: ["consulta", "procedimento", "vacina", "visita_domiciliar", "grupo", "atendimento_odonto"] 
@@ -896,6 +899,29 @@ export const therapeuticPlanItems = sqliteTable("therapeutic_plan_items", {
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
+// Care Line Diagnoses Mapping - Automatic care line detection via diagnosis codes
+export const careLineDiagnoses = sqliteTable("care_line_diagnoses", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  careLineId: text("care_line_id").notNull().references(() => careLines.id, { onDelete: "cascade" }),
+  diagnosisType: text("diagnosis_type", { enum: ["ciap2", "cid10"] }).notNull(),
+  diagnosisCode: text("diagnosis_code").notNull(), // "W78", "O11", "E10", etc
+  priority: integer("priority").default(0), // Higher priority = preferred match
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Care Line Triggers - Events that auto-assign care lines
+export const careLineTriggers = sqliteTable("care_line_triggers", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  careLineId: text("care_line_id").notNull().references(() => careLines.id, { onDelete: "cascade" }),
+  triggerType: text("trigger_type", { 
+    enum: ["problem", "procedure", "medication", "exam", "age_range", "gender", "appointment_specialty"] 
+  }).notNull(),
+  triggerValue: text("trigger_value").notNull(), // JSON with trigger criteria
+  priority: integer("priority").default(0),
+  active: integer("active", { mode: "boolean" }).default(true).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
 // Insert Schemas for new tables
 export const insertSpecialtySchema = createInsertSchema(specialties).omit({
   id: true,
@@ -934,6 +960,16 @@ export const insertTherapeuticPlanSchema = createInsertSchema(therapeuticPlans).
 });
 
 export const insertTherapeuticPlanItemSchema = createInsertSchema(therapeuticPlanItems).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCareLineDiagnosisSchema = createInsertSchema(careLineDiagnoses).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCareLineTriggerSchema = createInsertSchema(careLineTriggers).omit({
   id: true,
   createdAt: true,
 });
@@ -1058,3 +1094,9 @@ export type TherapeuticPlan = typeof therapeuticPlans.$inferSelect;
 
 export type InsertTherapeuticPlanItem = z.infer<typeof insertTherapeuticPlanItemSchema>;
 export type TherapeuticPlanItem = typeof therapeuticPlanItems.$inferSelect;
+
+export type CareLineDiagnosis = typeof careLineDiagnoses.$inferSelect;
+export type InsertCareLineDiagnosis = z.infer<typeof insertCareLineDiagnosisSchema>;
+
+export type CareLineTrigger = typeof careLineTriggers.$inferSelect;
+export type InsertCareLineTrigger = z.infer<typeof insertCareLineTriggerSchema>;

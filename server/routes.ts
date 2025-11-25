@@ -2481,6 +2481,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get consultation dynamic form (server-resolved template)
+  app.get("/api/consultations/:consultationId/dynamic-form", async (req, res) => {
+    try {
+      // Multi-tenant security
+      const consultation = await storage.getConsultationById(req.params.consultationId);
+      if (!consultation) {
+        return res.status(404).json({ error: "Consulta não encontrada" });
+      }
+      if (consultation.unitId !== req.session.user?.unitId) {
+        return res.status(403).json({ error: "Acesso negado: consulta não pertence à sua unidade" });
+      }
+
+      // Resolve care line and template
+      const { CareLineResolutionService } = await import("./services/care-line-resolution");
+      const resolution = await CareLineResolutionService.resolveForConsultation(req.params.consultationId);
+
+      if (!resolution.careLineId || !resolution.template) {
+        return res.json({
+          careLineId: null,
+          careLine: null,
+          template: null,
+          fields: [],
+          fieldData: [],
+          matchReason: resolution.matchReason,
+          matchDetails: resolution.matchDetails,
+        });
+      }
+
+      // Load template fields
+      const fields = await storage.getTemplateFields(resolution.template.id);
+
+      // Load existing field data
+      const fieldData = await storage.getConsultationFieldData(req.params.consultationId);
+
+      res.json({
+        careLineId: resolution.careLineId,
+        careLine: resolution.careLine,
+        template: resolution.template,
+        fields,
+        fieldData,
+        matchReason: resolution.matchReason,
+        matchDetails: resolution.matchDetails,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Assign care line to consultation
+  app.post("/api/consultations/:consultationId/care-line", async (req, res) => {
+    try {
+      const { careLineId } = req.body;
+
+      if (!careLineId) {
+        return res.status(400).json({ error: "careLineId é obrigatório" });
+      }
+
+      // Multi-tenant security
+      const consultation = await storage.getConsultationById(req.params.consultationId);
+      if (!consultation) {
+        return res.status(404).json({ error: "Consulta não encontrada" });
+      }
+      if (consultation.unitId !== req.session.user?.unitId) {
+        return res.status(403).json({ error: "Acesso negado: consulta não pertence à sua unidade" });
+      }
+
+      // Assign care line
+      const { CareLineResolutionService } = await import("./services/care-line-resolution");
+      await CareLineResolutionService.assignCareLineToConsultation(
+        req.params.consultationId,
+        careLineId,
+        req.session.user.unitId
+      );
+
+      res.json({ success: true, careLineId });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Save consultation field data
   app.post("/api/consultations/:consultationId/field-data", async (req, res) => {
     try {
