@@ -8,7 +8,34 @@ MuniSaúde Integrado is a comprehensive municipal health management system desig
 
 Preferred communication style: Simple, everyday language.
 
-## Recent Changes (November 24, 2025)
+## Recent Changes (November 25, 2025)
+
+### SelectItem Bug Fix - Appointment System Fully Functional
+
+**Critical UI bug resolved in 3 frontend files:**
+
+1. **SelectItem Value Correction**:
+   - Fixed Radix UI error: "SelectItem must have a non-empty value prop"
+   - Changed all `<SelectItem value="">` to `<SelectItem value="all">`
+   - Updated filter logic to treat "all" as "show all" (undefined in API queries)
+   - Files corrected:
+     - `client/src/pages/appointments.tsx`
+     - `client/src/pages/prescriptions.tsx`
+     - `client/src/pages/attendance-queue.tsx`
+
+2. **Default Filter Values**:
+   - Changed initial state from `""` to `"all"` for professional and unit filters
+   - Ensured consistent behavior across all filter components
+
+3. **System Validation**:
+   - No browser console errors
+   - All SelectItems rendering correctly
+   - Filter functionality working as expected
+   - Server logs clean (no 404s from malformed queries)
+
+**Status**: Appointment system 100% functional. All filter dropdowns working correctly.
+
+## Previous Changes (November 24, 2025)
 
 ### Appointments Module Fixed - All Endpoints Operational
 
