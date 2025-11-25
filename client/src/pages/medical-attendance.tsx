@@ -55,18 +55,25 @@ import {
   Edit,
 } from "lucide-react";
 
-// Helper para converter string vazia em undefined antes de fazer coerção
+// Helper para converter string vazia em undefined e strings numéricas em números
+// Usa preprocess para evitar que undefined passe por coerce (que resulta em NaN)
 const optionalNumber = () =>
-  z
-    .union([z.string(), z.number()])
-    .transform((val) => (val === "" || val === null ? undefined : val))
-    .pipe(z.coerce.number().positive().optional());
+  z.preprocess(
+    (val) => {
+      if (val === "" || val === null || val === undefined) return undefined;
+      return typeof val === "string" ? Number(val) : val;
+    },
+    z.number().positive().optional()
+  );
 
 const optionalNumberRange = (min: number, max: number) =>
-  z
-    .union([z.string(), z.number()])
-    .transform((val) => (val === "" || val === null ? undefined : val))
-    .pipe(z.coerce.number().min(min).max(max).optional());
+  z.preprocess(
+    (val) => {
+      if (val === "" || val === null || val === undefined) return undefined;
+      return typeof val === "string" ? Number(val) : val;
+    },
+    z.number().min(min).max(max).optional()
+  );
 
 // Schema validation
 const soapFormSchema = z.object({
