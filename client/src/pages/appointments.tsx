@@ -66,16 +66,16 @@ const statusLabels: Record<string, string> = {
 export default function Appointments() {
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [selectedProfessional, setSelectedProfessional] = useState<string>("");
-  const [selectedUnit, setSelectedUnit] = useState<string>("");
+  const [selectedProfessional, setSelectedProfessional] = useState<string>("all");
+  const [selectedUnit, setSelectedUnit] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"day" | "week">("week");
 
   const { data: appointments = [], isLoading: loadingAppointments } = useQuery<Appointment[]>({
     queryKey: ["/api/appointments", { 
       date: format(selectedDate, "yyyy-MM-dd"),
-      professionalId: selectedProfessional || undefined,
-      unitId: selectedUnit || undefined,
+      professionalId: selectedProfessional !== "all" ? selectedProfessional : undefined,
+      unitId: selectedUnit !== "all" ? selectedUnit : undefined,
     }],
   });
 
@@ -347,7 +347,7 @@ export default function Appointments() {
                   <SelectValue placeholder="Todos os profissionais" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   {professionals.map((prof) => (
                     <SelectItem key={prof.id} value={prof.id}>
                       {prof.name}
@@ -364,7 +364,7 @@ export default function Appointments() {
                   <SelectValue placeholder="Todas as unidades" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas</SelectItem>
+                  <SelectItem value="all">Todas</SelectItem>
                   {units.map((unit) => (
                     <SelectItem key={unit.id} value={unit.id}>
                       {unit.name}

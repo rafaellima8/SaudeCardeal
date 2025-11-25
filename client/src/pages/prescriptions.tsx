@@ -20,8 +20,8 @@ import { generateLogoSvg } from "@/lib/logo-svg";
 
 export default function Prescriptions() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCitizen, setSelectedCitizen] = useState("");
-  const [selectedProfessional, setSelectedProfessional] = useState("");
+  const [selectedCitizen, setSelectedCitizen] = useState("all");
+  const [selectedProfessional, setSelectedProfessional] = useState("all");
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
 
@@ -40,10 +40,10 @@ export default function Prescriptions() {
     queryKey: ["/api/prescriptions", selectedCitizen, selectedProfessional, dateFrom, dateTo],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (selectedCitizen) {
+      if (selectedCitizen && selectedCitizen !== "all") {
         params.append("citizenId", selectedCitizen);
       }
-      if (selectedProfessional) {
+      if (selectedProfessional && selectedProfessional !== "all") {
         params.append("professionalId", selectedProfessional);
       }
       if (dateFrom) {
@@ -280,7 +280,7 @@ export default function Prescriptions() {
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="" data-testid="option-all-citizens">Todos</SelectItem>
+                  <SelectItem value="all" data-testid="option-all-citizens">Todos</SelectItem>
                   {citizens.map((citizen) => (
                     <SelectItem 
                       key={citizen.id} 
@@ -301,7 +301,7 @@ export default function Prescriptions() {
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="" data-testid="option-all-professionals">Todos</SelectItem>
+                  <SelectItem value="all" data-testid="option-all-professionals">Todos</SelectItem>
                   {professionals.map((prof) => (
                     <SelectItem 
                       key={prof.id} 

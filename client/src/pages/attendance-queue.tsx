@@ -79,8 +79,8 @@ const statusConfig = {
 
 export default function AttendanceQueue() {
   const { toast } = useToast();
-  const [selectedProfessional, setSelectedProfessional] = useState<string>("");
-  const [selectedUnit, setSelectedUnit] = useState<string>("");
+  const [selectedProfessional, setSelectedProfessional] = useState<string>("all");
+  const [selectedUnit, setSelectedUnit] = useState<string>("all");
   const [selectedDate] = useState<Date>(new Date());
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
@@ -93,8 +93,8 @@ export default function AttendanceQueue() {
       "/api/appointments",
       {
         date: format(selectedDate, "yyyy-MM-dd"),
-        professionalId: selectedProfessional || undefined,
-        unitId: selectedUnit || undefined,
+        professionalId: selectedProfessional !== "all" ? selectedProfessional : undefined,
+        unitId: selectedUnit !== "all" ? selectedUnit : undefined,
       },
     ],
   });
@@ -287,7 +287,7 @@ export default function AttendanceQueue() {
                   <SelectValue placeholder="Todos os profissionais" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   {professionals.map((prof) => (
                     <SelectItem key={prof.id} value={prof.id}>
                       {prof.name}
@@ -304,7 +304,7 @@ export default function AttendanceQueue() {
                   <SelectValue placeholder="Todas as unidades" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas</SelectItem>
+                  <SelectItem value="all">Todas</SelectItem>
                   {units.map((unit) => (
                     <SelectItem key={unit.id} value={unit.id}>
                       {unit.name}
