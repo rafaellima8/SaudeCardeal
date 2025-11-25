@@ -4,13 +4,7 @@ import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { Badge } from "@/components/ui/badge";
 import { 
   Users, 
@@ -282,36 +276,32 @@ export default function AttendanceQueue() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label>Profissional</Label>
-              <Select value={selectedProfessional} onValueChange={setSelectedProfessional}>
-                <SelectTrigger data-testid="filter-professional">
-                  <SelectValue placeholder="Todos os profissionais" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {professionals.map((prof) => (
-                    <SelectItem key={prof.id} value={prof.id}>
-                      {prof.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                value={selectedProfessional}
+                onValueChange={setSelectedProfessional}
+                options={[
+                  { value: "all", label: "Todos os profissionais" },
+                  ...professionals.map((p: any) => ({ value: p.id, label: p.name }))
+                ]}
+                placeholder="Todos os profissionais"
+                searchPlaceholder="Buscar profissional..."
+                data-testid="filter-professional"
+              />
             </div>
 
             <div>
               <Label>Unidade</Label>
-              <Select value={selectedUnit} onValueChange={setSelectedUnit}>
-                <SelectTrigger data-testid="filter-unit">
-                  <SelectValue placeholder="Todas as unidades" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  {units.map((unit) => (
-                    <SelectItem key={unit.id} value={unit.id}>
-                      {unit.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                value={selectedUnit}
+                onValueChange={setSelectedUnit}
+                options={[
+                  { value: "all", label: "Todas as unidades" },
+                  ...units.map((u: any) => ({ value: u.id, label: u.name }))
+                ]}
+                placeholder="Todas as unidades"
+                searchPlaceholder="Buscar unidade..."
+                data-testid="filter-unit"
+              />
             </div>
           </div>
         </CardContent>
