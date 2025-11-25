@@ -168,34 +168,44 @@ export function DynamicConsultationForm({
     defaultValues: initialData,
   });
 
-  // Evaluate clinical protocols whenever form data changes
+  // Evaluate clinical protocols whenever form data changes (with debounce)
   useEffect(() => {
     if (!templateData?.fields || !careLineId) return;
 
-    const subscription = form.watch(async (formData) => {
-      try {
-        const response = await fetch("/api/clinical-protocols/evaluate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fieldData: formData,
-            careLineId,
-            specialtyId,
-          }),
-          credentials: "include",
-        });
+    let timeoutId: NodeJS.Timeout;
 
-        if (response.ok) {
-          const protocols = await response.json();
-          setTriggeredProtocols(protocols);
-          onProtocolsTriggered?.(protocols);
+    const subscription = form.watch((formData) => {
+      // Debounce protocol evaluation to avoid hammering the server
+      clearTimeout(timeoutId);
+      
+      timeoutId = setTimeout(async () => {
+        try {
+          const response = await fetch("/api/clinical-protocols/evaluate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              fieldData: formData,
+              careLineId,
+              specialtyId,
+            }),
+            credentials: "include",
+          });
+
+          if (response.ok) {
+            const protocols = await response.json();
+            setTriggeredProtocols(protocols);
+            onProtocolsTriggered?.(protocols);
+          }
+        } catch (error) {
+          console.error("Erro ao avaliar protocolos:", error);
         }
-      } catch (error) {
-        console.error("Erro ao avaliar protocolos:", error);
-      }
+      }, 500); // 500ms debounce
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(timeoutId);
+      subscription.unsubscribe();
+    };
   }, [form, templateData, careLineId, specialtyId, onProtocolsTriggered]);
 
   // Handle form submission

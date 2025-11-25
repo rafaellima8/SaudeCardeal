@@ -2465,6 +2465,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Consultation Field Data (get field data for a consultation)
   app.get("/api/consultations/:consultationId/field-data", async (req, res) => {
     try {
+      // Multi-tenant security: verify consultation belongs to user's unit
+      const consultation = await storage.getConsultationById(req.params.consultationId);
+      if (!consultation) {
+        return res.status(404).json({ error: "Consulta não encontrada" });
+      }
+      if (consultation.unitId !== req.session.user?.unitId) {
+        return res.status(403).json({ error: "Acesso negado: consulta não pertence à sua unidade" });
+      }
+      
       const fieldData = await storage.getConsultationFieldData(req.params.consultationId);
       res.json(fieldData);
     } catch (error: any) {
@@ -2479,6 +2488,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!Array.isArray(fieldData)) {
         return res.status(400).json({ error: "fieldData deve ser um array" });
+      }
+      
+      // Multi-tenant security: verify consultation belongs to user's unit
+      const consultation = await storage.getConsultationById(req.params.consultationId);
+      if (!consultation) {
+        return res.status(404).json({ error: "Consulta não encontrada" });
+      }
+      if (consultation.unitId !== req.session.user?.unitId) {
+        return res.status(403).json({ error: "Acesso negado: consulta não pertence à sua unidade" });
       }
       
       const saved = await storage.saveConsultationFieldData(req.params.consultationId, fieldData);
@@ -2512,12 +2530,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Therapeutic Plans
   app.get("/api/therapeutic-plans", async (req, res) => {
     try {
-      const { citizenId, careLineId, status, unitId } = req.query;
+      const { citizenId, careLineId, status } = req.query;
+      
+      // Multi-tenant security: force unitId to user's unit
       const plans = await storage.getTherapeuticPlans({ 
         citizenId: citizenId as string,
         careLineId: careLineId as string,
         status: status as string,
-        unitId: unitId as string,
+        unitId: req.session.user?.unitId, // Force user's unit
       });
       res.json(plans);
     } catch (error: any) {
@@ -2527,7 +2547,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/therapeutic-plans", async (req, res) => {
     try {
-      const plan = await storage.createTherapeuticPlan(req.body);
+      // Multi-tenant security: force unitId to user's unit
+      if (req.body.unitId && req.body.unitId !== req.session.user?.unitId) {
+        return res.status(403).json({ error: "Acesso negado: não é possível criar plano em outra unidade" });
+      }
+      
+      const plan = await storage.createTherapeuticPlan({
+        ...req.body,
+        unitId: req.session.user?.unitId, // Force user's unit
+        createdBy: req.session.user?.professionalId, // Auto-set creator
+      });
       res.status(201).json(plan);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -2536,10 +2565,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/therapeutic-plans/:id", async (req, res) => {
     try {
-      const plan = await storage.updateTherapeuticPlan(req.params.id, req.body);
-      if (!plan) {
+      // Multi-tenant security: verify plan belongs to user's unit
+      const existingPlan = await storage.getTherapeuticPlanById(req.params.id);
+      if (!existingPlan) {
         return res.status(404).json({ error: "Plano terapêutico não encontrado" });
       }
+      if (existingPlan.unitId !== req.session.user?.unitId) {
+        return res.status(403).json({ error: "Acesso negado: plano não pertence à sua unidade" });
+      }
+      
+      const plan = await storage.updateTherapeuticPlan(req.params.id, req.body);
       res.json(plan);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -2549,6 +2584,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Therapeutic Plan Items
   app.get("/api/therapeutic-plans/:planId/items", async (req, res) => {
     try {
+      // Multi-tenant security: verify plan belongs to user's unit
+      const plan = await storage.getTherapeuticPlanById(req.params.planId);
+      if (!plan) {
+        return res.status(404).json({ error: "Plano terapêutico não encontrado" });
+      }
+      if (plan.unitId !== req.session.user?.unitId) {
+        return res.status(403).json({ error: "Acesso negado: plano não pertence à sua unidade" });
+      }
+      
       const items = await storage.getTherapeuticPlanItems(req.params.planId);
       res.json(items);
     } catch (error: any) {
@@ -2558,6 +2602,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/therapeutic-plans/:planId/items", async (req, res) => {
     try {
+      // Multi-tenant security: verify plan belongs to user's unit
+      const plan = await storage.getTherapeuticPlanById(req.params.planId);
+      if (!plan) {
+        return res.status(404).json({ error: "Plano terapêutico não encontrado" });
+      }
+      if (plan.unitId !== req.session.user?.unitId) {
+        return res.status(403).json({ error: "Acesso negado: plano não pertence à sua unidade" });
+      }
+      
       const item = await storage.createTherapeuticPlanItem({ ...req.body, planId: req.params.planId });
       res.status(201).json(item);
     } catch (error: any) {
