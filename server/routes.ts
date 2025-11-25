@@ -29,6 +29,7 @@ import { generateExport } from "./integrations/esus/exporter";
 import seedSIGTAPMappings from "./seed-sigtap";
 import { authenticateUser, requireAuth, requireRole } from "./auth";
 import aiRoutes from "./routes-ai";
+import { generatePrescriptionPDF, generateMedicalCertificatePDF } from "./services/pdf-generator";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
@@ -491,6 +492,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Dados inválidos", details: error.errors });
       }
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // PRINT ROUTES - PDF Generation
+  // ============================================================================
+
+  // Imprimir receita médica
+  app.get("/api/consultations/:id/print-prescription", async (req, res) => {
+    try {
+      // Buscar consulta
+      const consultation = await storage.getConsultationById(req.params.id);
+      if (!consultation) {
+        return res.status(404).json({ error: "Consulta não encontrada" });
+      }
+
+      // SECURITY: Multi-tenant validation
+      const sessionUnitId = req.session?.user?.unitId;
+      if (sessionUnitId && consultation.unitId !== sessionUnitId) {
+        return res.status(403).json({ error: "Acesso negado: consulta de outra unidade" });
+      }
+
+      // Buscar dados relacionados
+      const citizen = await storage.getCitizenById(consultation.citizenId);
+      if (!citizen) {
+        return res.status(404).json({ error: "Cidadão não encontrado" });
+      }
+
+      const professional = await storage.getProfessionalById(consultation.professionalId);
+      if (!professional) {
+        return res.status(404).json({ error: "Profissional não encontrado" });
+      }
+
+      const unit = await storage.getHealthUnitById(consultation.unitId);
+      if (!unit) {
+        return res.status(404).json({ error: "Unidade não encontrada" });
+      }
+
+      // Buscar prescrições da consulta
+      const prescriptions = await storage.getPrescriptionsByConsultation(req.params.id);
+
+      // Gerar PDF
+      const pdfBuffer = generatePrescriptionPDF({
+        consultation,
+        citizen,
+        professional,
+        unit,
+        prescriptions,
+      });
+
+      // Enviar PDF como resposta
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="receita_${citizen.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error: any) {
+      console.error('Erro ao gerar receita:', error);
+      res.status(500).json({ error: error.message || 'Erro ao gerar receita' });
+    }
+  });
+
+  // Gerar atestado médico
+  app.post("/api/consultations/:id/print-medical-certificate", async (req, res) => {
+    try {
+      // Validar dados do atestado
+      const certificateSchema = z.object({
+        type: z.enum(['trabalho', 'escola', 'outros']),
+        startDate: z.string().transform(str => new Date(str)),
+        endDate: z.string().transform(str => new Date(str)),
+        reason: z.string().optional(),
+      });
+
+      const { type, startDate, endDate, reason } = certificateSchema.parse(req.body);
+
+      // Buscar consulta
+      const consultation = await storage.getConsultationById(req.params.id);
+      if (!consultation) {
+        return res.status(404).json({ error: "Consulta não encontrada" });
+      }
+
+      // SECURITY: Multi-tenant validation
+      const sessionUnitId = req.session?.user?.unitId;
+      if (sessionUnitId && consultation.unitId !== sessionUnitId) {
+        return res.status(403).json({ error: "Acesso negado: consulta de outra unidade" });
+      }
+
+      // Buscar dados relacionados
+      const citizen = await storage.getCitizenById(consultation.citizenId);
+      if (!citizen) {
+        return res.status(404).json({ error: "Cidadão não encontrado" });
+      }
+
+      const professional = await storage.getProfessionalById(consultation.professionalId);
+      if (!professional) {
+        return res.status(404).json({ error: "Profissional não encontrado" });
+      }
+
+      const unit = await storage.getHealthUnitById(consultation.unitId);
+      if (!unit) {
+        return res.status(404).json({ error: "Unidade não encontrada" });
+      }
+
+      // Gerar PDF
+      const pdfBuffer = generateMedicalCertificatePDF({
+        consultation,
+        citizen,
+        professional,
+        unit,
+        certificateType: type,
+        startDate,
+        endDate,
+        reason,
+      });
+
+      // Enviar PDF como resposta
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="atestado_${citizen.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      console.error('Erro ao gerar atestado:', error);
+      res.status(500).json({ error: error.message || 'Erro ao gerar atestado' });
     }
   });
 
