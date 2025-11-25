@@ -905,7 +905,7 @@ export const therapeuticPlanItems = sqliteTable("therapeutic_plan_items", {
 export const careLineDiagnoses = sqliteTable("care_line_diagnoses", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   careLineId: text("care_line_id").notNull().references(() => careLines.id, { onDelete: "cascade" }),
-  diagnosisType: text("diagnosis_type", { enum: ["ciap2", "cid10"] }).notNull(),
+  diagnosisType: text("diagnosis_type", { enum: ["ciap2" as const, "cid10" as const] }).notNull(),
   diagnosisCode: text("diagnosis_code").notNull(), // "W78", "O11", "E10", etc
   priority: integer("priority").default(0), // Higher priority = preferred match
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),

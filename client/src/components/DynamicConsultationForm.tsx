@@ -56,6 +56,7 @@ export function DynamicConsultationForm({
   }>({
     queryKey: ["/api/consultations", consultationId, "dynamic-form"],
     queryFn: () => apiRequest("GET", `/api/consultations/${consultationId}/dynamic-form`),
+    // @ts-ignore - TanStack Query type inference issue
     enabled: !!consultationId,
   });
 
