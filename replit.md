@@ -10,6 +10,47 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (November 25, 2025)
 
+### Searchable Selection (Combobox) - Major UX Enhancement
+
+**Implemented searchable/autocomplete functionality across key modules:**
+
+1. **New Combobox Component** (`client/src/components/ui/combobox.tsx`):
+   - Created reusable Combobox component using Shadcn Command primitives
+   - Supports type-to-search/filter functionality for all selection fields
+   - Fully controlled component with proper TypeScript types
+   - Features: instant search, keyboard navigation, empty state messaging
+   - Maintains all existing test IDs for compatibility
+
+2. **Modules Updated with Search**:
+   - **Appointments** (`appointments.tsx`): 5 selection fields now searchable
+     - Patient selection (form) - search by name or CNS
+     - Professional selection (form) - search by name or specialty
+     - Health unit selection (form) - search by name
+     - Professional filter (calendar view) - search in filter
+     - Health unit filter (calendar view) - search in filter
+   - **Prescriptions** (`prescriptions.tsx`): 2 filter fields now searchable
+     - Patient filter - search by name
+     - Professional filter - search by name
+   - **Attendance Queue** (`attendance-queue.tsx`): 2 filter fields now searchable
+     - Professional filter - search by name
+     - Health unit filter - search by name
+
+3. **UX Improvements**:
+   - Users can now type to filter long lists instead of scrolling
+   - Instant feedback with "no results" message when search yields nothing
+   - Keyboard navigation (arrow keys, Enter to select, Esc to close)
+   - Visual indicator (checkmark) for currently selected item
+   - Maintains "Todos" (all) option in filters for quick reset
+
+4. **Technical Implementation**:
+   - Replaced static `<Select>` components with dynamic `<Combobox>` 
+   - Preserved all existing filtering logic and API query parameters
+   - No breaking changes - all existing functionality maintained
+   - TypeScript type-safe implementation
+   - Architecture review approved - ready for rollout to remaining modules
+
+**Status**: Search functionality active in 3 core modules (9 selection fields total). Remaining modules (ACE, TFD, Reports, etc.) can be updated incrementally.
+
 ### SelectItem Bug Fix - Appointment System Fully Functional
 
 **Critical UI bug resolved in 3 frontend files:**
