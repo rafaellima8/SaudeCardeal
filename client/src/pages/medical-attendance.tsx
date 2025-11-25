@@ -4,8 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { queryClient } from "@/lib/queryClient";
-import { apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -160,71 +159,42 @@ export default function MedicalAttendance() {
   // Buscar dados da consulta
   const { data: consultation, isLoading: loadingConsultation } = useQuery({
     queryKey: ["/api/consultations", consultationId],
-    queryFn: async () => {
-      const response = await fetch(`/api/consultations/${consultationId}`);
-      if (!response.ok) throw new Error("Erro ao carregar consulta");
-      return response.json();
-    },
+    queryFn: () => apiRequest("GET", `/api/consultations/${consultationId}`),
     enabled: !!consultationId,
   });
 
   // Buscar histórico do paciente
   const { data: patientHistory, isLoading: loadingHistory } = useQuery({
-    queryKey: ["/api/citizens", consultation?.citizenId, "history"],
-    queryFn: async () => {
-      if (!consultation?.citizenId) return null;
-      const response = await fetch(`/api/citizens/${consultation.citizenId}/history`);
-      if (!response.ok) throw new Error("Erro ao carregar histórico");
-      return response.json();
-    },
+    queryKey: ["/api/citizens", consultation?.citizenId, "medical-history"],
+    queryFn: () => apiRequest("GET", `/api/citizens/${consultation.citizenId}/medical-history`),
     enabled: !!consultation?.citizenId,
   });
 
   // Buscar problemas ativos do cidadão
   const { data: citizenProblems = [], isLoading: loadingProblems } = useQuery({
     queryKey: ["/api/citizens", consultation?.citizenId, "problems"],
-    queryFn: async () => {
-      if (!consultation?.citizenId) return [];
-      const response = await fetch(`/api/citizens/${consultation.citizenId}/problems`);
-      if (!response.ok) throw new Error("Erro ao carregar problemas");
-      return response.json();
-    },
+    queryFn: () => apiRequest("GET", `/api/citizens/${consultation.citizenId}/problems`),
     enabled: !!consultation?.citizenId,
   });
 
   // Buscar prescrições da consulta
   const { data: prescriptions = [], isLoading: loadingPrescriptions } = useQuery({
     queryKey: ["/api/prescriptions", consultationId],
-    queryFn: async () => {
-      if (!consultationId) return [];
-      const response = await fetch(`/api/prescriptions?consultationId=${consultationId}`);
-      if (!response.ok) throw new Error("Erro ao carregar prescrições");
-      return response.json();
-    },
+    queryFn: () => apiRequest("GET", `/api/prescriptions?consultationId=${consultationId}`),
     enabled: !!consultationId,
   });
 
   // Buscar encaminhamentos da consulta
   const { data: referrals = [], isLoading: loadingReferrals } = useQuery({
     queryKey: ["/api/medical-referrals", consultationId],
-    queryFn: async () => {
-      if (!consultationId) return [];
-      const response = await fetch(`/api/medical-referrals?consultationId=${consultationId}`);
-      if (!response.ok) throw new Error("Erro ao carregar encaminhamentos");
-      return response.json();
-    },
+    queryFn: () => apiRequest("GET", `/api/medical-referrals?consultationId=${consultationId}`),
     enabled: !!consultationId,
   });
 
   // Buscar exames da consulta
   const { data: exams = [], isLoading: loadingExams } = useQuery({
     queryKey: ["/api/exams", consultationId],
-    queryFn: async () => {
-      if (!consultationId) return [];
-      const response = await fetch(`/api/exams?consultationId=${consultationId}`);
-      if (!response.ok) throw new Error("Erro ao carregar exames");
-      return response.json();
-    },
+    queryFn: () => apiRequest("GET", `/api/exams?consultationId=${consultationId}`),
     enabled: !!consultationId,
   });
 
@@ -412,6 +382,9 @@ export default function MedicalAttendance() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/prescriptions", consultationId] });
+      if (consultation?.citizenId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/citizens", consultation.citizenId, "medical-history"] });
+      }
       setPrescriptionDialogOpen(false);
       setEditingPrescription(null);
       toast({
@@ -435,6 +408,9 @@ export default function MedicalAttendance() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/prescriptions", consultationId] });
+      if (consultation?.citizenId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/citizens", consultation.citizenId, "medical-history"] });
+      }
       setPrescriptionDialogOpen(false);
       setEditingPrescription(null);
       toast({
@@ -457,6 +433,9 @@ export default function MedicalAttendance() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/prescriptions", consultationId] });
+      if (consultation?.citizenId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/citizens", consultation.citizenId, "medical-history"] });
+      }
       setDeletePrescriptionId(null);
       toast({
         title: "Prescrição Removida",
@@ -487,6 +466,9 @@ export default function MedicalAttendance() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/medical-referrals", consultationId] });
+      if (consultation?.citizenId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/citizens", consultation.citizenId, "medical-history"] });
+      }
       setReferralDialogOpen(false);
       setEditingReferral(null);
       toast({
@@ -510,6 +492,9 @@ export default function MedicalAttendance() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/medical-referrals", consultationId] });
+      if (consultation?.citizenId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/citizens", consultation.citizenId, "medical-history"] });
+      }
       setReferralDialogOpen(false);
       setEditingReferral(null);
       toast({
@@ -532,6 +517,9 @@ export default function MedicalAttendance() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/medical-referrals", consultationId] });
+      if (consultation?.citizenId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/citizens", consultation.citizenId, "medical-history"] });
+      }
       setDeleteReferralId(null);
       toast({
         title: "Encaminhamento Removido",
@@ -564,6 +552,9 @@ export default function MedicalAttendance() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/exams", consultationId] });
+      if (consultation?.citizenId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/citizens", consultation.citizenId, "medical-history"] });
+      }
       setExamDialogOpen(false);
       setEditingExam(null);
       examForm.reset();
@@ -588,6 +579,9 @@ export default function MedicalAttendance() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/exams", consultationId] });
+      if (consultation?.citizenId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/citizens", consultation.citizenId, "medical-history"] });
+      }
       setExamDialogOpen(false);
       setEditingExam(null);
       examForm.reset();
@@ -611,6 +605,9 @@ export default function MedicalAttendance() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/exams", consultationId] });
+      if (consultation?.citizenId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/citizens", consultation.citizenId, "medical-history"] });
+      }
       setDeleteExamId(null);
       toast({
         title: "Exame Removido",

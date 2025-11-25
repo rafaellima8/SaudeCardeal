@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,6 +23,7 @@ interface MedicalHistoryProps {
 export function MedicalHistory({ citizenId }: MedicalHistoryProps) {
   const { data: history, isLoading } = useQuery({
     queryKey: ["/api/citizens", citizenId, "medical-history"],
+    queryFn: () => apiRequest("GET", `/api/citizens/${citizenId}/medical-history`),
     enabled: !!citizenId,
   });
 
