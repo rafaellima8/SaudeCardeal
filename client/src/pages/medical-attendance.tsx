@@ -48,6 +48,7 @@ import {
 import { PrescriptionForm, type PrescriptionFormData } from "@/components/PrescriptionForm";
 import { ReferralForm, type ReferralFormData } from "@/components/ReferralForm";
 import { MedicalHistory } from "@/components/MedicalHistory";
+import { DynamicConsultationForm } from "@/components/DynamicConsultationForm";
 
 // Icons
 import {
@@ -1014,10 +1015,14 @@ export default function MedicalAttendance() {
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   <Tabs defaultValue="soap" className="w-full">
-                    <TabsList className="grid w-full grid-cols-4">
+                    <TabsList className="grid w-full grid-cols-5">
                       <TabsTrigger value="soap" data-testid="tab-soap">SOAP</TabsTrigger>
                       <TabsTrigger value="vitals" data-testid="tab-vitals">Sinais Vitais</TabsTrigger>
                       <TabsTrigger value="notes" data-testid="tab-notes">Observações</TabsTrigger>
+                      <TabsTrigger value="dynamic" data-testid="tab-dynamic">
+                        <ClipboardList className="h-4 w-4 mr-2" />
+                        Especialidade
+                      </TabsTrigger>
                       <TabsTrigger value="history" data-testid="tab-history">
                         <History className="h-4 w-4 mr-2" />
                         Histórico
@@ -1306,6 +1311,48 @@ export default function MedicalAttendance() {
                           </FormItem>
                         )}
                       />
+                    </TabsContent>
+
+                    <TabsContent value="dynamic" className="space-y-4 mt-4">
+                      <div className="rounded-lg border border-muted bg-muted/30 p-4">
+                        <div className="flex items-start gap-3">
+                          <ClipboardList className="h-5 w-5 text-primary mt-0.5" />
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-sm mb-1">Formulários Específicos por Especialidade</h4>
+                            <p className="text-sm text-muted-foreground">
+                              Esta aba permite registrar dados específicos conforme a linha de cuidado do paciente 
+                              (pré-natal, diabetes, hipertensão, etc). Os protocolos clínicos avaliarão automaticamente 
+                              os dados e gerarão alertas quando necessário.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border p-6 text-center">
+                        <ClipboardList className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                        <h3 className="font-semibold mb-2">Formulários Dinâmicos em Desenvolvimento</h3>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          O sistema de formulários específicos por especialidade está sendo implementado.
+                          Em breve você poderá registrar:
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-2 max-w-md mx-auto">
+                          <li className="flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            Pré-natal: DUM, IG, altura uterina, BCF, movimentos fetais
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            Diabetes: Glicemia, HbA1c, ajuste de insulina
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            Hipertensão: Controle pressórico, ajuste medicamentoso
+                          </li>
+                        </ul>
+                        <p className="text-xs text-muted-foreground mt-6">
+                          💡 Os dados serão validados automaticamente conforme protocolos clínicos do Ministério da Saúde
+                        </p>
+                      </div>
                     </TabsContent>
 
                     <TabsContent value="history" className="mt-4">
