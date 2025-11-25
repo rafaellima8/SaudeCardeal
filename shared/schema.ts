@@ -797,9 +797,11 @@ export const specialties = sqliteTable("specialties", {
 export const careLines = sqliteTable("care_lines", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   name: text("name").notNull(), // "Diabetes", "Pré-natal", "Hipertensão"
-  code: text("code").notNull().unique(), // "DIABETES", "PRENATAL", etc
+  code: text("code").notNull(), // REMOVED .unique() - allowing per-unit duplicates
   description: text("description"),
   specialtyId: text("specialty_id").references(() => specialties.id), // Opcional
+  unitId: text("unit_id").notNull().references(() => healthUnits.id), // SECURITY: Multi-tenant isolation
+  priority: integer("priority").default(0), // For specialty fallback ordering
   riskStratification: integer("risk_stratification", { mode: "boolean" }).default(false),
   active: integer("active", { mode: "boolean" }).default(true).notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),

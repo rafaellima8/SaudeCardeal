@@ -2493,9 +2493,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Acesso negado: consulta não pertence à sua unidade" });
       }
 
-      // Resolve care line and template
+      // Resolve care line and template (SECURITY: pass unitId)
       const { CareLineResolutionService } = await import("./services/care-line-resolution");
-      const resolution = await CareLineResolutionService.resolveForConsultation(req.params.consultationId);
+      const resolution = await CareLineResolutionService.resolveForConsultation(
+        req.params.consultationId,
+        req.session.user.unitId // SECURITY: enforce multi-tenant isolation
+      );
 
       if (!resolution.careLineId || !resolution.template) {
         return res.json({

@@ -16,6 +16,7 @@ export interface CareLineResolutionContext {
   consultationId: string;
   citizenId: string;
   professionalId: string;
+  unitId: string; // REQUIRED for multi-tenant security
   appointmentId?: string;
   activeProblems?: Array<{ ciap2Code?: string; cid10Code?: string }>;
 }
@@ -30,28 +31,41 @@ export interface CareLineResolution {
 
 export class CareLineResolutionService {
   /**
-   * Resolve care line for a consultation
+   * Resolve care line for a consultation (MULTI-TENANT SECURE)
    */
-  static async resolveForConsultation(consultationId: string): Promise<CareLineResolution> {
+  static async resolveForConsultation(consultationId: string, unitId: string): Promise<CareLineResolution> {
     // Get consultation
     const consultation = await db.query.consultations.findFirst({
-      where: eq(schema.consultations.id, consultationId),
+      where: and(
+        eq(schema.consultations.id, consultationId),
+        eq(schema.consultations.unitId, unitId) // SECURITY: unit validation
+      ),
     });
 
     if (!consultation) {
-      throw new Error("Consultation not found");
+      throw new Error("Consultation not found or access denied");
     }
 
-    // 1. Check explicit assignment
+    // 1. Check explicit assignment (validate unit ownership)
     if (consultation.careLineId) {
-      return await this.loadCareLineWithTemplate(
-        consultation.careLineId,
-        "explicit",
-        "Directly assigned to consultation"
-      );
+      const careLine = await db.query.careLines.findFirst({
+        where: and(
+          eq(schema.careLines.id, consultation.careLineId),
+          eq(schema.careLines.unitId, unitId) // SECURITY: verify care line belongs to unit
+        ),
+      });
+      
+      if (careLine) {
+        return await this.loadCareLineWithTemplate(
+          consultation.careLineId,
+          unitId,
+          "explicit",
+          "Directly assigned to consultation"
+        );
+      }
     }
 
-    // 2. Check active problems/diagnoses
+    // 2. Check active problems/diagnoses (MULTI-TENANT SECURE)
     const problems = await db.query.citizenProblems.findMany({
       where: and(
         eq(schema.citizenProblems.citizenId, consultation.citizenId),
@@ -65,7 +79,8 @@ export class CareLineResolutionService {
         .filter(Boolean) as string[];
 
       if (codes.length > 0) {
-        const diagnosisMatch = await db.query.careLineDiagnoses.findFirst({
+        // SECURITY: First get matching diagnoses, then verify care line belongs to unit
+        const diagnosisMappings = await db.query.careLineDiagnoses.findMany({
           where: and(
             inArray(schema.careLineDiagnoses.diagnosisCode, codes),
             inArray(
@@ -76,17 +91,29 @@ export class CareLineResolutionService {
           orderBy: [desc(schema.careLineDiagnoses.priority)],
         });
 
-        if (diagnosisMatch) {
-          return await this.loadCareLineWithTemplate(
-            diagnosisMatch.careLineId,
-            "diagnosis",
-            `Matched diagnosis code: ${diagnosisMatch.diagnosisCode}`
-          );
+        for (const mapping of diagnosisMappings) {
+          // Verify care line belongs to same unit
+          const careLine = await db.query.careLines.findFirst({
+            where: and(
+              eq(schema.careLines.id, mapping.careLineId),
+              eq(schema.careLines.unitId, unitId), // SECURITY: unit validation
+              eq(schema.careLines.active, true)
+            ),
+          });
+
+          if (careLine) {
+            return await this.loadCareLineWithTemplate(
+              mapping.careLineId,
+              unitId,
+              "diagnosis",
+              `Matched diagnosis code: ${mapping.diagnosisCode}`
+            );
+          }
         }
       }
     }
 
-    // 3. Check appointment specialty
+    // 3. Check appointment specialty (MULTI-TENANT SECURE)
     if (consultation.appointmentId) {
       const appointment = await db.query.appointments.findFirst({
         where: eq(schema.appointments.id, consultation.appointmentId),
@@ -103,16 +130,22 @@ export class CareLineResolutionService {
           });
 
           if (specialtyMatch) {
-            const careLine = await db.query.careLines.findFirst({
+            // SECURITY: Only select care lines from same unit, prioritized
+            const careLines = await db.query.careLines.findMany({
               where: and(
                 eq(schema.careLines.specialtyId, specialtyMatch.id),
+                eq(schema.careLines.unitId, unitId), // SECURITY: unit filter
                 eq(schema.careLines.active, true)
               ),
+              orderBy: [desc(schema.careLines.priority)], // Use priority if defined
             });
 
-            if (careLine) {
+            if (careLines.length > 0) {
+              // Select highest priority care line
+              const careLine = careLines[0];
               return await this.loadCareLineWithTemplate(
                 careLine.id,
+                unitId,
                 "specialty",
                 `Professional specialty: ${professional.specialty}`
               );
@@ -122,7 +155,7 @@ export class CareLineResolutionService {
       }
     }
 
-    // 4. Check age/gender triggers
+    // 4. Check age/gender triggers (MULTI-TENANT SECURE)
     const citizen = await db.query.citizens.findFirst({
       where: eq(schema.citizens.id, consultation.citizenId),
     });
@@ -142,10 +175,22 @@ export class CareLineResolutionService {
       for (const trigger of triggers) {
         const criteria = JSON.parse(trigger.triggerValue);
 
+        // SECURITY: Verify trigger's care line belongs to unit before matching
+        const careLine = await db.query.careLines.findFirst({
+          where: and(
+            eq(schema.careLines.id, trigger.careLineId),
+            eq(schema.careLines.unitId, unitId), // SECURITY: unit validation
+            eq(schema.careLines.active, true)
+          ),
+        });
+
+        if (!careLine) continue; // Skip if care line not in this unit
+
         if (trigger.triggerType === "age_range") {
           if (age >= criteria.minAge && age <= criteria.maxAge) {
             return await this.loadCareLineWithTemplate(
               trigger.careLineId,
+              unitId,
               "trigger",
               `Age range match: ${criteria.minAge}-${criteria.maxAge}`
             );
@@ -155,6 +200,7 @@ export class CareLineResolutionService {
         if (trigger.triggerType === "gender" && criteria.gender === gender) {
           return await this.loadCareLineWithTemplate(
             trigger.careLineId,
+            unitId,
             "trigger",
             `Gender match: ${gender}`
           );
@@ -172,15 +218,19 @@ export class CareLineResolutionService {
   }
 
   /**
-   * Load care line with its active template
+   * Load care line with its active template (MULTI-TENANT SECURE)
    */
   private static async loadCareLineWithTemplate(
     careLineId: string,
+    unitId: string, // SECURITY: required for unit validation
     matchReason: CareLineResolution["matchReason"],
     matchDetails: string
   ): Promise<CareLineResolution> {
     const careLine = await db.query.careLines.findFirst({
-      where: eq(schema.careLines.id, careLineId),
+      where: and(
+        eq(schema.careLines.id, careLineId),
+        eq(schema.careLines.unitId, unitId) // SECURITY: verify ownership
+      ),
     });
 
     if (!careLine) {
@@ -209,24 +259,35 @@ export class CareLineResolutionService {
   }
 
   /**
-   * Assign care line to consultation
+   * Assign care line to consultation (MULTI-TENANT SECURE)
    */
   static async assignCareLineToConsultation(
     consultationId: string,
     careLineId: string,
     unitId: string
   ): Promise<void> {
-    // Verify consultation belongs to unit
+    // SECURITY: Verify consultation belongs to unit
     const consultation = await db.query.consultations.findFirst({
-      where: eq(schema.consultations.id, consultationId),
+      where: and(
+        eq(schema.consultations.id, consultationId),
+        eq(schema.consultations.unitId, unitId)
+      ),
     });
 
     if (!consultation) {
-      throw new Error("Consultation not found");
+      throw new Error("Consultation not found or access denied");
     }
 
-    if (consultation.unitId !== unitId) {
-      throw new Error("Access denied: consultation does not belong to your unit");
+    // SECURITY: Verify target care line belongs to same unit
+    const careLine = await db.query.careLines.findFirst({
+      where: and(
+        eq(schema.careLines.id, careLineId),
+        eq(schema.careLines.unitId, unitId)
+      ),
+    });
+
+    if (!careLine) {
+      throw new Error("Care line not found or access denied");
     }
 
     // Update consultation
