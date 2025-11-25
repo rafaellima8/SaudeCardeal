@@ -11,6 +11,7 @@ import {
   insertConsultationSchema,
   insertPrescriptionSchema,
   insertExamSchema,
+  insertMedicalReferralSchema,
   insertTfdRequestSchema,
   insertProfessionalSchema,
   insertDwellingSchema,
@@ -672,6 +673,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const success = await storage.deletePrescription(req.params.id);
       if (!success) {
         return res.status(404).json({ error: "Prescrição não encontrada" });
+      }
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Medical Referrals API
+  app.get("/api/medical-referrals", async (req, res) => {
+    try {
+      const { citizenId, consultationId, unitId, status } = req.query;
+      const referrals = await storage.getMedicalReferrals({
+        citizenId: citizenId as string,
+        consultationId: consultationId as string,
+        unitId: unitId as string,
+        status: status as string,
+      });
+      res.json(referrals);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/medical-referrals/:id", async (req, res) => {
+    try {
+      const referral = await storage.getMedicalReferralById(req.params.id);
+      if (!referral) {
+        return res.status(404).json({ error: "Encaminhamento não encontrado" });
+      }
+      res.json(referral);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/medical-referrals", async (req, res) => {
+    try {
+      const data = insertMedicalReferralSchema.parse(req.body);
+      const referral = await storage.createMedicalReferral(data);
+      res.status(201).json(referral);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/medical-referrals/:id", async (req, res) => {
+    try {
+      const referral = await storage.updateMedicalReferral(req.params.id, req.body);
+      if (!referral) {
+        return res.status(404).json({ error: "Encaminhamento não encontrado" });
+      }
+      res.json(referral);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/medical-referrals/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteMedicalReferral(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Encaminhamento não encontrado" });
       }
       res.status(204).send();
     } catch (error: any) {

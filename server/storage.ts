@@ -16,6 +16,8 @@ import type {
   MedicationStock,
   InsertExam,
   Exam,
+  InsertMedicalReferral,
+  MedicalReferral,
   InsertTfdRequest,
   TfdRequest,
   InsertAttendanceQueue,
@@ -143,6 +145,13 @@ export interface IStorage {
   createExam(exam: InsertExam): Promise<Exam>;
   updateExam(id: string, exam: Partial<InsertExam>): Promise<Exam | undefined>;
   deleteExam(id: string): Promise<boolean>;
+
+  // Medical Referrals
+  getMedicalReferrals(params: { citizenId?: string; consultationId?: string; unitId?: string; status?: string }): Promise<MedicalReferral[]>;
+  getMedicalReferralById(id: string): Promise<MedicalReferral | undefined>;
+  createMedicalReferral(referral: InsertMedicalReferral): Promise<MedicalReferral>;
+  updateMedicalReferral(id: string, referral: Partial<InsertMedicalReferral>): Promise<MedicalReferral | undefined>;
+  deleteMedicalReferral(id: string): Promise<boolean>;
 
   // TFD
   getTfdRequests(params: { citizenId?: string; status?: string }): Promise<TfdRequest[]>;
@@ -658,6 +667,48 @@ export class DbStorage implements IStorage {
       .update(schema.exams)
       .set(exam)
       .where(eq(schema.exams.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Medical Referrals
+  async getMedicalReferrals(params: { 
+    citizenId?: string; 
+    consultationId?: string; 
+    unitId?: string; 
+    status?: string;
+  }): Promise<MedicalReferral[]> {
+    const conditions: any[] = [];
+
+    if (params.citizenId) conditions.push(eq(schema.medicalReferrals.citizenId, params.citizenId));
+    if (params.consultationId) conditions.push(eq(schema.medicalReferrals.consultationId, params.consultationId));
+    if (params.unitId) conditions.push(eq(schema.medicalReferrals.unitId, params.unitId));
+    if (params.status) conditions.push(eq(schema.medicalReferrals.status, params.status as any));
+
+    let query = db.select().from(schema.medicalReferrals);
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    return query.orderBy(desc(schema.medicalReferrals.referralDate));
+  }
+
+  async getMedicalReferralById(id: string): Promise<MedicalReferral | undefined> {
+    const [referral] = await db.select().from(schema.medicalReferrals).where(eq(schema.medicalReferrals.id, id));
+    return referral;
+  }
+
+  async createMedicalReferral(referral: InsertMedicalReferral): Promise<MedicalReferral> {
+    const [created] = await db.insert(schema.medicalReferrals).values(referral).returning();
+    return created;
+  }
+
+  async updateMedicalReferral(id: string, referral: Partial<InsertMedicalReferral>): Promise<MedicalReferral | undefined> {
+    const [updated] = await db
+      .update(schema.medicalReferrals)
+      .set({ ...referral, updatedAt: new Date() })
+      .where(eq(schema.medicalReferrals.id, id))
       .returning();
     return updated;
   }
@@ -1270,6 +1321,11 @@ export class DbStorage implements IStorage {
 
   async deleteExam(id: string): Promise<boolean> {
     const result = await db.delete(schema.exams).where(eq(schema.exams.id, id));
+    return result.changes > 0;
+  }
+
+  async deleteMedicalReferral(id: string): Promise<boolean> {
+    const result = await db.delete(schema.medicalReferrals).where(eq(schema.medicalReferrals.id, id));
     return result.changes > 0;
   }
 
