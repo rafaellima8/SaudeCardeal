@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -16,6 +17,7 @@ import {
   Calendar as CalendarIcon,
   User,
   Building2,
+  Stethoscope,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { type Appointment, type Citizen, type Professional, type HealthUnit } from "@shared/schema";
@@ -73,12 +75,14 @@ const statusConfig = {
 
 export default function AttendanceQueue() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [selectedProfessional, setSelectedProfessional] = useState<string>("all");
   const [selectedUnit, setSelectedUnit] = useState<string>("all");
   const [selectedDate] = useState<Date>(new Date());
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     appointmentId: string;
+    professionalId?: string;
     action: "confirm" | "start" | "complete" | "cancel" | "no-show";
   }>({ open: false, appointmentId: "", action: "confirm" });
 
@@ -132,14 +136,64 @@ export default function AttendanceQueue() {
     },
   });
 
+  const startConsultationMutation = useMutation({
+    mutationFn: async ({ queueId, professionalId }: { queueId: string; professionalId: string }) => {
+      const response = await fetch("/api/attendance/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ queueId, professionalId }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Erro ao iniciar atendimento");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/queue"] });
+      setConfirmDialog({ open: false, appointmentId: "", action: "confirm" });
+      toast({
+        title: "Atendimento Iniciado",
+        description: "Redirecionando para tela de atendimento...",
+      });
+      // Redirecionar para página de atendimento médico
+      setLocation(`/atendimento-medico/${data.consultation.id}`);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao Iniciar Atendimento",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleStatusChange = (id: string, newStatus: string) => {
     updateStatusMutation.mutate({ id, status: newStatus });
   };
 
   const handleConfirmAction = () => {
+    // Se for "start", usar a mutation específica que cria a consulta
+    if (confirmDialog.action === "start") {
+      if (!confirmDialog.professionalId) {
+        toast({
+          title: "Erro",
+          description: "Profissional não identificado",
+          variant: "destructive",
+        });
+        return;
+      }
+      startConsultationMutation.mutate({
+        queueId: confirmDialog.appointmentId,
+        professionalId: confirmDialog.professionalId,
+      });
+      return;
+    }
+
+    // Para outras ações, apenas mudar o status
     const statusMap = {
       confirm: "confirmed",
-      start: "in_progress",
       complete: "completed",
       cancel: "cancelled",
       "no-show": "no_show",
@@ -201,6 +255,7 @@ export default function AttendanceQueue() {
                     setConfirmDialog({
                       open: true,
                       appointmentId: apt.id,
+                      professionalId: apt.professionalId,
                       action: apt.status === "scheduled" ? "confirm" : apt.status === "confirmed" ? "start" : "complete",
                     })
                   }
@@ -404,9 +459,9 @@ export default function AttendanceQueue() {
             <AlertDialogAction 
               onClick={handleConfirmAction} 
               data-testid="dialog-confirm"
-              disabled={updateStatusMutation.isPending}
+              disabled={updateStatusMutation.isPending || startConsultationMutation.isPending}
             >
-              {updateStatusMutation.isPending ? "Processando..." : "Confirmar"}
+              {(updateStatusMutation.isPending || startConsultationMutation.isPending) ? "Processando..." : "Confirmar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

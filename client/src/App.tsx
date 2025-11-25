@@ -17,6 +17,7 @@ import Patients from "@/pages/patients";
 import PatientDetail from "@/pages/patient-detail";
 import Appointments from "@/pages/appointments";
 import AttendanceQueue from "@/pages/attendance-queue";
+import MedicalAttendance from "@/pages/medical-attendance";
 import Consultations from "@/pages/consultations";
 import Prescriptions from "@/pages/prescriptions";
 import Pharmacy from "@/pages/pharmacy";
@@ -45,6 +46,7 @@ function ProtectedRoutes() {
       <Route path="/pacientes/:id" component={PatientDetail} />
       <Route path="/agendamentos" component={Appointments} />
       <Route path="/fila-atendimento" component={AttendanceQueue} />
+      <Route path="/atendimento-medico/:consultationId" component={MedicalAttendance} />
       <Route path="/atendimentos" component={Consultations} />
       <Route path="/prescricoes" component={Prescriptions} />
       <Route path="/farmacia" component={Pharmacy} />
