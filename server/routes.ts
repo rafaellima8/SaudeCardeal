@@ -31,6 +31,11 @@ import { authenticateUser, requireAuth, requireRole } from "./auth";
 import aiRoutes from "./routes-ai";
 import { generatePrescriptionPDF, generateMedicalCertificatePDF } from "./services/pdf-generator";
 import { CareLineResolutionService } from "./services/care-line-resolution";
+import { ProtocolAlertService } from "./services/protocol-alert.service";
+import { rawSqlite } from "./db";
+
+// Initialize Protocol Alert Service using SHARED SQLite instance (transactional consistency) ✅
+const protocolAlertService = new ProtocolAlertService(rawSqlite);
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
@@ -269,7 +274,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { status } = req.query;
-      const queue = await storage.getAttendanceQueue(req.params.unitId, status as string);
+      const queue = await storage.getAttendanceQueue({
+        unitId: req.params.unitId,
+        status: status as string,
+      });
       res.json(queue);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -416,7 +424,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const data = insertConsultationSchema.parse(req.body);
       const consultation = await storage.createConsultation(data);
-      res.status(201).json(consultation);
+      
+      // CLINICAL DECISION SUPPORT: Evaluate protocols and trigger alerts ✅
+      let alerts: any[] = [];
+      try {
+        alerts = await protocolAlertService.evaluateConsultation(consultation.id);
+      } catch (alertError: any) {
+        console.warn('[PROTOCOL ALERTS] Aviso: Falha ao avaliar protocolos:', alertError.message);
+      }
+      
+      res.status(201).json({ ...consultation, alerts });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Dados inválidos", details: error.errors });
@@ -445,7 +462,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         validatedPrescriptions
       );
       
-      res.status(201).json(result);
+      // CLINICAL DECISION SUPPORT: Evaluate protocols and trigger alerts ✅
+      let alerts: any[] = [];
+      try {
+        alerts = await protocolAlertService.evaluateConsultation(result.consultation.id);
+      } catch (alertError: any) {
+        console.warn('[PROTOCOL ALERTS] Aviso: Falha ao avaliar protocolos:', alertError.message);
+      }
+      
+      res.status(201).json({ ...result, alerts });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Dados inválidos", details: error.errors });
@@ -490,7 +515,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Consulta não encontrada" });
       }
 
-      res.json(updated);
+      // CLINICAL DECISION SUPPORT: Re-evaluate protocols after update ✅
+      let alerts: any[] = [];
+      try {
+        alerts = await protocolAlertService.evaluateConsultation(updated.id);
+      } catch (alertError: any) {
+        console.warn('[PROTOCOL ALERTS] Aviso: Falha ao avaliar protocolos:', alertError.message);
+      }
+
+      res.json({ ...updated, alerts });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Dados inválidos", details: error.errors });
@@ -533,7 +566,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Consulta não encontrada" });
       }
 
-      res.json(finalized);
+      // CLINICAL DECISION SUPPORT: Evaluate protocols on finalization ✅
+      let alerts: any[] = [];
+      try {
+        alerts = await protocolAlertService.evaluateConsultation(finalized.id);
+      } catch (alertError: any) {
+        console.warn('[PROTOCOL ALERTS] Aviso: Falha ao avaliar protocolos:', alertError.message);
+      }
+
+      res.json({ ...finalized, alerts });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Dados inválidos", details: error.errors });
@@ -794,15 +835,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { careLineId } = req.params;
       const { status } = req.query;
 
-      // SECURITY: Multi-tenant validation
+      // SECURITY: Multi-tenant validation - FORCE session unitId (prevent cross-unit access)
       const sessionUnitId = req.session?.user?.unitId;
       if (!sessionUnitId) {
         return res.status(401).json({ error: "Sessão inválida - unitId não encontrado" });
       }
 
+      // CRITICAL: Always use sessionUnitId (never trust URL params for multi-tenant security)
       const queue = await storage.getAttendanceQueueByCareLine({
-        unitId: sessionUnitId,
-        careLineId,
+        unitId: sessionUnitId, // ✅ ENFORCE session unitId
+        careLineId, // OK to trust careLineId since it's filtered by unitId
         status: status as string,
       });
 

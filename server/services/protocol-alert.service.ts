@@ -1,5 +1,4 @@
 import type { Database } from "better-sqlite3";
-import type { consultations } from "@/shared/schema";
 
 /**
  * Protocol Alert Service

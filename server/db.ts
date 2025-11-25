@@ -6,3 +6,4 @@ const sqlite = new Database("./saude.db");
 sqlite.pragma('journal_mode = WAL');
 
 export const db = drizzle(sqlite, { schema });
+export const rawSqlite = sqlite; // Export raw sqlite for services that need direct access ✅
