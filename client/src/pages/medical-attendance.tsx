@@ -338,11 +338,14 @@ export default function MedicalAttendance() {
   // Mutations para prescrições
   const createPrescriptionMutation = useMutation({
     mutationFn: async (data: PrescriptionFormData) => {
+      if (!consultation?.citizenId || !consultation?.professionalId) {
+        throw new Error("Dados da consulta incompletos");
+      }
       const result: any = await apiRequest("POST", "/api/prescriptions", {
         ...data,
-        consultationId,
-        citizenId: consultation?.citizenId,
-        professionalId: consultation?.professionalId,
+        consultationId: consultationId,
+        citizenId: consultation.citizenId,
+        professionalId: consultation.professionalId,
       });
       return result;
     },
@@ -1228,7 +1231,11 @@ export default function MedicalAttendance() {
       {/* AlertDialog para Confirmar Exclusão de Prescrição */}
       <AlertDialog 
         open={!!deletePrescriptionId} 
-        onOpenChange={(open) => !open && setDeletePrescriptionId(null)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeletePrescriptionId(null);
+          }
+        }}
       >
         <AlertDialogContent data-testid="alert-delete-prescription">
           <AlertDialogHeader>
@@ -1238,9 +1245,18 @@ export default function MedicalAttendance() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="alert-cancel">Cancelar</AlertDialogCancel>
+            <AlertDialogCancel 
+              onClick={() => setDeletePrescriptionId(null)}
+              data-testid="alert-cancel"
+            >
+              Cancelar
+            </AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => deletePrescriptionId && deletePrescriptionMutation.mutate(deletePrescriptionId)}
+              onClick={() => {
+                if (deletePrescriptionId) {
+                  deletePrescriptionMutation.mutate(deletePrescriptionId);
+                }
+              }}
               disabled={deletePrescriptionMutation.isPending}
               data-testid="alert-confirm"
             >
