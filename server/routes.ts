@@ -619,6 +619,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================================================
+  // e-SUS AB / SISAB EXPORT API
+  // ============================================================================
+
+  // Exportar atendimento no formato Ficha de Atendimento Individual (FAI)
+  app.get("/api/consultations/:id/export-fai", async (req, res) => {
+    try {
+      const { mapConsultationToFAI, validateExportData } = await import('./services/esus-export');
+      
+      // Buscar consulta
+      const consultation = await storage.getConsultationById(req.params.id);
+      if (!consultation) {
+        return res.status(404).json({ error: "Consulta não encontrada" });
+      }
+
+      // SECURITY: Multi-tenant validation
+      const sessionUnitId = req.session?.user?.unitId;
+      if (sessionUnitId && consultation.unitId !== sessionUnitId) {
+        return res.status(403).json({ error: "Acesso negado: consulta de outra unidade" });
+      }
+
+      // Buscar dados relacionados
+      const citizen = await storage.getCitizenById(consultation.citizenId);
+      if (!citizen) {
+        return res.status(404).json({ error: "Cidadão não encontrado" });
+      }
+
+      const professional = await storage.getProfessionalById(consultation.professionalId);
+      if (!professional) {
+        return res.status(404).json({ error: "Profissional não encontrado" });
+      }
+
+      const unit = await storage.getHealthUnitById(consultation.unitId);
+      if (!unit) {
+        return res.status(404).json({ error: "Unidade não encontrada" });
+      }
+
+      // Buscar prescrições, encaminhamentos e exames da consulta
+      const prescriptions = await storage.getPrescriptions({ consultationId: req.params.id });
+      const referrals = await storage.getMedicalReferrals({ consultationId: req.params.id });
+      const exams = await storage.getExams({ consultationId: req.params.id });
+
+      // Configuração do tenant (dados da unidade de saúde)
+      // TODO: Mover para configurações do sistema/tenant
+      const tenantConfig = {
+        codigoIbgeMunicipio: unit.ibgeCode || '2906501', // Cardeal da Silva/BA
+        cnesUnidade: unit.cnes || '',
+        ine: unit.ine || null,
+      };
+
+      // Mapear para formato FAI
+      const faiData = mapConsultationToFAI({
+        consultation,
+        citizen,
+        professional,
+        unit,
+        prescriptions: prescriptions.map(p => ({
+          id: p.id,
+          consultationId: p.consultationId,
+          citizenId: p.citizenId,
+          professionalId: p.professionalId,
+          medication: p.medication,
+          dosage: p.dosage,
+          frequency: p.frequency,
+          duration: p.duration,
+          quantity: p.quantity,
+          instructions: p.instructions,
+          createdAt: p.createdAt,
+        })),
+        referrals,
+        exams,
+        tenantConfig,
+      });
+
+      // Validar dados exportados
+      const validation = validateExportData(faiData);
+      if (!validation.valid) {
+        return res.status(400).json({ 
+          error: "Dados incompletos para exportação e-SUS", 
+          details: validation.errors 
+        });
+      }
+
+      // Retornar JSON estruturado
+      res.json({
+        success: true,
+        data: faiData,
+        validation,
+      });
+    } catch (error: any) {
+      console.error('Erro ao exportar para e-SUS:', error);
+      res.status(500).json({ error: error.message || 'Erro ao exportar dados' });
+    }
+  });
+
+  // ============================================================================
   // MEDICAL ATTENDANCE API (Atendimento Médico - e-SUS PEC) ✅
   // ============================================================================
 
