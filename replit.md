@@ -37,6 +37,15 @@ The backend uses Express.js and TypeScript on Node.js, providing a RESTful API w
 -   **AI Medical Assistant**: A production-ready AI assistant powered by OpenAI GPT-5 for diagnostic suggestions (CIAP-2/CID-10), drug interaction checks, prescription validation, and care plan generation, with robust validation and RBAC-controlled access.
 -   **SOAP Consultation System**: Full-stack implementation of medical consultations adhering to e-SUS PEC v5.3 standards, including subjective, objective, assessment, and plan (SOAP) fields, vital signs, CIAP-2/CID-10 codes, and integrated prescription management.
 -   **Medical Attendance Module**: Complete 3-column workflow integrating patient selection (column 1), SOAP consultation form with vital signs and diagnostic codes (column 2), and electronic prescriptions CRUD (column 3). Fully integrated with proper consultation/professional context, cache synchronization, and transactional integrity.
+    -   **Complete API Endpoints**: Full CRUD for consultations and attendance queue management:
+        -   `GET /api/attendance-queue` - List filtered attendance queue (by unit/professional/status) with multi-tenant security
+        -   `GET /api/attendance/next` - Fetch next patient in queue (priority-ordered)
+        -   `POST /api/attendance/start` - Start consultation from queue entry
+        -   `PUT /api/consultations/:id` - Update consultation (partial updates allowed)
+        -   `POST /api/consultations/:id/finalize` - Finalize consultation (requires diagnosis validation)
+        -   `GET /api/citizens/:id/history` - Complete patient clinical history
+        -   `POST /api/consultations-with-prescriptions` - Transactional creation of consultation + prescriptions
+    -   **Security Pattern**: All endpoints enforce multi-tenant validation via `req.session.user.unitId`, ensuring data isolation at controller level.
 -   **Searchable Selection (Combobox)**: System-wide implementation of searchable/autocomplete functionality for all selection fields using a reusable Combobox component.
 
 #### Next Development Priorities

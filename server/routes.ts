@@ -400,9 +400,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Atualizar consulta (enquanto em andamento)
+  app.put("/api/consultations/:id", async (req, res) => {
+    try {
+      // Buscar consulta existente para validação
+      const existing = await storage.getConsultationById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Consulta não encontrada" });
+      }
+
+      // SECURITY: Multi-tenant validation
+      const sessionUnitId = req.session?.user?.unitId;
+      if (sessionUnitId && existing.unitId !== sessionUnitId) {
+        return res.status(403).json({ error: "Acesso negado: consulta de outra unidade" });
+      }
+
+      // Permitir atualização parcial de campos clínicos
+      const allowedFields = insertConsultationSchema.partial();
+      const updateData = allowedFields.parse(req.body);
+
+      const updated = await storage.updateConsultation(req.params.id, updateData);
+      if (!updated) {
+        return res.status(404).json({ error: "Consulta não encontrada" });
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Finalizar atendimento
+  app.post("/api/consultations/:id/finalize", async (req, res) => {
+    try {
+      // Buscar consulta existente
+      const existing = await storage.getConsultationById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Consulta não encontrada" });
+      }
+
+      // SECURITY: Multi-tenant validation
+      const sessionUnitId = req.session?.user?.unitId;
+      if (sessionUnitId && existing.unitId !== sessionUnitId) {
+        return res.status(403).json({ error: "Acesso negado: consulta de outra unidade" });
+      }
+
+      // Validar que possui pelo menos um diagnóstico
+      const hasDiagnosis = (existing.ciap2Codes && existing.ciap2Codes.length > 0) ||
+                          (existing.cid10Codes && existing.cid10Codes.length > 0) ||
+                          existing.diagnosis;
+
+      if (!hasDiagnosis) {
+        return res.status(400).json({ 
+          error: "Não é possível finalizar: consulta precisa ter pelo menos um diagnóstico (CIAP-2, CID-10 ou diagnóstico descritivo)" 
+        });
+      }
+
+      // Atualizar consulta com dados finais se fornecidos no body
+      let finalData = req.body || {};
+      
+      const finalized = await storage.updateConsultation(req.params.id, finalData);
+      if (!finalized) {
+        return res.status(404).json({ error: "Consulta não encontrada" });
+      }
+
+      res.json(finalized);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ============================================================================
   // MEDICAL ATTENDANCE API (Atendimento Médico - e-SUS PEC) ✅
   // ============================================================================
+
+  // Listar fila de atendimento (filtrada por profissional/unidade)
+  app.get("/api/attendance-queue", async (req, res) => {
+    try {
+      const { unitId, professionalId, status } = req.query;
+
+      // SECURITY: Multi-tenant validation - force unitId from session
+      const sessionUnitId = req.session?.user?.unitId;
+      if (!sessionUnitId) {
+        return res.status(401).json({ error: "Sessão inválida - unitId não encontrado" });
+      }
+
+      // Buscar fila filtrada
+      const queue = await storage.getAttendanceQueue({
+        unitId: sessionUnitId, // Sempre usar unitId da sessão
+        professionalId: professionalId as string,
+        status: status as string,
+      });
+
+      res.json(queue);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   // Buscar próximo paciente da fila
   app.get("/api/attendance/next", async (req, res) => {

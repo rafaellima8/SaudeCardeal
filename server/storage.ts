@@ -64,7 +64,7 @@ export interface IStorage {
   deleteAppointment(id: string): Promise<boolean>;
 
   // Attendance Queue
-  getAttendanceQueue(unitId: string, status?: string): Promise<AttendanceQueue[]>;
+  getAttendanceQueue(params: { unitId: string; professionalId?: string; status?: string }): Promise<AttendanceQueue[]>;
   getQueueEntry(id: string): Promise<AttendanceQueue | undefined>; // Get single queue entry by ID ✅
   createQueueEntry(entry: InsertAttendanceQueue): Promise<AttendanceQueue>;
   updateQueueEntry(id: string, entry: Partial<InsertAttendanceQueue>): Promise<AttendanceQueue | undefined>;
@@ -74,6 +74,7 @@ export interface IStorage {
   getConsultations(params?: { citizenId?: string; professionalId?: string; limit?: number }): Promise<Consultation[]>;
   getConsultationById(id: string): Promise<Consultation | undefined>;
   createConsultation(consultation: InsertConsultation): Promise<Consultation>;
+  updateConsultation(id: string, consultation: Partial<InsertConsultation>): Promise<Consultation | undefined>;
   createConsultationWithPrescriptions(
     consultation: InsertConsultation, 
     prescriptions: Omit<InsertPrescription, 'consultationId' | 'citizenId' | 'professionalId'>[]
@@ -350,25 +351,20 @@ export class DbStorage implements IStorage {
   }
 
   // Attendance Queue
-  async getAttendanceQueue(unitId: string, status?: string): Promise<AttendanceQueue[]> {
-    if (status) {
-      return db.select()
-        .from(schema.attendanceQueue)
-        .where(
-          and(
-            eq(schema.attendanceQueue.unitId, unitId),
-            eq(schema.attendanceQueue.status, status as any)
-          )
-        )
-        .orderBy(
-          desc(schema.attendanceQueue.priority),
-          asc(schema.attendanceQueue.arrivedAt)
-        );
+  async getAttendanceQueue(params: { unitId: string; professionalId?: string; status?: string }): Promise<AttendanceQueue[]> {
+    const conditions = [eq(schema.attendanceQueue.unitId, params.unitId)];
+
+    if (params.status) {
+      conditions.push(eq(schema.attendanceQueue.status, params.status as any));
+    }
+
+    if (params.professionalId) {
+      conditions.push(eq(schema.attendanceQueue.professionalId, params.professionalId));
     }
 
     return db.select()
       .from(schema.attendanceQueue)
-      .where(eq(schema.attendanceQueue.unitId, unitId))
+      .where(and(...conditions))
       .orderBy(
         desc(schema.attendanceQueue.priority),
         asc(schema.attendanceQueue.arrivedAt)
@@ -466,6 +462,15 @@ export class DbStorage implements IStorage {
   async createConsultation(consultation: InsertConsultation): Promise<Consultation> {
     const [created] = await db.insert(schema.consultations).values(consultation).returning();
     return created;
+  }
+
+  async updateConsultation(id: string, consultation: Partial<InsertConsultation>): Promise<Consultation | undefined> {
+    const [updated] = await db
+      .update(schema.consultations)
+      .set(consultation)
+      .where(eq(schema.consultations.id, id))
+      .returning();
+    return updated;
   }
 
   async createConsultationWithPrescriptions(
