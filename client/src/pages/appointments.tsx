@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Combobox } from "@/components/ui/combobox";
 import {
   Select,
   SelectContent,
@@ -176,20 +177,17 @@ export default function Appointments() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Paciente</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-citizen">
-                            <SelectValue placeholder="Selecione o paciente" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {citizens.map((citizen) => (
-                            <SelectItem key={citizen.id} value={citizen.id}>
-                              {citizen.name} - {citizen.cns}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <Combobox
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          options={citizens.map(c => ({ value: c.id, label: `${c.name} - ${c.cns}` }))}
+                          placeholder="Selecione o paciente"
+                          searchPlaceholder="Buscar paciente..."
+                          emptyMessage="Nenhum paciente encontrado."
+                          data-testid="select-citizen"
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -201,20 +199,17 @@ export default function Appointments() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Profissional</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-professional">
-                            <SelectValue placeholder="Selecione o profissional" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {professionals.map((prof) => (
-                            <SelectItem key={prof.id} value={prof.id}>
-                              {prof.name} - {prof.specialty}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <Combobox
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          options={professionals.map(p => ({ value: p.id, label: `${p.name} - ${p.specialty}` }))}
+                          placeholder="Selecione o profissional"
+                          searchPlaceholder="Buscar profissional..."
+                          emptyMessage="Nenhum profissional encontrado."
+                          data-testid="select-professional"
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -226,20 +221,17 @@ export default function Appointments() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Unidade de Saúde</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-unit">
-                            <SelectValue placeholder="Selecione a unidade" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {units.map((unit) => (
-                            <SelectItem key={unit.id} value={unit.id}>
-                              {unit.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <Combobox
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          options={units.map(u => ({ value: u.id, label: u.name }))}
+                          placeholder="Selecione a unidade"
+                          searchPlaceholder="Buscar unidade..."
+                          emptyMessage="Nenhuma unidade encontrada."
+                          data-testid="select-unit"
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -342,36 +334,32 @@ export default function Appointments() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <Label>Profissional</Label>
-              <Select value={selectedProfessional} onValueChange={setSelectedProfessional}>
-                <SelectTrigger data-testid="filter-professional">
-                  <SelectValue placeholder="Todos os profissionais" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {professionals.map((prof) => (
-                    <SelectItem key={prof.id} value={prof.id}>
-                      {prof.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                value={selectedProfessional}
+                onValueChange={setSelectedProfessional}
+                options={[
+                  { value: "all", label: "Todos os profissionais" },
+                  ...professionals.map(p => ({ value: p.id, label: p.name }))
+                ]}
+                placeholder="Todos os profissionais"
+                searchPlaceholder="Buscar profissional..."
+                data-testid="filter-professional"
+              />
             </div>
 
             <div>
               <Label>Unidade</Label>
-              <Select value={selectedUnit} onValueChange={setSelectedUnit}>
-                <SelectTrigger data-testid="filter-unit">
-                  <SelectValue placeholder="Todas as unidades" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  {units.map((unit) => (
-                    <SelectItem key={unit.id} value={unit.id}>
-                      {unit.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                value={selectedUnit}
+                onValueChange={setSelectedUnit}
+                options={[
+                  { value: "all", label: "Todas as unidades" },
+                  ...units.map(u => ({ value: u.id, label: u.name }))
+                ]}
+                placeholder="Todas as unidades"
+                searchPlaceholder="Buscar unidade..."
+                data-testid="filter-unit"
+              />
             </div>
 
             <div>
