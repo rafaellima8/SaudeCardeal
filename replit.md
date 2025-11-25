@@ -59,12 +59,29 @@ The backend uses Express.js and TypeScript on Node.js, providing a RESTful API w
     -   **Multi-tenant Security**: All exam endpoints validate `req.session.user.unitId` and filter by consultation ownership.
 -   **Medical History Visualization**: Comprehensive patient longitudinal record displaying complete clinical timeline with chronological consultations, active health problems, current prescriptions, pending referrals, and exam requests. Implemented as standalone `MedicalHistory.tsx` component with card-based layout and collapsible sections.
 -   **Searchable Selection (Combobox)**: System-wide implementation of searchable/autocomplete functionality for all selection fields using a reusable Combobox component.
+-   **Medical Document Generation (PDF)**: Backend-based PDF generation service for official medical documents:
+    -   **Prescription Printing**: Professional medical prescription PDFs with institutional branding, medication details, professional signatures, and security elements.
+    -   **Medical Certificates**: Customizable medical certificates (trabalho/escola/outros) with date ranges, CID-10 codes, and legal compliance.
+    -   **PDF Service**: Centralized `server/services/pdf-generator.ts` using jsPDF with reusable header/footer templates, logo embedding, and semantic color palettes.
+    -   **API Endpoints**: `GET /api/consultations/:id/print-prescription` and `POST /api/consultations/:id/print-medical-certificate` with multi-tenant security.
+-   **e-SUS AB/SISAB Export Module**: Production-ready data export system for DATASUS compliance:
+    -   **FAI Mapping Service**: Complete implementation of `mapConsultationToFAI()` converting medical consultations to Ficha de Atendimento Individual (FAI) format compliant with e-SUS AB v5.3.
+    -   **Comprehensive Validation**: Rigorous validation of mandatory SISAB fields (CNS, CNES, CBO, diagnósticos, turno) with detailed error/warning reporting.
+    -   **Export API**: `GET /api/consultations/:id/export-fai` endpoint returns structured JSON with validation results.
+    -   **Documentation**: Complete specification in `server/services/ESUS_EXPORT_README.md` detailing FAI structure, mandatory fields, and integration roadmap.
+    -   **Known Gaps**: CBO professional field, anthropometric data, and SIGTAP exam codes require schema enhancements (documented with TODOs).
+    -   **Future Roadmap**: Export queue system, batch processing, digital signature, direct DATASUS integration, and additional e-SUS forms (cadastro, visita domiciliar, atividade coletiva).
 
 #### Next Development Priorities
 
-1.  Patient Summary Sheet: Longitudinal health record.
-2.  Medication Stock Management: Pharmacy inventory control.
-3.  Reception Workflow Enhancements: Initial triage and risk classification.
+1.  **Schema Enhancements for e-SUS Compliance**:
+    -   Add `cboCode` field to `professionals` table (blocking issue for SISAB)
+    -   Add `sigtapCode` and `priority` fields to `exams` table
+    -   Integrate anthropometric/vital signs data (from `fad_evaluations` or dedicated fields)
+2.  Patient Summary Sheet: Longitudinal health record.
+3.  Medication Stock Management: Pharmacy inventory control.
+4.  Reception Workflow Enhancements: Initial triage and risk classification.
+5.  e-SUS Export Queue: Batch processing and retry mechanism for SISAB submissions.
 
 ## External Dependencies
 
