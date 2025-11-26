@@ -6,7 +6,7 @@ import {
   insertClinicalProtocolSchema,
   updateProtocolAlertSchema,
 } from "@shared/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, or, isNull } from "drizzle-orm";
 import { requireAuth, enforceUnitScope, getEffectiveUnitId, requireRole } from "./auth";
 import { protocolAlertService } from "./services/protocol-alert-drizzle.service";
 import { z } from "zod";
@@ -24,16 +24,28 @@ router.get("/protocols", enforceUnitScope(), async (req, res) => {
   try {
     const effectiveUnitId = getEffectiveUnitId(req);
     
-    let query = db.select().from(clinicalProtocols);
+    let protocols;
     
     if (effectiveUnitId) {
-      // Unit-specific: show global + unit protocols
-      query = query.where(
-        eq(clinicalProtocols.unitId, effectiveUnitId)
-      ) as any;
+      // Unit-specific: show global protocols (unitId null) + unit-specific protocols
+      protocols = await db
+        .select()
+        .from(clinicalProtocols)
+        .where(
+          or(
+            eq(clinicalProtocols.unitId, effectiveUnitId),
+            isNull(clinicalProtocols.unitId)
+          )
+        )
+        .orderBy(desc(clinicalProtocols.createdAt));
+    } else {
+      // Admin: show all protocols
+      protocols = await db
+        .select()
+        .from(clinicalProtocols)
+        .orderBy(desc(clinicalProtocols.createdAt));
     }
     
-    const protocols = await query.orderBy(desc(clinicalProtocols.createdAt));
     res.json(protocols);
   } catch (error: any) {
     console.error("Error fetching protocols:", error);

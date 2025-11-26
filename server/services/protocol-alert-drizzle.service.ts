@@ -9,7 +9,7 @@ import {
   type InsertProtocolAlert,
   type ProtocolAlert,
 } from "@shared/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, or, isNull } from "drizzle-orm";
 
 interface VitalSigns {
   bloodPressureSystolic?: number;
@@ -81,10 +81,13 @@ export class ProtocolAlertDrizzleService {
       .where(
         and(
           eq(clinicalProtocols.active, true),
-          // Global protocols (unitId null) or unit-specific
+          // Global protocols (unitId null) OR unit-specific protocols
           consult.unitId 
-            ? inArray(clinicalProtocols.unitId, [consult.unitId, null] as any)
-            : eq(clinicalProtocols.unitId, null as any)
+            ? or(
+                eq(clinicalProtocols.unitId, consult.unitId),
+                isNull(clinicalProtocols.unitId)
+              )
+            : isNull(clinicalProtocols.unitId)
         )
       );
 
