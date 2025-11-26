@@ -1414,6 +1414,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Stock movements
+  app.post("/api/pharmacy/stock-movements", async (req, res) => {
+    try {
+      const { medicationId, type, quantity, batchNumber, expirationDate, reason, unitId, professionalId } = req.body;
+      
+      if (!medicationId || !type || !quantity || !reason) {
+        return res.status(400).json({ error: "Campos obrigatórios: medicationId, type, quantity, reason" });
+      }
+
+      // Multi-tenant security
+      const sessionUnitId = req.session?.user?.unitId;
+      if (sessionUnitId && unitId !== sessionUnitId) {
+        return res.status(403).json({ error: "Acesso negado: unidade diferente da sessão" });
+      }
+
+      const movement = {
+        medicationId,
+        unitId,
+        professionalId,
+        type,
+        quantity: type === "saida" ? -Math.abs(quantity) : Math.abs(quantity),
+        batchNumber,
+        expirationDate: expirationDate ? new Date(expirationDate) : undefined,
+        reason,
+        createdAt: new Date(),
+      };
+
+      const created = await storage.createStockMovement(movement);
+      res.status(201).json(created);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/pharmacy/stock-movements", async (req, res) => {
+    try {
+      const sessionUnitId = req.session?.user?.unitId;
+      const movements = await storage.getStockMovements({ unitId: sessionUnitId, limit: 50 });
+      res.json(movements);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Exams API
   // ============================================================================
   // EXAMS API (Exames) ✅
@@ -2929,6 +2973,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const item = await storage.createTherapeuticPlanItem({ ...req.body, planId: req.params.planId });
       res.status(201).json(item);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // CLINICAL PROTOCOLS API (Admin CRUD) ✅
+  // ============================================================================
+
+  app.get("/api/clinical-protocols", async (req, res) => {
+    try {
+      // Note: Clinical protocols are system-wide (não são multi-tenant por unidade)
+      const protocols = await storage.getClinicalProtocols({ active: undefined });
+      res.json(protocols);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/clinical-protocols", async (req, res) => {
+    try {
+      // Admin-only endpoint (role check would go here in production)
+      if (!req.body.name || !req.body.careLineId) {
+        return res.status(400).json({ error: "Campos obrigatórios: name, careLineId" });
+      }
+      
+      const protocol = await storage.createClinicalProtocol(req.body);
+      res.status(201).json(protocol);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/clinical-protocols/:id", async (req, res) => {
+    try {
+      const protocol = await storage.updateClinicalProtocol(req.params.id, req.body);
+      if (!protocol) {
+        return res.status(404).json({ error: "Protocolo não encontrado" });
+      }
+      res.json(protocol);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/clinical-protocols/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteClinicalProtocol(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Protocolo não encontrado" });
+      }
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // CONSULTATION TEMPLATES API (Dynamic Forms Admin) ✅
+  // ============================================================================
+
+  app.get("/api/consultation-templates", async (req, res) => {
+    try {
+      const templates = await storage.getConsultationTemplates({});
+      res.json(templates);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/consultation-templates/:id/fields", async (req, res) => {
+    try {
+      const fields = await storage.getTemplateFields(req.params.id);
+      res.json(fields);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/consultation-templates", async (req, res) => {
+    try {
+      // Basic validation
+      if (!req.body.name || !req.body.careLineId) {
+        return res.status(400).json({ error: "Campos obrigatórios: name, careLineId" });
+      }
+      
+      const template = await storage.createConsultationTemplate(req.body);
+      res.status(201).json(template);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/consultation-templates/:id", async (req, res) => {
+    try {
+      const template = await storage.updateConsultationTemplate(req.params.id, req.body);
+      if (!template) {
+        return res.status(404).json({ error: "Template não encontrado" });
+      }
+      res.json(template);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/consultation-templates/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteConsultationTemplate(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Template não encontrado" });
+      }
+      res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

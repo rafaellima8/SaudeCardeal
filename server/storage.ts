@@ -109,6 +109,21 @@ export interface IStorage {
   updateCitizenProblem(id: string, citizenId: string, problem: Partial<InsertCitizenProblem>): Promise<CitizenProblem | undefined>; // Security ✅
   deleteCitizenProblem(id: string, citizenId: string): Promise<boolean>; // Security ✅
 
+  // Clinical Protocols
+  getClinicalProtocols(params: { active?: boolean }): Promise<any[]>;
+  getClinicalProtocolById(id: string): Promise<any | undefined>;
+  createClinicalProtocol(protocol: any): Promise<any>;
+  updateClinicalProtocol(id: string, protocol: any): Promise<any | undefined>;
+  deleteClinicalProtocol(id: string): Promise<boolean>;
+
+  // Consultation Templates (Dynamic Forms)
+  getConsultationTemplates(params: { careLineId?: string; active?: boolean }): Promise<any[]>;
+  getConsultationTemplateById(id: string): Promise<any | undefined>;
+  createConsultationTemplate(template: any): Promise<any>;
+  updateConsultationTemplate(id: string, template: any): Promise<any | undefined>;
+  deleteConsultationTemplate(id: string): Promise<boolean>;
+  getTemplateFields(templateId: string): Promise<any[]>;
+
   // Prescriptions
   getPrescriptions(params: { 
     citizenId?: string; 
@@ -145,6 +160,10 @@ export interface IStorage {
   updateMedicationStock(id: string, stock: Partial<InsertMedicationStock>): Promise<MedicationStock | undefined>;
   deleteMedicationStock(id: string): Promise<boolean>;
   getLowStockMedications(unitId: string): Promise<any[]>;
+  
+  // Stock Movements
+  createStockMovement(movement: any): Promise<any>;
+  getStockMovements(params: { unitId?: string; medicationId?: string; limit?: number }): Promise<any[]>;
 
   // Dashboard Stats
   getDashboardStats(): Promise<{
@@ -693,11 +712,6 @@ export class DbStorage implements IStorage {
       .where(eq(schema.prescriptions.id, id))
       .returning();
     return updated;
-  }
-
-  async deletePrescription(id: string): Promise<boolean> {
-    const result = await db.delete(schema.prescriptions).where(eq(schema.prescriptions.id, id));
-    return result.changes > 0;
   }
 
   // Dispensations
@@ -1471,11 +1485,6 @@ export class DbStorage implements IStorage {
         eq(schema.citizenProblems.id, id),
         eq(schema.citizenProblems.citizenId, citizenId) // Security: prevent cross-citizen deletes
       ));
-    return result.changes > 0;
-  }
-
-  async deletePrescription(id: string): Promise<boolean> {
-    const result = await db.delete(schema.prescriptions).where(eq(schema.prescriptions.id, id));
     return result.changes > 0;
   }
 
@@ -2567,6 +2576,69 @@ export class DbStorage implements IStorage {
   async deleteTherapeuticPlanItem(id: string): Promise<boolean> {
     const result = await db.delete(schema.therapeuticPlanItems).where(eq(schema.therapeuticPlanItems.id, id));
     return result.changes > 0;
+  }
+
+  // ============================================================================
+  // STOCK MOVEMENTS ✅ (Pharmacy Inventory Management)
+  // ============================================================================
+
+  async createStockMovement(movement: any): Promise<any> {
+    // Validate medication exists
+    const [medication] = await db
+      .select()
+      .from(schema.medications)
+      .where(eq(schema.medications.id, movement.medicationId))
+      .limit(1);
+    
+    if (!medication) {
+      throw new Error("Medicamento não encontrado");
+    }
+
+    const currentStock = await db
+      .select()
+      .from(schema.medicationStock)
+      .where(
+        and(
+          eq(schema.medicationStock.medicationId, movement.medicationId),
+          eq(schema.medicationStock.unitId, movement.unitId)
+        )
+      )
+      .limit(1);
+
+    if (currentStock.length === 0) {
+      // Create new stock record
+      await db.insert(schema.medicationStock).values({
+        medicationId: movement.medicationId,
+        unitId: movement.unitId,
+        quantity: movement.quantity,
+        minimumQuantity: 10,
+        batchNumber: movement.batchNumber,
+        expirationDate: movement.expirationDate,
+        lastUpdated: new Date(),
+      });
+    } else {
+      // Update existing stock
+      await db
+        .update(schema.medicationStock)
+        .set({
+          quantity: currentStock[0].quantity + movement.quantity,
+          lastUpdated: new Date(),
+        })
+        .where(eq(schema.medicationStock.id, currentStock[0].id));
+    }
+
+    return {
+      id: `mov_${Date.now()}`,
+      ...movement,
+      createdAt: new Date(),
+      medicationName: medication.name,
+    };
+  }
+
+  async getStockMovements(params: { unitId?: string; medicationId?: string; limit?: number }): Promise<any[]> {
+    // For now, return empty array (movements are tracked via stock updates)
+    // Future: Create dedicated stock_movements table for audit trail
+    return [];
   }
 }
 

@@ -22,12 +22,15 @@ import Consultations from "@/pages/consultations";
 import Prescriptions from "@/pages/prescriptions";
 import Pharmacy from "@/pages/pharmacy";
 import PharmacyDispensation from "@/pages/pharmacy-dispensation";
+import PharmacyStock from "@/pages/pharmacy-stock";
 import TFD from "@/pages/tfd";
 import Reports from "@/pages/reports";
 import Units from "@/pages/units";
 import Professionals from "@/pages/professionals";
 import Indicators from "@/pages/indicators";
 import EsusExports from "@/pages/admin/esus-exports";
+import ClinicalProtocols from "@/pages/admin/clinical-protocols";
+import DynamicFormsAdmin from "@/pages/admin/dynamic-forms-admin";
 import TerritoryPage from "@/pages/territorio";
 import AceDashboard from "@modules/ace/client/pages/ace-dashboard";
 import AceDwellings from "@/pages/ace-dwellings";
@@ -52,12 +55,15 @@ function ProtectedRoutes() {
       <Route path="/prescricoes" component={Prescriptions} />
       <Route path="/farmacia" component={Pharmacy} />
       <Route path="/farmacia/dispensacao" component={PharmacyDispensation} />
+      <Route path="/farmacia/estoque" component={PharmacyStock} />
       <Route path="/tfd" component={TFD} />
       <Route path="/relatorios" component={Reports} />
       <Route path="/unidades" component={Units} />
       <Route path="/profissionais" component={Professionals} />
       <Route path="/indicadores" component={Indicators} />
       <Route path="/admin/esus-exports" component={EsusExports} />
+      <Route path="/admin/protocolos-clinicos" component={ClinicalProtocols} />
+      <Route path="/admin/formularios-dinamicos" component={DynamicFormsAdmin} />
       <Route path="/territorio" component={TerritoryPage} />
       <Route path="/ace" component={AceDashboard} />
       <Route path="/ace/imoveis" component={AceDwellings} />
