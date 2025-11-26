@@ -30,11 +30,16 @@ export const menuPermissions = {
   ace: ["admin", "acs", "gestor"] as UserRole[],
   endemias: ["admin", "acs", "gestor"] as UserRole[],
   farmacia: ["admin", "farmaceutico", "gestor"] as UserRole[],
+  dispensacao: ["admin", "farmaceutico", "gestor"] as UserRole[],
+  estoque: ["admin", "farmaceutico", "gestor"] as UserRole[],
   tfd: ["admin", "gestor", "recepcao"] as UserRole[],
   relatorios: ["admin", "medico", "gestor"] as UserRole[],
   unidades: ["admin", "gestor"] as UserRole[],
   profissionais: ["admin", "gestor"] as UserRole[],
   indicadores: ["admin", "gestor"] as UserRole[],
+  "protocolos clinicos": ["admin", "gestor"] as UserRole[],
+  "formularios dinamicos": ["admin", "gestor"] as UserRole[],
+  "exportacao e-sus": ["admin", "gestor"] as UserRole[],
 };
 
 /**

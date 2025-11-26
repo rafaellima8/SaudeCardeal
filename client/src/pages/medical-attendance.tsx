@@ -50,6 +50,14 @@ import { ReferralForm, type ReferralFormData } from "@/components/ReferralForm";
 import { MedicalHistory } from "@/components/MedicalHistory";
 import { DynamicConsultationForm } from "@/components/DynamicConsultationForm";
 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
 // Icons
 import {
   User,
@@ -66,6 +74,7 @@ import {
   Plus,
   Trash2,
   Edit,
+  Pencil,
   ArrowRightLeft,
   TestTube,
   ClipboardList,
@@ -167,44 +176,44 @@ export default function MedicalAttendance() {
   const [certificateReason, setCertificateReason] = useState<string>('');
 
   // Buscar dados da consulta
-  const { data: consultation, isLoading: loadingConsultation } = useQuery({
+  const { data: consultation, isLoading: loadingConsultation } = useQuery<any>({
     queryKey: ["/api/consultations", consultationId],
-    queryFn: () => apiRequest("GET", `/api/consultations/${consultationId}`),
+    queryFn: () => apiRequest<any>("GET", `/api/consultations/${consultationId}`),
     enabled: !!consultationId,
   });
 
   // Buscar histórico do paciente
-  const { data: patientHistory, isLoading: loadingHistory } = useQuery({
+  const { data: patientHistory, isLoading: loadingHistory } = useQuery<any>({
     queryKey: ["/api/citizens", consultation?.citizenId, "medical-history"],
-    queryFn: () => apiRequest("GET", `/api/citizens/${consultation.citizenId}/medical-history`),
+    queryFn: () => apiRequest<any>("GET", `/api/citizens/${consultation?.citizenId}/medical-history`),
     enabled: !!consultation?.citizenId,
   });
 
   // Buscar problemas ativos do cidadão
-  const { data: citizenProblems = [], isLoading: loadingProblems } = useQuery({
+  const { data: citizenProblems = [], isLoading: loadingProblems } = useQuery<any[]>({
     queryKey: ["/api/citizens", consultation?.citizenId, "problems"],
-    queryFn: () => apiRequest("GET", `/api/citizens/${consultation.citizenId}/problems`),
+    queryFn: () => apiRequest<any[]>("GET", `/api/citizens/${consultation?.citizenId}/problems`),
     enabled: !!consultation?.citizenId,
   });
 
   // Buscar prescrições da consulta
-  const { data: prescriptions = [], isLoading: loadingPrescriptions } = useQuery({
+  const { data: prescriptions = [], isLoading: loadingPrescriptions } = useQuery<any[]>({
     queryKey: ["/api/prescriptions", consultationId],
-    queryFn: () => apiRequest("GET", `/api/prescriptions?consultationId=${consultationId}`),
+    queryFn: () => apiRequest<any[]>("GET", `/api/prescriptions?consultationId=${consultationId}`),
     enabled: !!consultationId,
   });
 
   // Buscar encaminhamentos da consulta
-  const { data: referrals = [], isLoading: loadingReferrals } = useQuery({
+  const { data: referrals = [], isLoading: loadingReferrals } = useQuery<any[]>({
     queryKey: ["/api/medical-referrals", consultationId],
-    queryFn: () => apiRequest("GET", `/api/medical-referrals?consultationId=${consultationId}`),
+    queryFn: () => apiRequest<any[]>("GET", `/api/medical-referrals?consultationId=${consultationId}`),
     enabled: !!consultationId,
   });
 
   // Buscar exames da consulta
-  const { data: exams = [], isLoading: loadingExams } = useQuery({
+  const { data: exams = [], isLoading: loadingExams } = useQuery<any[]>({
     queryKey: ["/api/exams", consultationId],
-    queryFn: () => apiRequest("GET", `/api/exams?consultationId=${consultationId}`),
+    queryFn: () => apiRequest<any[]>("GET", `/api/exams?consultationId=${consultationId}`),
     enabled: !!consultationId,
   });
 

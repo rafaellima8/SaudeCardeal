@@ -55,6 +55,8 @@ const allMenuItems = [
   { title: "ACE Focos", icon: Bug, url: "/ace/focos" },
   { title: "Endemias", icon: Bug, url: "/endemias" },
   { title: "Farmácia", icon: Pill, url: "/farmacia" },
+  { title: "Dispensação", icon: Pill, url: "/farmacia/dispensacao" },
+  { title: "Estoque", icon: Pill, url: "/farmacia/estoque" },
   { title: "TFD", icon: Truck, url: "/tfd" },
   { title: "Relatórios", icon: FileText, url: "/relatorios" },
 ];
@@ -63,6 +65,9 @@ const allConfigItems = [
   { title: "Unidades", icon: Building2, url: "/unidades" },
   { title: "Profissionais", icon: UserCog, url: "/profissionais" },
   { title: "Indicadores", icon: BarChart3, url: "/indicadores" },
+  { title: "Protocolos Clínicos", icon: FileCheck, url: "/admin/protocolos-clinicos" },
+  { title: "Formulários Dinâmicos", icon: ClipboardList, url: "/admin/formularios-dinamicos" },
+  { title: "Exportação e-SUS", icon: FileText, url: "/admin/esus-exports" },
 ];
 
 const roleLabels: Record<string, string> = {
