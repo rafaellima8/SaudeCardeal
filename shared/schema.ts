@@ -266,9 +266,52 @@ export const citizenProblems = sqliteTable("citizen_problems", {
 // PHARMACY TABLES
 // ============================================================================
 
-// Medications (Medicamentos)
+// RENAME Catalog - Relação Nacional de Medicamentos Essenciais
+export const renameCatalog = sqliteTable("rename_catalog", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  code: text("code").notNull().unique(), // Código RENAME
+  commercialName: text("commercial_name").notNull(), // Nome comercial
+  activeIngredient: text("active_ingredient").notNull(), // Princípio ativo
+  therapeuticClass: text("therapeutic_class"), // Classe terapêutica
+  presentation: text("presentation").notNull(), // Apresentação (ex: "500mg comprimido")
+  concentration: text("concentration"), // Concentração
+  unit: text("unit"), // Unidade (mg, ml, UI)
+  administrationRoute: text("administration_route", { 
+    enum: ["oral", "topical", "injectable", "inhalation", "sublingual", "rectal", "ophthalmic", "nasal", "auricular"] 
+  }).notNull().default("oral"),
+  isControlled: integer("is_controlled", { mode: "boolean" }).default(false), // Portaria 344/98
+  controlType: text("control_type", { 
+    enum: ["A1", "A2", "A3", "B1", "B2", "C1", "C2", "C3", "C4", "C5", "D1", "D2"] 
+  }), // Tipo de controle ANVISA
+  maxPrescriptionDays: integer("max_prescription_days").default(30), // Dias máximos prescrição
+  requiresSpecialForm: integer("requires_special_form", { mode: "boolean" }).default(false), // Receituário especial
+  pediatricDosePerKg: text("pediatric_dose_per_kg"), // Dose pediátrica por kg
+  contraindications: text("contraindications", { mode: "json" }).$type<string[]>(), // Contraindicações
+  interactions: text("interactions", { mode: "json" }).$type<string[]>(), // Interações conhecidas
+  active: integer("active", { mode: "boolean" }).default(true),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Citizen Allergies (Alergias do Cidadão)
+export const citizenAllergies = sqliteTable("citizen_allergies", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  citizenId: text("citizen_id").notNull().references(() => citizens.id, { onDelete: "cascade" }),
+  allergyType: text("allergy_type", { 
+    enum: ["medication", "food", "environmental", "other"] 
+  }).notNull(),
+  allergen: text("allergen").notNull(), // Substância alergênica
+  severity: text("severity", { enum: ["mild", "moderate", "severe", "anaphylactic"] }).notNull(),
+  reaction: text("reaction"), // Tipo de reação
+  diagnosedDate: integer("diagnosed_date", { mode: "timestamp" }),
+  notes: text("notes"),
+  active: integer("active", { mode: "boolean" }).default(true),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Medications (Medicamentos) - Estoque local da unidade
 export const medications = sqliteTable("medications", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
+  renameId: text("rename_id").references(() => renameCatalog.id), // Referência ao catálogo RENAME
   name: text("name").notNull(),
   genericName: text("generic_name"),
   manufacturer: text("manufacturer"),
@@ -291,20 +334,61 @@ export const medicationStock = sqliteTable("medication_stock", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
-// Prescriptions (Receitas Médicas)
+// Prescriptions (Receitas Médicas) - Estrutura Completa e-SUS
 export const prescriptions = sqliteTable("prescriptions", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   consultationId: text("consultation_id").references(() => consultations.id),
   citizenId: text("citizen_id").notNull().references(() => citizens.id),
   professionalId: text("professional_id").notNull().references(() => professionals.id),
-  unitId: text("unit_id").notNull().references(() => healthUnits.id), // Multi-tenant safety ✅
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  renameId: text("rename_id").references(() => renameCatalog.id), // Referência catálogo RENAME
+  
+  // Dados do medicamento
   medication: text("medication").notNull(),
-  dosage: text("dosage").notNull(),
-  frequency: text("frequency").notNull(),
-  duration: text("duration").notNull(),
-  quantity: integer("quantity").notNull(),
-  instructions: text("instructions"),
-  status: text("status", { enum: ["pending", "dispensed", "cancelled"] }).notNull().default("pending"),
+  genericName: text("generic_name"), // Princípio ativo
+  dosage: text("dosage").notNull(), // Ex: "500mg"
+  dosageUnit: text("dosage_unit", { enum: ["mg", "ml", "g", "UI", "mcg", "comprimido", "gota"] }),
+  
+  // Posologia estruturada
+  frequency: text("frequency").notNull(), // Ex: "8/8h" ou "3x ao dia"
+  frequencyUnit: text("frequency_unit", { enum: ["hours", "daily", "weekly", "monthly", "asNeeded"] }),
+  duration: text("duration").notNull(), // Ex: "7 dias"
+  durationDays: integer("duration_days"), // Número de dias
+  quantity: integer("quantity").notNull(), // Quantidade total
+  
+  // Via de administração
+  administrationRoute: text("administration_route", { 
+    enum: ["oral", "topical", "injectable", "inhalation", "sublingual", "rectal", "ophthalmic", "nasal", "auricular"] 
+  }).default("oral"),
+  
+  // Orientações e observações
+  instructions: text("instructions"), // Orientações especiais
+  specialInstructions: text("special_instructions"), // Ex: "Tomar em jejum"
+  useContinuous: integer("use_continuous", { mode: "boolean" }).default(false), // Uso contínuo
+  
+  // Controle Portaria 344/98
+  isControlled: integer("is_controlled", { mode: "boolean" }).default(false),
+  controlType: text("control_type", { enum: ["A1", "A2", "A3", "B1", "B2", "C1", "C2", "C3", "C4", "C5", "D1", "D2"] }),
+  specialFormNumber: text("special_form_number"), // Número notificação especial
+  
+  // Validações realizadas
+  allergyChecked: integer("allergy_checked", { mode: "boolean" }).default(false),
+  interactionChecked: integer("interaction_checked", { mode: "boolean" }).default(false),
+  dosageValidated: integer("dosage_validated", { mode: "boolean" }).default(false),
+  pediatricDoseCalculated: integer("pediatric_dose_calculated", { mode: "boolean" }).default(false),
+  patientWeight: integer("patient_weight"), // Peso usado para cálculo pediátrico
+  
+  // Assinatura digital
+  signatureHash: text("signature_hash"),
+  signedAt: integer("signed_at", { mode: "timestamp" }),
+  qrCodeData: text("qr_code_data"), // Dados para QR Code de validação
+  
+  // Status e timestamps
+  status: text("status", { enum: ["draft", "pending", "dispensed", "partial", "cancelled", "expired"] }).notNull().default("pending"),
+  validUntil: integer("valid_until", { mode: "timestamp" }), // Validade da receita
+  dispensedAt: integer("dispensed_at", { mode: "timestamp" }),
+  dispensedBy: text("dispensed_by").references(() => professionals.id),
+  
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
@@ -329,20 +413,59 @@ export type InsertDispensation = z.infer<typeof insertDispensationSchema>;
 // EXAMS AND TFD TABLES
 // ============================================================================
 
-// Exams (Exames)
+// Exams (Exames) - Workflow Completo e-SUS
 export const exams = sqliteTable("exams", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   citizenId: text("citizen_id").notNull().references(() => citizens.id),
   professionalId: text("professional_id").notNull().references(() => professionals.id),
   unitId: text("unit_id").notNull().references(() => healthUnits.id),
   consultationId: text("consultation_id").references(() => consultations.id),
-  examType: text("exam_type").notNull(),
+  
+  // Dados do exame
+  examType: text("exam_type").notNull(), // Nome do exame
+  sigtapCode: text("sigtap_code"), // Código SIGTAP
+  examCategory: text("exam_category", { 
+    enum: ["laboratory", "imaging", "procedure", "pathology", "other"] 
+  }).default("laboratory"),
+  
+  // Solicitação estruturada
+  priority: text("priority", { enum: ["routine", "urgent", "emergency"] }).notNull().default("routine"),
+  clinicalJustification: text("clinical_justification").notNull(), // Justificativa clínica obrigatória
+  hypothesisDiagnosis: text("hypothesis_diagnosis"), // Hipótese diagnóstica
+  cid10Code: text("cid10_code"), // CID-10 relacionado
+  desiredDate: integer("desired_date", { mode: "timestamp" }), // Data desejada de realização
+  
+  // Timestamps do workflow
   requestDate: integer("request_date", { mode: "timestamp" }).notNull(),
-  resultDate: integer("result_date", { mode: "timestamp" }),
-  status: text("status", { enum: ["requested", "scheduled", "completed", "cancelled"] }).notNull().default("requested"),
-  result: text("result"),
+  scheduledDate: integer("scheduled_date", { mode: "timestamp" }), // Data agendada
+  collectedDate: integer("collected_date", { mode: "timestamp" }), // Data da coleta
+  resultDate: integer("result_date", { mode: "timestamp" }), // Data resultado disponível
+  
+  // Status workflow: solicitado → agendado → coletado → resultado disponível
+  status: text("status", { 
+    enum: ["requested", "scheduled", "collected", "result_available", "completed", "cancelled"] 
+  }).notNull().default("requested"),
+  
+  // Resultado e anexos
+  result: text("result"), // Resultado textual
+  resultValue: text("result_value"), // Valor numérico se aplicável
+  resultUnit: text("result_unit"), // Unidade do resultado
+  referenceRange: text("reference_range"), // Valores de referência
+  isAbnormal: integer("is_abnormal", { mode: "boolean" }), // Resultado anormal
+  attachmentUrl: text("attachment_url"), // URL do anexo digitalizado
+  attachmentFileName: text("attachment_file_name"), // Nome do arquivo
+  
+  // Profissionais envolvidos
+  collectedBy: text("collected_by").references(() => professionals.id), // Quem coletou
+  analyzedBy: text("analyzed_by").references(() => professionals.id), // Quem analisou
+  
+  // Observações e notificações
   observations: text("observations"),
+  patientNotified: integer("patient_notified", { mode: "boolean" }).default(false),
+  notificationSentAt: integer("notification_sent_at", { mode: "timestamp" }),
+  
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
 // Medical Referrals (Encaminhamentos Médicos) - COM SUGESTÃO INTELIGENTE ✅

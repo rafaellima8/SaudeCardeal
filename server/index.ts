@@ -4,6 +4,7 @@ import { db } from "./db";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import seedSIGTAPMappings from "./seed-sigtap";
+import seedRENAMECatalog from "./seed-rename";
 import { seed as seedMinimal } from "./seed-minimal";
 import { seedSpecialtiesAndRules } from "./seed-specialties";
 
@@ -89,6 +90,13 @@ app.use((req, res, next) => {
     await seedSpecialtiesAndRules();
   } catch (error) {
     console.warn("[STARTUP] Aviso: Seed especialidades falhou (pode já estar populado):", error);
+  }
+  
+  // Seed catálogo RENAME (medicamentos essenciais)
+  try {
+    await seedRENAMECatalog();
+  } catch (error) {
+    console.warn("[STARTUP] Aviso: Seed RENAME falhou (pode já estar populado):", error);
   }
   
   const server = await registerRoutes(app);

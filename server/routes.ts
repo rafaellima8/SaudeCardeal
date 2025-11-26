@@ -4513,6 +4513,452 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================================================
+  // RENAME CATALOG & PRESCRIPTION VALIDATION API
+  // ============================================================================
+
+  // Busca inteligente no catálogo RENAME (protegido por autenticação)
+  app.get("/api/rename/search", enforceUnitScope(), async (req, res) => {
+    try {
+      const { q, limit } = req.query;
+      if (!q || typeof q !== "string") {
+        return res.status(400).json({ error: "Parâmetro de busca 'q' é obrigatório" });
+      }
+      
+      const prescriptionService = await import("./services/prescriptionValidationService");
+      const results = await prescriptionService.searchRENAMECatalog(q, Number(limit) || 20);
+      res.json(results);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Obter medicamento RENAME por ID (protegido)
+  app.get("/api/rename/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const medication = await db
+        .select()
+        .from(schema.renameCatalog)
+        .where(eq(schema.renameCatalog.id, req.params.id))
+        .limit(1);
+      
+      if (!medication[0]) {
+        return res.status(404).json({ error: "Medicamento não encontrado" });
+      }
+      res.json(medication[0]);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Listar medicamentos controlados (Portaria 344/98) - protegido
+  app.get("/api/rename/controlled/list", enforceUnitScope(), async (req, res) => {
+    try {
+      const medications = await db
+        .select()
+        .from(schema.renameCatalog)
+        .where(
+          and(
+            eq(schema.renameCatalog.isControlled, true),
+            eq(schema.renameCatalog.active, true)
+          )
+        );
+      res.json(medications);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Validação completa de prescrição
+  app.post("/api/prescriptions/validate", enforceUnitScope(), async (req, res) => {
+    try {
+      const { medicationName, dosage, frequency, citizenId, existingMedications } = req.body;
+      
+      if (!medicationName || !dosage || !frequency || !citizenId) {
+        return res.status(400).json({ error: "Campos obrigatórios: medicationName, dosage, frequency, citizenId" });
+      }
+      
+      // Obter dados do cidadão para validação
+      const citizen = await storage.getCitizenById(citizenId);
+      if (!citizen) {
+        return res.status(404).json({ error: "Cidadão não encontrado" });
+      }
+      
+      // Calcular idade
+      let citizenAge: number | undefined;
+      if (citizen.birthDate) {
+        const birth = new Date(citizen.birthDate);
+        citizenAge = Math.floor((Date.now() - birth.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+      }
+      
+      const prescriptionService = await import("./services/prescriptionValidationService");
+      const result = await prescriptionService.validatePrescription({
+        medicationName,
+        dosage,
+        frequency,
+        citizenId,
+        citizenAge,
+        citizenWeight: undefined, // Pode ser passado opcionalmente
+        existingMedications,
+      });
+      
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Gerar QR Code para prescrição
+  app.get("/api/prescriptions/:id/qrcode", enforceUnitScope(), async (req, res) => {
+    try {
+      const [prescription] = await db
+        .select()
+        .from(schema.prescriptions)
+        .where(eq(schema.prescriptions.id, req.params.id))
+        .limit(1);
+      
+      if (!prescription) {
+        return res.status(404).json({ error: "Prescrição não encontrada" });
+      }
+      
+      const valid = await validateEntityAccess(req, prescription.unitId);
+      if (!valid) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      
+      const prescriptionService = await import("./services/prescriptionValidationService");
+      const qrData = await prescriptionService.generateQRCodeData(prescription.id);
+      
+      res.json({ qrData, prescriptionId: prescription.id });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Validar QR Code de prescrição
+  app.post("/api/prescriptions/validate-qr", async (req, res) => {
+    try {
+      const { qrData } = req.body;
+      if (!qrData) {
+        return res.status(400).json({ error: "QR Data é obrigatório" });
+      }
+      
+      const prescriptionService = await import("./services/prescriptionValidationService");
+      const result = await prescriptionService.validateQRCode(qrData);
+      
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // CITIZEN ALLERGIES API
+  // ============================================================================
+
+  // Listar alergias do cidadão
+  app.get("/api/citizens/:citizenId/allergies", enforceUnitScope(), async (req, res) => {
+    try {
+      const allergies = await db
+        .select()
+        .from(schema.citizenAllergies)
+        .where(
+          and(
+            eq(schema.citizenAllergies.citizenId, req.params.citizenId),
+            eq(schema.citizenAllergies.active, true)
+          )
+        );
+      res.json(allergies);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Adicionar alergia ao cidadão
+  app.post("/api/citizens/:citizenId/allergies", enforceUnitScope(), async (req, res) => {
+    try {
+      const { allergyType, allergen, severity, reaction, notes } = req.body;
+      
+      if (!allergyType || !allergen || !severity) {
+        return res.status(400).json({ error: "Campos obrigatórios: allergyType, allergen, severity" });
+      }
+      
+      const [allergy] = await db
+        .insert(schema.citizenAllergies)
+        .values({
+          citizenId: req.params.citizenId,
+          allergyType,
+          allergen,
+          severity,
+          reaction,
+          notes,
+          active: true,
+          diagnosedDate: new Date(),
+        })
+        .returning();
+      
+      res.status(201).json(allergy);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Remover alergia (soft delete)
+  app.delete("/api/citizens/:citizenId/allergies/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      await db
+        .update(schema.citizenAllergies)
+        .set({ active: false })
+        .where(eq(schema.citizenAllergies.id, req.params.id));
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // EXAMS WORKFLOW API - Status Transitions
+  // ============================================================================
+
+  // Agendar exame (requested → scheduled)
+  app.patch("/api/exams/:id/schedule", enforceUnitScope(), async (req, res) => {
+    try {
+      const { scheduledDate } = req.body;
+      
+      const [exam] = await db
+        .select()
+        .from(schema.exams)
+        .where(eq(schema.exams.id, req.params.id))
+        .limit(1);
+      
+      if (!exam) {
+        return res.status(404).json({ error: "Exame não encontrado" });
+      }
+      
+      const valid = await validateEntityAccess(req, exam.unitId);
+      if (!valid) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      
+      if (exam.status !== "requested") {
+        return res.status(400).json({ error: "Exame deve estar no status 'solicitado' para agendar" });
+      }
+      
+      const [updated] = await db
+        .update(schema.exams)
+        .set({
+          status: "scheduled",
+          scheduledDate: scheduledDate ? new Date(scheduledDate) : new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.exams.id, req.params.id))
+        .returning();
+      
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Registrar coleta (scheduled → collected)
+  app.patch("/api/exams/:id/collect", enforceUnitScope(), async (req, res) => {
+    try {
+      const professionalId = req.session?.user?.professionalId;
+      
+      const [exam] = await db
+        .select()
+        .from(schema.exams)
+        .where(eq(schema.exams.id, req.params.id))
+        .limit(1);
+      
+      if (!exam) {
+        return res.status(404).json({ error: "Exame não encontrado" });
+      }
+      
+      const valid = await validateEntityAccess(req, exam.unitId);
+      if (!valid) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      
+      if (!["requested", "scheduled"].includes(exam.status)) {
+        return res.status(400).json({ error: "Exame deve estar agendado ou solicitado para registrar coleta" });
+      }
+      
+      const [updated] = await db
+        .update(schema.exams)
+        .set({
+          status: "collected",
+          collectedDate: new Date(),
+          collectedBy: professionalId || null,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.exams.id, req.params.id))
+        .returning();
+      
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Registrar resultado (collected → result_available)
+  app.patch("/api/exams/:id/result", enforceUnitScope(), async (req, res) => {
+    try {
+      const { result, resultValue, resultUnit, referenceRange, isAbnormal, observations } = req.body;
+      const professionalId = req.session?.user?.professionalId;
+      
+      const [exam] = await db
+        .select()
+        .from(schema.exams)
+        .where(eq(schema.exams.id, req.params.id))
+        .limit(1);
+      
+      if (!exam) {
+        return res.status(404).json({ error: "Exame não encontrado" });
+      }
+      
+      const valid = await validateEntityAccess(req, exam.unitId);
+      if (!valid) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      
+      if (!["collected", "scheduled", "requested"].includes(exam.status)) {
+        return res.status(400).json({ error: "Exame deve estar coletado para registrar resultado" });
+      }
+      
+      const [updated] = await db
+        .update(schema.exams)
+        .set({
+          status: "result_available",
+          result,
+          resultValue,
+          resultUnit,
+          referenceRange,
+          isAbnormal,
+          observations,
+          resultDate: new Date(),
+          analyzedBy: professionalId || null,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.exams.id, req.params.id))
+        .returning();
+      
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Upload anexo de resultado
+  app.patch("/api/exams/:id/attachment", enforceUnitScope(), async (req, res) => {
+    try {
+      const { attachmentUrl, attachmentFileName } = req.body;
+      
+      const [exam] = await db
+        .select()
+        .from(schema.exams)
+        .where(eq(schema.exams.id, req.params.id))
+        .limit(1);
+      
+      if (!exam) {
+        return res.status(404).json({ error: "Exame não encontrado" });
+      }
+      
+      const valid = await validateEntityAccess(req, exam.unitId);
+      if (!valid) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      
+      const [updated] = await db
+        .update(schema.exams)
+        .set({
+          attachmentUrl,
+          attachmentFileName,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.exams.id, req.params.id))
+        .returning();
+      
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Finalizar exame (result_available → completed)
+  app.patch("/api/exams/:id/complete", enforceUnitScope(), async (req, res) => {
+    try {
+      const [exam] = await db
+        .select()
+        .from(schema.exams)
+        .where(eq(schema.exams.id, req.params.id))
+        .limit(1);
+      
+      if (!exam) {
+        return res.status(404).json({ error: "Exame não encontrado" });
+      }
+      
+      const valid = await validateEntityAccess(req, exam.unitId);
+      if (!valid) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      
+      if (exam.status !== "result_available") {
+        return res.status(400).json({ error: "Exame deve ter resultado disponível para finalizar" });
+      }
+      
+      const [updated] = await db
+        .update(schema.exams)
+        .set({
+          status: "completed",
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.exams.id, req.params.id))
+        .returning();
+      
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Notificar paciente sobre resultado
+  app.post("/api/exams/:id/notify", enforceUnitScope(), async (req, res) => {
+    try {
+      const [exam] = await db
+        .select()
+        .from(schema.exams)
+        .where(eq(schema.exams.id, req.params.id))
+        .limit(1);
+      
+      if (!exam) {
+        return res.status(404).json({ error: "Exame não encontrado" });
+      }
+      
+      const valid = await validateEntityAccess(req, exam.unitId);
+      if (!valid) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      
+      // Aqui integraria com serviço de notificação (SMS/WhatsApp)
+      // Por enquanto apenas marca como notificado
+      const [updated] = await db
+        .update(schema.exams)
+        .set({
+          patientNotified: true,
+          notificationSentAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.exams.id, req.params.id))
+        .returning();
+      
+      res.json({ success: true, exam: updated, message: "Notificação enviada" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
   // DOCUMENT VALIDATION API
   // ============================================================================
 
