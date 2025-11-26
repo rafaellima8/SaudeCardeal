@@ -73,10 +73,13 @@ The backend uses Express.js and TypeScript on Node.js, providing a RESTful API w
 -   **documentValidationService.ts**: CPF/CNS/CEP validation using Brazilian standard algorithms.
 -   **examValidationService.ts**: Clinical exam validation with SIGTAP integration and specialty-specific rules.
 -   **clinicalJourneyService.ts**: Full clinical pathway orchestration with digital signatures and protocol alerts.
--   **protocolAlertService.ts**: Automated clinical alerts with real-time triggering and severity classification.
+-   **protocol-alert-drizzle.service.ts**: Consolidated protocol alert service with Drizzle ORM integration (canonical service).
+-   **protocolAlertService.ts**: In-memory alert evaluation engine with condition matching.
 -   **digitalSignatureService.ts**: Digital signature generation and validation for medical documents.
 -   **notificationService.ts**: Push notifications for pharmacy, queue, and clinical alerts.
 -   **prescriptionValidationService.ts**: RENAME catalog search, allergy conflict detection, drug interaction validation, pediatric dose calculations, and Portaria 344/98 controlled substance verification.
+-   **medical-ai.ts**: OpenAI GPT-5 integration for diagnostic suggestions, drug interactions, and care plans.
+-   **ai-audit.ts**: Audit logging for all AI interactions with compliance tracking.
 
 ## External Dependencies
 
