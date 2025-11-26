@@ -645,6 +645,75 @@ export const aiAuditLogs = sqliteTable("ai_audit_logs", {
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
+// Notifications (Sistema de Notificações)
+export const notifications = sqliteTable("notifications", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  userId: text("user_id").references(() => users.id), // null = notificação para toda unidade
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  type: text("type", {
+    enum: ["clinical_alert", "prescription_ready", "stock_low", "exam_result", "referral_update", "appointment_reminder", "system", "tfd_update"]
+  }).notNull(),
+  priority: text("priority", {
+    enum: ["low", "medium", "high", "critical"]
+  }).notNull().default("medium"),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  entityType: text("entity_type"), // Ex: "consultation", "prescription"
+  entityId: text("entity_id"),
+  actionUrl: text("action_url"),
+  metadata: text("metadata", { mode: "json" }),
+  readAt: integer("read_at", { mode: "timestamp" }),
+  dismissedAt: integer("dismissed_at", { mode: "timestamp" }),
+  expiresAt: integer("expires_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Document Signatures (Assinaturas Digitais)
+export const documentSignatures = sqliteTable("document_signatures", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  documentType: text("document_type", {
+    enum: ["prescription", "certificate", "referral", "exam_request", "consultation"]
+  }).notNull(),
+  documentId: text("document_id").notNull(),
+  signerId: text("signer_id").notNull().references(() => professionals.id),
+  signerName: text("signer_name").notNull(),
+  signerCredentials: text("signer_credentials"), // CRM, CNS, etc
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  hash: text("hash").notNull(),
+  signature: text("signature").notNull(),
+  timestamp: integer("timestamp", { mode: "timestamp" }).notNull(),
+  validationCode: text("validation_code").notNull().unique(),
+  version: text("version").notNull().default("1.0"),
+  algorithm: text("algorithm").notNull().default("RSA-SHA256"),
+  revokedAt: integer("revoked_at", { mode: "timestamp" }),
+  revokedReason: text("revoked_reason"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Medical Certificates (Atestados Médicos)
+export const medicalCertificates = sqliteTable("medical_certificates", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  consultationId: text("consultation_id").notNull().references(() => consultations.id),
+  citizenId: text("citizen_id").notNull().references(() => citizens.id),
+  professionalId: text("professional_id").notNull().references(() => professionals.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  certificateType: text("certificate_type", {
+    enum: ["trabalho", "escola", "acompanhante", "comparecimento", "aptidao", "outros"]
+  }).notNull(),
+  startDate: integer("start_date", { mode: "timestamp" }).notNull(),
+  endDate: integer("end_date", { mode: "timestamp" }).notNull(),
+  daysCount: integer("days_count").notNull(),
+  reason: text("reason"),
+  cid10Code: text("cid10_code"),
+  observations: text("observations"),
+  signatureId: text("signature_id").references(() => documentSignatures.id),
+  printedAt: integer("printed_at", { mode: "timestamp" }),
+  status: text("status", {
+    enum: ["draft", "signed", "printed", "cancelled"]
+  }).notNull().default("draft"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
 // ============================================================================
 // INSERT SCHEMAS (Zod Validation)
 // ============================================================================

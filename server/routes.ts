@@ -24,6 +24,7 @@ import {
   insertFocalTreatmentSchema,
   insertCitizenProblemSchema,
 } from "@shared/schema";
+import * as schema from "@shared/schema";
 import { z } from "zod";
 import { generateExport } from "./integrations/esus/exporter";
 import seedSIGTAPMappings from "./seed-sigtap";
@@ -40,8 +41,14 @@ import aiRoutes from "./routes-ai";
 import { generatePrescriptionPDF, generateMedicalCertificatePDF } from "./services/pdf-generator";
 import { CareLineResolutionService } from "./services/care-line-resolution";
 import { ProtocolAlertService } from "./services/protocol-alert.service";
-import { rawSqlite } from "./db";
+import { rawSqlite, db } from "./db";
 import { sugerirEspecialidades, invalidateRulesCache } from "./services/sugestorEspecialidade";
+import * as ciap2Cid10Service from "./services/ciap2Cid10Service";
+import * as notificationService from "./services/notificationService";
+import * as digitalSignatureService from "./services/digitalSignatureService";
+import * as examValidationService from "./services/examValidationService";
+import * as clinicalJourneyService from "./services/clinicalJourneyService";
+import { eq, and, sql } from "drizzle-orm";
 import { specialtySuggestionInputSchema, insertReferralRuleSchema } from "@shared/schema";
 
 // Initialize Protocol Alert Service using SHARED SQLite instance (transactional consistency) ✅
@@ -3593,6 +3600,592 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Template não encontrado" });
       }
       res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // CIAP-2 / CID-10 AUTOCOMPLETE API
+  // ============================================================================
+
+  app.get("/api/ciap2/search", async (req, res) => {
+    try {
+      const { q, limit } = req.query;
+      if (!q || typeof q !== 'string') {
+        return res.status(400).json({ error: "Parâmetro 'q' obrigatório" });
+      }
+      const results = ciap2Cid10Service.searchCiap2(q, parseInt(limit as string) || 10);
+      res.json(results);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/cid10/search", async (req, res) => {
+    try {
+      const { q, limit } = req.query;
+      if (!q || typeof q !== 'string') {
+        return res.status(400).json({ error: "Parâmetro 'q' obrigatório" });
+      }
+      const results = ciap2Cid10Service.searchCid10(q, parseInt(limit as string) || 10);
+      res.json(results);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/ciap2/:code", async (req, res) => {
+    try {
+      const code = ciap2Cid10Service.getCiap2ByCode(req.params.code);
+      if (!code) {
+        return res.status(404).json({ error: "Código CIAP-2 não encontrado" });
+      }
+      res.json(code);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/cid10/:code", async (req, res) => {
+    try {
+      const code = ciap2Cid10Service.getCid10ByCode(req.params.code);
+      if (!code) {
+        return res.status(404).json({ error: "Código CID-10 não encontrado" });
+      }
+      res.json(code);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/ciap2/:code/cid10-mappings", async (req, res) => {
+    try {
+      const mappings = ciap2Cid10Service.getCid10MappingsForCiap2(req.params.code);
+      res.json(mappings);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // NOTIFICATIONS API
+  // ============================================================================
+
+  app.get("/api/notifications", enforceUnitScope(), async (req, res) => {
+    try {
+      const userId = req.session?.user?.id;
+      const unitId = getEffectiveUnitId(req);
+      const { unreadOnly, type, limit } = req.query;
+      
+      const notifications = await notificationService.getUserNotifications({
+        userId,
+        unitId,
+        unreadOnly: unreadOnly === 'true',
+        type: type as string,
+        limit: parseInt(limit as string) || 50,
+      });
+      res.json(notifications);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/notifications/unread-count", enforceUnitScope(), async (req, res) => {
+    try {
+      const userId = req.session?.user?.id;
+      const unitId = getEffectiveUnitId(req);
+      const count = await notificationService.getUnreadCount(userId, unitId);
+      res.json({ count });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/notifications/:id/read", enforceUnitScope(), async (req, res) => {
+    try {
+      const success = await notificationService.markAsRead(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Notificação não encontrada" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/notifications/:id/dismiss", enforceUnitScope(), async (req, res) => {
+    try {
+      const success = await notificationService.dismissNotification(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Notificação não encontrada" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/notifications/mark-all-read", enforceUnitScope(), async (req, res) => {
+    try {
+      const userId = req.session?.user?.id;
+      const unitId = getEffectiveUnitId(req);
+      const count = await notificationService.markAllAsRead(userId, unitId);
+      res.json({ markedCount: count });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // DIGITAL SIGNATURES API
+  // ============================================================================
+
+  app.get("/api/signatures/validate/:code", async (req, res) => {
+    try {
+      const validation = await digitalSignatureService.validateSignatureByCode(req.params.code);
+      res.json(validation);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/signatures/document/:type/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const signature = await digitalSignatureService.getDocumentSignature(
+        req.params.type,
+        req.params.id
+      );
+      if (!signature) {
+        return res.status(404).json({ error: "Assinatura não encontrada" });
+      }
+      res.json(signature);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/signatures/sign", enforceUnitScope(), async (req, res) => {
+    try {
+      const { documentType, documentId, content } = req.body;
+      
+      if (!documentType || !documentId || !content) {
+        return res.status(400).json({ error: "Campos obrigatórios: documentType, documentId, content" });
+      }
+      
+      // Buscar profissional do usuário
+      const professionalId = req.session?.user?.professionalId;
+      if (!professionalId) {
+        return res.status(403).json({ error: "Usuário não vinculado a um profissional" });
+      }
+      
+      const professional = await db
+        .select()
+        .from(schema.professionals)
+        .where(eq(schema.professionals.id, professionalId))
+        .limit(1);
+      
+      if (professional.length === 0) {
+        return res.status(404).json({ error: "Profissional não encontrado" });
+      }
+      
+      const unitId = req.session?.user?.unitId;
+      if (!unitId) {
+        return res.status(403).json({ error: "Usuário sem unidade definida" });
+      }
+      
+      const signature = await digitalSignatureService.signDocument({
+        type: documentType,
+        id: documentId,
+        content,
+        signerId: professionalId,
+        signerName: professional[0].name,
+        signerCRM: professional[0].registrationNumber || undefined,
+        unitId,
+      });
+      
+      res.status(201).json(signature);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // MEDICAL CERTIFICATES API (Atestados Médicos)
+  // ============================================================================
+
+  app.get("/api/medical-certificates", enforceUnitScope(), async (req, res) => {
+    try {
+      const unitId = getEffectiveUnitId(req);
+      const { citizenId, professionalId, status, startDate, endDate } = req.query;
+      
+      const conditions: any[] = [];
+      if (unitId) {
+        conditions.push(eq(schema.medicalCertificates.unitId, unitId));
+      }
+      if (citizenId) {
+        conditions.push(eq(schema.medicalCertificates.citizenId, citizenId as string));
+      }
+      if (professionalId) {
+        conditions.push(eq(schema.medicalCertificates.professionalId, professionalId as string));
+      }
+      if (status) {
+        conditions.push(eq(schema.medicalCertificates.status, status as any));
+      }
+      
+      const certificates = await db
+        .select()
+        .from(schema.medicalCertificates)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(sql`${schema.medicalCertificates.createdAt} DESC`)
+        .limit(100);
+      
+      res.json(certificates);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/medical-certificates/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const certificate = await db
+        .select()
+        .from(schema.medicalCertificates)
+        .where(eq(schema.medicalCertificates.id, req.params.id))
+        .limit(1);
+      
+      if (certificate.length === 0) {
+        return res.status(404).json({ error: "Atestado não encontrado" });
+      }
+      
+      // Multi-tenant validation
+      const unitId = getEffectiveUnitId(req);
+      if (unitId && certificate[0].unitId !== unitId) {
+        return res.status(403).json({ error: "Acesso negado a esta unidade" });
+      }
+      
+      res.json(certificate[0]);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/medical-certificates", enforceUnitScope(), async (req, res) => {
+    try {
+      const unitId = req.session?.user?.unitId;
+      if (!unitId) {
+        return res.status(403).json({ error: "Usuário sem unidade definida" });
+      }
+      
+      const data = {
+        ...req.body,
+        unitId,
+        startDate: new Date(req.body.startDate),
+        endDate: new Date(req.body.endDate),
+      };
+      
+      const result = await db.insert(schema.medicalCertificates).values(data).returning();
+      res.status(201).json(result[0]);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/medical-certificates/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const certificate = await db
+        .select()
+        .from(schema.medicalCertificates)
+        .where(eq(schema.medicalCertificates.id, req.params.id))
+        .limit(1);
+      
+      if (certificate.length === 0) {
+        return res.status(404).json({ error: "Atestado não encontrado" });
+      }
+      
+      const unitId = getEffectiveUnitId(req);
+      if (unitId && certificate[0].unitId !== unitId) {
+        return res.status(403).json({ error: "Acesso negado a esta unidade" });
+      }
+      
+      const updateData = { ...req.body };
+      if (req.body.startDate) updateData.startDate = new Date(req.body.startDate);
+      if (req.body.endDate) updateData.endDate = new Date(req.body.endDate);
+      
+      const result = await db
+        .update(schema.medicalCertificates)
+        .set(updateData)
+        .where(eq(schema.medicalCertificates.id, req.params.id))
+        .returning();
+      
+      res.json(result[0]);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/medical-certificates/:id/sign", enforceUnitScope(), async (req, res) => {
+    try {
+      const certificate = await db
+        .select()
+        .from(schema.medicalCertificates)
+        .where(eq(schema.medicalCertificates.id, req.params.id))
+        .limit(1);
+      
+      if (certificate.length === 0) {
+        return res.status(404).json({ error: "Atestado não encontrado" });
+      }
+      
+      const unitId = getEffectiveUnitId(req);
+      if (unitId && certificate[0].unitId !== unitId) {
+        return res.status(403).json({ error: "Acesso negado a esta unidade" });
+      }
+      
+      // Buscar profissional
+      const professionalId = req.session?.user?.professionalId;
+      if (!professionalId) {
+        return res.status(403).json({ error: "Usuário não vinculado a um profissional" });
+      }
+      
+      const professional = await db
+        .select()
+        .from(schema.professionals)
+        .where(eq(schema.professionals.id, professionalId))
+        .limit(1);
+      
+      if (professional.length === 0) {
+        return res.status(404).json({ error: "Profissional não encontrado" });
+      }
+      
+      // Criar assinatura digital
+      const content = JSON.stringify({
+        id: certificate[0].id,
+        certificateType: certificate[0].certificateType,
+        citizenId: certificate[0].citizenId,
+        startDate: certificate[0].startDate,
+        endDate: certificate[0].endDate,
+        daysCount: certificate[0].daysCount,
+      });
+      
+      const signature = await digitalSignatureService.signDocument({
+        type: 'certificate',
+        id: certificate[0].id,
+        content,
+        signerId: professionalId,
+        signerName: professional[0].name,
+        signerCRM: professional[0].registrationNumber || undefined,
+        unitId: certificate[0].unitId,
+      });
+      
+      // Atualizar status do atestado
+      const result = await db
+        .update(schema.medicalCertificates)
+        .set({ 
+          status: 'signed',
+          signatureId: signature.documentId, // usar o ID do documento assinado
+        })
+        .where(eq(schema.medicalCertificates.id, req.params.id))
+        .returning();
+      
+      res.json({ certificate: result[0], signature });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // EXAM VALIDATION API
+  // ============================================================================
+
+  app.post("/api/exams/validate", enforceUnitScope(), async (req, res) => {
+    try {
+      const { examType, citizenId, sigtapCode, ciap2Codes, cid10Codes } = req.body;
+      
+      if (!examType || !citizenId) {
+        return res.status(400).json({ error: "Campos obrigatórios: examType, citizenId" });
+      }
+      
+      // Buscar dados do cidadão
+      const citizen = await db
+        .select()
+        .from(schema.citizens)
+        .where(eq(schema.citizens.id, citizenId))
+        .limit(1);
+      
+      if (citizen.length === 0) {
+        return res.status(404).json({ error: "Cidadão não encontrado" });
+      }
+      
+      const citizenData = citizen[0];
+      const citizenAge = citizenData.birthDate 
+        ? Math.floor((Date.now() - new Date(citizenData.birthDate).getTime()) / (1000 * 60 * 60 * 24 * 365))
+        : 0;
+      
+      const validation = await examValidationService.validateExamRequest({
+        examType,
+        sigtapCode,
+        citizenId,
+        citizenAge,
+        citizenSex: citizenData.sex as 'M' | 'F',
+        consultationId: req.body.consultationId || '',
+        ciap2Codes,
+        cid10Codes,
+        isPregnant: citizenData.isPregnant || false,
+        chronicConditions: citizenData.chronicConditions as string[] || [],
+      });
+      
+      res.json(validation);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/exams/suggestions/:citizenId", enforceUnitScope(), async (req, res) => {
+    try {
+      const citizen = await db
+        .select()
+        .from(schema.citizens)
+        .where(eq(schema.citizens.id, req.params.citizenId))
+        .limit(1);
+      
+      if (citizen.length === 0) {
+        return res.status(404).json({ error: "Cidadão não encontrado" });
+      }
+      
+      const citizenData = citizen[0];
+      const citizenAge = citizenData.birthDate 
+        ? Math.floor((Date.now() - new Date(citizenData.birthDate).getTime()) / (1000 * 60 * 60 * 24 * 365))
+        : 0;
+      
+      const { ciap2Codes, cid10Codes } = req.query;
+      
+      const suggestions = examValidationService.suggestComplementaryExams({
+        ciap2Codes: ciap2Codes ? (ciap2Codes as string).split(',') : undefined,
+        cid10Codes: cid10Codes ? (cid10Codes as string).split(',') : undefined,
+        citizenAge,
+        citizenSex: citizenData.sex as 'M' | 'F',
+        chronicConditions: citizenData.chronicConditions as string[] || [],
+      });
+      
+      res.json(suggestions);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/exams/history/:citizenId", enforceUnitScope(), async (req, res) => {
+    try {
+      const { examType, startDate, endDate, limit } = req.query;
+      
+      const history = await examValidationService.getExamHistory({
+        citizenId: req.params.citizenId,
+        examType: examType as string,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+        limit: parseInt(limit as string) || 50,
+      });
+      
+      res.json(history);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // CLINICAL JOURNEY API
+  // ============================================================================
+
+  app.post("/api/clinical-journey/start", enforceUnitScope(), async (req, res) => {
+    try {
+      const { consultationId, citizenId, citizenName } = req.body;
+      
+      if (!consultationId || !citizenId) {
+        return res.status(400).json({ error: "Campos obrigatórios: consultationId, citizenId" });
+      }
+      
+      const context = {
+        consultationId,
+        citizenId,
+        citizenName: citizenName || '',
+        professionalId: req.session?.user?.professionalId || '',
+        professionalName: req.session?.user?.name || '',
+        unitId: req.session?.user?.unitId || '',
+        userId: req.session?.user?.id || '',
+        userRole: req.session?.user?.role || '',
+      };
+      
+      const result = await clinicalJourneyService.startJourney(context);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/clinical-journey/triage", enforceUnitScope(), async (req, res) => {
+    try {
+      const { consultationId, citizenId, citizenName, triageData } = req.body;
+      
+      const context = {
+        consultationId,
+        citizenId,
+        citizenName: citizenName || '',
+        professionalId: req.session?.user?.professionalId || '',
+        professionalName: req.session?.user?.name || '',
+        unitId: req.session?.user?.unitId || '',
+        userId: req.session?.user?.id || '',
+        userRole: req.session?.user?.role || '',
+      };
+      
+      const result = await clinicalJourneyService.processTriageStep(context, triageData);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/clinical-journey/consultation", enforceUnitScope(), async (req, res) => {
+    try {
+      const { consultationId, citizenId, citizenName, consultationData } = req.body;
+      
+      const context = {
+        consultationId,
+        citizenId,
+        citizenName: citizenName || '',
+        professionalId: req.session?.user?.professionalId || '',
+        professionalName: req.session?.user?.name || '',
+        unitId: req.session?.user?.unitId || '',
+        userId: req.session?.user?.id || '',
+        userRole: req.session?.user?.role || '',
+      };
+      
+      const result = await clinicalJourneyService.processConsultationStep(context, consultationData);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/clinical-journey/finalize", enforceUnitScope(), async (req, res) => {
+    try {
+      const { consultationId, citizenId, citizenName, signPrescriptions, signCertificates, signReferrals } = req.body;
+      
+      const context = {
+        consultationId,
+        citizenId,
+        citizenName: citizenName || '',
+        professionalId: req.session?.user?.professionalId || '',
+        professionalName: req.session?.user?.name || '',
+        unitId: req.session?.user?.unitId || '',
+        userId: req.session?.user?.id || '',
+        userRole: req.session?.user?.role || '',
+      };
+      
+      const result = await clinicalJourneyService.finalizeJourney(context, {
+        signPrescriptions,
+        signCertificates,
+        signReferrals,
+      });
+      res.json(result);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
