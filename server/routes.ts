@@ -1923,15 +1923,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/pharmacy/stock", enforceUnitScope(), async (req, res) => {
     try {
-      const sessionUnitId = req.session?.user?.unitId;
-      if (!sessionUnitId) {
-        return res.status(401).json({ error: "Não autenticado" });
-      }
-
+      const effectiveUnitId = getEffectiveUnitId(req);
       const { search, status, includeExpired } = req.query;
 
       const stock = await storage.getAllMedicationStock({
-        unitId: sessionUnitId,
+        unitId: effectiveUnitId || undefined,
         search: search as string,
         status: status as string,
         includeExpired: includeExpired === "true",
@@ -1945,12 +1941,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/pharmacy/stock/low", enforceUnitScope(), async (req, res) => {
     try {
-      const sessionUnitId = req.session?.user?.unitId;
-      if (!sessionUnitId) {
-        return res.status(401).json({ error: "Não autenticado" });
+      const effectiveUnitId = getEffectiveUnitId(req);
+      if (!effectiveUnitId) {
+        return res.status(400).json({ error: "Unidade de saúde não especificada" });
       }
 
-      const lowStock = await storage.getLowStockMedications(sessionUnitId);
+      const lowStock = await storage.getLowStockMedications(effectiveUnitId);
       res.json(lowStock);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1959,15 +1955,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/pharmacy/stock/expiring", enforceUnitScope(), async (req, res) => {
     try {
-      const sessionUnitId = req.session?.user?.unitId;
-      if (!sessionUnitId) {
-        return res.status(401).json({ error: "Não autenticado" });
+      const effectiveUnitId = getEffectiveUnitId(req);
+      if (!effectiveUnitId) {
+        return res.status(400).json({ error: "Unidade de saúde não especificada" });
       }
 
       const { days } = req.query;
       const daysAhead = days ? parseInt(days as string) : 90;
 
-      const expiringStock = await storage.getExpiringStock(sessionUnitId, daysAhead);
+      const expiringStock = await storage.getExpiringStock(effectiveUnitId, daysAhead);
       res.json(expiringStock);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
