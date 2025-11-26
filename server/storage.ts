@@ -1316,7 +1316,7 @@ export class DbStorage implements IStorage {
     // Count low stock items
     let stockQuery = db.select({ count: sql<number>`count(*)` })
       .from(schema.medicationStock)
-      .where(sql`${schema.medicationStock.quantity} < ${schema.medicationStock.minStock}`);
+      .where(sql`${schema.medicationStock.currentQuantity} < ${schema.medicationStock.minStock}`);
     
     if (unitId) {
       stockQuery = stockQuery.where(eq(schema.medicationStock.unitId, unitId)) as any;
