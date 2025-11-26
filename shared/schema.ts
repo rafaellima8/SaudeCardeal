@@ -504,10 +504,34 @@ export const medicalReferrals = sqliteTable("medical_referrals", {
   status: text("status", { 
     enum: ["pending", "scheduled", "in_progress", "completed", "cancelled"] 
   }).notNull().default("pending"),
+  clinicalRisk: text("clinical_risk", { enum: ["baixo", "medio", "alto"] }).default("medio"),
   referralDate: integer("referral_date", { mode: "timestamp" }).notNull(),
   scheduledDate: integer("scheduled_date", { mode: "timestamp" }),
   completedDate: integer("completed_date", { mode: "timestamp" }),
   observations: text("observations"),
+  
+  // Fila de Linha de Cuidado
+  careLineId: text("care_line_id").references(() => careLines.id),
+  queuePosition: integer("queue_position"),
+  queueEnteredAt: integer("queue_entered_at", { mode: "timestamp" }),
+  
+  // Contra-Referência (resposta do especialista)
+  counterReferralDate: integer("counter_referral_date", { mode: "timestamp" }),
+  counterReferralProfessionalId: text("counter_referral_professional_id").references(() => professionals.id),
+  counterReferralReport: text("counter_referral_report"),
+  counterReferralDiagnosis: text("counter_referral_diagnosis"),
+  counterReferralConducts: text("counter_referral_conducts"),
+  counterReferralFollowUp: text("counter_referral_follow_up"),
+  counterReferralAttachments: text("counter_referral_attachments", { mode: "json" }).$type<string[]>(),
+  
+  // Auditoria
+  statusHistory: text("status_history", { mode: "json" }).$type<{
+    status: string;
+    changedAt: string;
+    changedBy: string;
+    reason?: string;
+  }[]>(),
+  
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });

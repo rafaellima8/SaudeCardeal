@@ -1594,17 +1594,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/medical-referrals/:id", async (req, res) => {
+  app.delete("/api/medical-referrals/:id", enforceUnitScope(), async (req, res) => {
     try {
-      // Buscar referral existente para validação multi-tenant
       const existingReferral = await storage.getMedicalReferralById(req.params.id);
       if (!existingReferral) {
         return res.status(404).json({ error: "Encaminhamento não encontrado" });
       }
       
-      // Validação multi-tenant: verificar se referral pertence à unidade do usuário autenticado
-      const sessionUnitId = req.session?.user?.unitId;
-      if (sessionUnitId && existingReferral.unitId !== sessionUnitId) {
+      if (!validateEntityAccess(req, existingReferral.unitId)) {
         return res.status(403).json({ error: "Acesso negado: encaminhamento de outra unidade" });
       }
       
@@ -1613,6 +1610,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Encaminhamento não encontrado" });
       }
       res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // REFERRAL WORKFLOW - Contra-Referência & Fila de Linha de Cuidado
+  // ============================================================================
+  
+  app.post("/api/medical-referrals/:id/add-to-queue", enforceUnitScope(), async (req, res) => {
+    try {
+      const { careLineId } = req.body;
+      if (!careLineId) {
+        return res.status(400).json({ error: "careLineId é obrigatório" });
+      }
+      
+      const existingReferral = await storage.getMedicalReferralById(req.params.id);
+      if (!existingReferral) {
+        return res.status(404).json({ error: "Encaminhamento não encontrado" });
+      }
+      
+      if (!validateEntityAccess(req, existingReferral.unitId)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      
+      const { referralWorkflowService } = await import("./services/referralWorkflowService");
+      const result = await referralWorkflowService.addToCareLine(req.params.id, careLineId, {
+        referralId: req.params.id,
+        userId: req.session?.user?.id || "",
+        userName: req.session?.user?.name || "",
+        unitId: req.session?.user?.unitId || "",
+      });
+      
+      if (!result.success) {
+        return res.status(400).json({ error: result.message });
+      }
+      
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  app.post("/api/medical-referrals/:id/change-status", enforceUnitScope(), async (req, res) => {
+    try {
+      const { status, reason } = req.body;
+      if (!status) {
+        return res.status(400).json({ error: "status é obrigatório" });
+      }
+      
+      const existingReferral = await storage.getMedicalReferralById(req.params.id);
+      if (!existingReferral) {
+        return res.status(404).json({ error: "Encaminhamento não encontrado" });
+      }
+      
+      if (!validateEntityAccess(req, existingReferral.unitId)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      
+      const { referralWorkflowService } = await import("./services/referralWorkflowService");
+      const result = await referralWorkflowService.changeStatus(req.params.id, status, {
+        referralId: req.params.id,
+        userId: req.session?.user?.id || "",
+        userName: req.session?.user?.name || "",
+        unitId: req.session?.user?.unitId || "",
+      }, reason);
+      
+      if (!result.success) {
+        return res.status(400).json({ error: result.message });
+      }
+      
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  app.post("/api/medical-referrals/:id/counter-referral", enforceUnitScope(), async (req, res) => {
+    try {
+      const { report, diagnosis, conducts, followUp, attachments } = req.body;
+      if (!report) {
+        return res.status(400).json({ error: "report (laudo) é obrigatório" });
+      }
+      
+      const existingReferral = await storage.getMedicalReferralById(req.params.id);
+      if (!existingReferral) {
+        return res.status(404).json({ error: "Encaminhamento não encontrado" });
+      }
+      
+      const { referralWorkflowService } = await import("./services/referralWorkflowService");
+      const result = await referralWorkflowService.registerCounterReferral(
+        req.params.id,
+        { report, diagnosis, conducts, followUp, attachments },
+        {
+          referralId: req.params.id,
+          userId: req.session?.user?.id || "",
+          userName: req.session?.user?.name || "",
+          unitId: req.session?.user?.unitId || "",
+        }
+      );
+      
+      if (!result.success) {
+        return res.status(400).json({ error: result.message });
+      }
+      
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  app.get("/api/care-line-queue/:careLineId/referrals", enforceUnitScope(), async (req, res) => {
+    try {
+      const unitId = getEffectiveUnitId(req);
+      const { referralWorkflowService } = await import("./services/referralWorkflowService");
+      const queue = await referralWorkflowService.getQueueByCareLine(req.params.careLineId, unitId || undefined);
+      res.json(queue);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  app.get("/api/referral-indicators", enforceUnitScope(), async (req, res) => {
+    try {
+      const unitId = getEffectiveUnitId(req);
+      if (!unitId) {
+        return res.status(400).json({ error: "Unidade não identificada" });
+      }
+      
+      const { startDate, endDate } = req.query;
+      const { referralWorkflowService } = await import("./services/referralWorkflowService");
+      const indicators = await referralWorkflowService.getIndicators(
+        unitId,
+        startDate ? new Date(startDate as string) : undefined,
+        endDate ? new Date(endDate as string) : undefined
+      );
+      res.json(indicators);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -4346,167 +4480,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         signReferrals,
       });
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // ============================================================================
-  // MEDICAL CERTIFICATES API - Atestados Médicos
-  // ============================================================================
-
-  app.get("/api/medical-certificates", enforceUnitScope(), async (req, res) => {
-    try {
-      const { citizenId, status } = req.query;
-      const unitId = getEffectiveUnitId(req);
-      
-      const certificates = await db
-        .select()
-        .from(schema.medicalCertificates)
-        .where(
-          and(
-            unitId ? eq(schema.medicalCertificates.unitId, unitId) : undefined,
-            citizenId ? eq(schema.medicalCertificates.citizenId, citizenId as string) : undefined,
-            status ? eq(schema.medicalCertificates.status, status as string) : undefined
-          )
-        )
-        .orderBy(sql`created_at DESC`)
-        .limit(100);
-      
-      res.json(certificates);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.post("/api/medical-certificates", enforceUnitScope(), async (req, res) => {
-    try {
-      const unitId = req.session?.user?.unitId;
-      const professionalId = req.session?.user?.professionalId;
-      
-      if (!unitId || !professionalId) {
-        return res.status(401).json({ error: "Sessão inválida" });
-      }
-      
-      const { type, citizenId, consultationId, content, daysOff, startDate, endDate, cid10Code, restrictions } = req.body;
-      
-      const [certificate] = await db
-        .insert(schema.medicalCertificates)
-        .values({
-          type,
-          citizenId,
-          consultationId,
-          professionalId,
-          unitId,
-          content,
-          daysOff: daysOff || null,
-          startDate: startDate || null,
-          endDate: endDate || null,
-          cid10Code: cid10Code || null,
-          restrictions: restrictions || null,
-          status: 'draft',
-          createdAt: new Date().toISOString(),
-        })
-        .returning();
-      
-      res.status(201).json(certificate);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.get("/api/medical-certificates/:id", enforceUnitScope(), async (req, res) => {
-    try {
-      const [certificate] = await db
-        .select()
-        .from(schema.medicalCertificates)
-        .where(eq(schema.medicalCertificates.id, parseInt(req.params.id)))
-        .limit(1);
-      
-      if (!certificate) {
-        return res.status(404).json({ error: "Atestado não encontrado" });
-      }
-      
-      const valid = await validateEntityAccess(req, certificate.unitId);
-      if (!valid) {
-        return res.status(403).json({ error: "Acesso negado" });
-      }
-      
-      res.json(certificate);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.post("/api/medical-certificates/:id/sign", enforceUnitScope(), async (req, res) => {
-    try {
-      const [certificate] = await db
-        .select()
-        .from(schema.medicalCertificates)
-        .where(eq(schema.medicalCertificates.id, parseInt(req.params.id)))
-        .limit(1);
-      
-      if (!certificate) {
-        return res.status(404).json({ error: "Atestado não encontrado" });
-      }
-      
-      const valid = await validateEntityAccess(req, certificate.unitId);
-      if (!valid) {
-        return res.status(403).json({ error: "Acesso negado" });
-      }
-      
-      const professional = await storage.getProfessionalById(certificate.professionalId);
-      if (!professional) {
-        return res.status(404).json({ error: "Profissional não encontrado" });
-      }
-      
-      const signResult = await digitalSignatureService.signDocument({
-        type: 'certificate',
-        id: certificate.id,
-        content: certificate.content,
-        signerId: certificate.professionalId,
-        signerName: professional.name,
-        signerCRM: professional.councilNumber,
-        unitId: certificate.unitId,
-      });
-      
-      await db
-        .update(schema.medicalCertificates)
-        .set({
-          status: 'signed',
-          signedAt: new Date().toISOString(),
-          signatureHash: signResult.hash,
-        })
-        .where(eq(schema.medicalCertificates.id, certificate.id));
-      
-      res.json({ success: true, signatureHash: signResult.hash });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.get("/api/medical-certificates/:id/pdf", enforceUnitScope(), async (req, res) => {
-    try {
-      const [certificate] = await db
-        .select()
-        .from(schema.medicalCertificates)
-        .where(eq(schema.medicalCertificates.id, parseInt(req.params.id)))
-        .limit(1);
-      
-      if (!certificate) {
-        return res.status(404).json({ error: "Atestado não encontrado" });
-      }
-      
-      const valid = await validateEntityAccess(req, certificate.unitId);
-      if (!valid) {
-        return res.status(403).json({ error: "Acesso negado" });
-      }
-      
-      res.json({
-        success: true,
-        message: "PDF generation endpoint - implement jsPDF generation here",
-        certificate,
-      });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
