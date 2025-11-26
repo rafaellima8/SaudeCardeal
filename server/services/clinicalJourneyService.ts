@@ -8,11 +8,11 @@
 import { db } from "../db";
 import * as schema from "@shared/schema";
 import { eq, and } from "drizzle-orm";
-import { evaluateAlerts, type ClinicalAlert, type AlertEvaluationContext } from "./protocolAlertService";
-import { createClinicalAlert } from "./notificationService";
+import { evaluateAlerts, type ClinicalAlert } from "./protocolAlertService";
+import { createClinicalAlert, notifyPharmacyNewPrescription } from "./notificationService";
 import { signDocument } from "./digitalSignatureService";
 import { examValidationService } from "./examValidationService";
-import { logMedicalRecordAccess } from "./auditService";
+import { logMedicalRecordAccess, type AuditContext } from "./auditService";
 
 export type ProtocolAlert = ClinicalAlert;
 
@@ -44,14 +44,18 @@ export async function startJourney(context: JourneyContext): Promise<JourneyStep
   const actions: Array<{ type: string; description: string; required: boolean }> = [];
   
   // Registrar acesso ao prontuário
-  await logMedicalRecordAccess({
+  const auditContext: AuditContext = {
     userId: context.userId,
-    userName: context.professionalName,
-    userRole: context.userRole,
-    citizenId: context.citizenId,
     unitId: context.unitId,
+    professionalId: context.professionalId,
+  };
+  
+  await logMedicalRecordAccess({
+    citizenId: context.citizenId,
     action: 'view',
+    entityType: 'full_record',
     accessReason: 'Início de atendimento',
+    context: auditContext,
   });
   
   // Buscar dados do cidadão
@@ -157,6 +161,10 @@ export async function processTriageStep(
   
   // Criar notificações para alertas críticos
   for (const alert of alerts.filter(a => a.severity === 'critical')) {
+    const mappedSeverity: 'low' | 'medium' | 'high' | 'critical' = 
+      alert.severity === 'info' ? 'low' : 
+      alert.severity === 'warning' ? 'medium' : alert.severity;
+    
     await createClinicalAlert({
       userId: context.userId,
       unitId: context.unitId,
@@ -164,7 +172,7 @@ export async function processTriageStep(
       citizenName: context.citizenName,
       consultationId: context.consultationId,
       alertType: alert.category,
-      severity: alert.severity,
+      severity: mappedSeverity,
       message: alert.message,
       recommendation: alert.recommendation || '',
     });
@@ -323,13 +331,8 @@ export async function processPrescriptionStep(
   const stock = await db
     .select()
     .from(schema.medicationStock)
-    .where(
-      and(
-        eq(schema.medicationStock.unitId, context.unitId),
-        eq(schema.medicationStock.status, 'active')
-      )
-    )
-    .limit(1);
+    .where(eq(schema.medicationStock.unitId, context.unitId))
+    .limit(100);
   
   // Buscar medicamento correspondente
   const medication = await db
@@ -408,7 +411,7 @@ export async function finalizeJourney(
           content,
           signerId: context.professionalId,
           signerName: prof.name,
-          signerCRM: prof.registrationNumber,
+          signerCRM: prof.councilNumber,
           unitId: context.unitId,
         });
         
@@ -441,7 +444,7 @@ export async function finalizeJourney(
           content,
           signerId: context.professionalId,
           signerName: prof.name,
-          signerCRM: prof.registrationNumber,
+          signerCRM: prof.councilNumber,
           unitId: context.unitId,
         });
         
@@ -453,15 +456,20 @@ export async function finalizeJourney(
   }
   
   // Registrar finalização
-  await logMedicalRecordAccess({
+  const auditCtx: AuditContext = {
     userId: context.userId,
-    userName: context.professionalName,
-    userRole: context.userRole,
-    citizenId: context.citizenId,
     unitId: context.unitId,
+    professionalId: context.professionalId,
+  };
+  
+  await logMedicalRecordAccess({
+    citizenId: context.citizenId,
     action: 'update',
+    entityType: 'consultation',
+    entityId: context.consultationId,
     accessReason: 'Finalização de atendimento',
-    dataAccessed: { signedDocuments },
+    metadata: { signedDocuments },
+    context: auditCtx,
   });
   
   return {

@@ -48,6 +48,7 @@ import * as notificationService from "./services/notificationService";
 import * as digitalSignatureService from "./services/digitalSignatureService";
 import * as examValidationService from "./services/examValidationService";
 import * as clinicalJourneyService from "./services/clinicalJourneyService";
+import * as documentValidationService from "./services/documentValidationService";
 import { eq, and, sql } from "drizzle-orm";
 import { specialtySuggestionInputSchema, insertReferralRuleSchema } from "@shared/schema";
 
@@ -1028,6 +1029,165 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error.message.includes('não encontrado')) {
         return res.status(404).json({ error: error.message });
       }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // QUEUE MANAGEMENT API - Chamada de Senhas e Estatísticas
+  // ============================================================================
+
+  // Listar fila de atendimento (usa unitId da sessão)
+  app.get("/api/queue", enforceUnitScope(), async (req, res) => {
+    try {
+      const { status } = req.query;
+      const unitId = getEffectiveUnitId(req);
+      
+      if (!unitId) {
+        return res.status(401).json({ error: "Sessão inválida - unitId não encontrado" });
+      }
+      
+      const queue = await storage.getAttendanceQueue({
+        unitId,
+        status: status as string,
+      });
+      
+      // Enriquecer com nomes dos cidadãos e números de senha
+      const enrichedQueue = await Promise.all(queue.map(async (entry, index) => {
+        let citizenName = 'Paciente';
+        try {
+          const citizen = await storage.getCitizenById(entry.citizenId);
+          if (citizen) citizenName = citizen.name;
+        } catch {}
+        
+        return {
+          ...entry,
+          citizenName,
+          ticketNumber: `${entry.priority === 'priority' ? 'P' : 'N'}${String(entry.id).padStart(3, '0')}`,
+          estimatedWaitMinutes: index * 10,
+        };
+      }));
+      
+      res.json(enrichedQueue);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Chamar próximo paciente da fila
+  app.post("/api/queue/call-next", enforceUnitScope(), async (req, res) => {
+    try {
+      const { room, professionalId } = req.body;
+      const unitId = req.session?.user?.unitId;
+      
+      if (!unitId) {
+        return res.status(401).json({ error: "Sessão inválida" });
+      }
+      
+      const nextPatient = await storage.getNextPatientInQueue(unitId, professionalId);
+      
+      if (!nextPatient) {
+        return res.json({ success: true, ticket: null, message: "Nenhum paciente aguardando" });
+      }
+      
+      await storage.updateQueueEntry(nextPatient.id, {
+        status: 'called',
+        calledAt: new Date().toISOString(),
+        room: room || undefined,
+      });
+      
+      const updatedEntry = await storage.getQueueEntry(nextPatient.id);
+      
+      res.json({ 
+        success: true, 
+        ticket: {
+          ...updatedEntry,
+          ticketNumber: `${updatedEntry?.priority === 'priority' ? 'P' : 'N'}${String(updatedEntry?.id || 0).padStart(3, '0')}`,
+          citizenName: updatedEntry?.citizenId || 'Paciente',
+          room,
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Atualizar status do ticket
+  app.patch("/api/queue/:id/status", enforceUnitScope(), async (req, res) => {
+    try {
+      const { status } = req.body;
+      const validStatuses = ['waiting', 'called', 'in_service', 'completed', 'no_show'];
+      
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: "Status inválido" });
+      }
+      
+      const queueEntry = await storage.getQueueEntry(req.params.id);
+      if (!queueEntry) {
+        return res.status(404).json({ error: "Entrada não encontrada" });
+      }
+      
+      if (req.session.user?.unitId !== queueEntry.unitId) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      
+      const updateData: any = { status };
+      if (status === 'in_service') {
+        updateData.serviceStartedAt = new Date().toISOString();
+      }
+      if (status === 'completed') {
+        updateData.completedAt = new Date().toISOString();
+      }
+      
+      await storage.updateQueueEntry(req.params.id, updateData);
+      const updated = await storage.getQueueEntry(req.params.id);
+      
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Estatísticas da fila
+  app.get("/api/queue/stats", enforceUnitScope(), async (req, res) => {
+    try {
+      const unitId = getEffectiveUnitId(req);
+      
+      const allQueue = await storage.getAttendanceQueue({
+        unitId: unitId || undefined,
+      });
+      
+      const waiting = allQueue.filter(q => q.status === 'waiting').length;
+      const inService = allQueue.filter(q => q.status === 'in_service').length;
+      const completed = allQueue.filter(q => q.status === 'completed').length;
+      const noShow = allQueue.filter(q => q.status === 'no_show').length;
+      
+      const completedToday = allQueue.filter(q => {
+        if (q.status !== 'completed') return false;
+        const today = new Date().toDateString();
+        return new Date(q.createdAt || '').toDateString() === today;
+      });
+      
+      let averageWaitMinutes = 0;
+      if (completedToday.length > 0) {
+        const totalWait = completedToday.reduce((sum, q) => {
+          if (q.calledAt && q.createdAt) {
+            const wait = new Date(q.calledAt).getTime() - new Date(q.createdAt).getTime();
+            return sum + (wait / 60000);
+          }
+          return sum;
+        }, 0);
+        averageWaitMinutes = Math.round(totalWait / completedToday.length);
+      }
+      
+      res.json({
+        waiting,
+        inService,
+        completed,
+        noShow,
+        averageWaitMinutes,
+      });
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
@@ -4185,6 +4345,219 @@ export async function registerRoutes(app: Express): Promise<Server> {
         signCertificates,
         signReferrals,
       });
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // MEDICAL CERTIFICATES API - Atestados Médicos
+  // ============================================================================
+
+  app.get("/api/medical-certificates", enforceUnitScope(), async (req, res) => {
+    try {
+      const { citizenId, status } = req.query;
+      const unitId = getEffectiveUnitId(req);
+      
+      const certificates = await db
+        .select()
+        .from(schema.medicalCertificates)
+        .where(
+          and(
+            unitId ? eq(schema.medicalCertificates.unitId, unitId) : undefined,
+            citizenId ? eq(schema.medicalCertificates.citizenId, citizenId as string) : undefined,
+            status ? eq(schema.medicalCertificates.status, status as string) : undefined
+          )
+        )
+        .orderBy(sql`created_at DESC`)
+        .limit(100);
+      
+      res.json(certificates);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/medical-certificates", enforceUnitScope(), async (req, res) => {
+    try {
+      const unitId = req.session?.user?.unitId;
+      const professionalId = req.session?.user?.professionalId;
+      
+      if (!unitId || !professionalId) {
+        return res.status(401).json({ error: "Sessão inválida" });
+      }
+      
+      const { type, citizenId, consultationId, content, daysOff, startDate, endDate, cid10Code, restrictions } = req.body;
+      
+      const [certificate] = await db
+        .insert(schema.medicalCertificates)
+        .values({
+          type,
+          citizenId,
+          consultationId,
+          professionalId,
+          unitId,
+          content,
+          daysOff: daysOff || null,
+          startDate: startDate || null,
+          endDate: endDate || null,
+          cid10Code: cid10Code || null,
+          restrictions: restrictions || null,
+          status: 'draft',
+          createdAt: new Date().toISOString(),
+        })
+        .returning();
+      
+      res.status(201).json(certificate);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/medical-certificates/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const [certificate] = await db
+        .select()
+        .from(schema.medicalCertificates)
+        .where(eq(schema.medicalCertificates.id, parseInt(req.params.id)))
+        .limit(1);
+      
+      if (!certificate) {
+        return res.status(404).json({ error: "Atestado não encontrado" });
+      }
+      
+      const valid = await validateEntityAccess(req, certificate.unitId);
+      if (!valid) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      
+      res.json(certificate);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/medical-certificates/:id/sign", enforceUnitScope(), async (req, res) => {
+    try {
+      const [certificate] = await db
+        .select()
+        .from(schema.medicalCertificates)
+        .where(eq(schema.medicalCertificates.id, parseInt(req.params.id)))
+        .limit(1);
+      
+      if (!certificate) {
+        return res.status(404).json({ error: "Atestado não encontrado" });
+      }
+      
+      const valid = await validateEntityAccess(req, certificate.unitId);
+      if (!valid) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      
+      const professional = await storage.getProfessionalById(certificate.professionalId);
+      if (!professional) {
+        return res.status(404).json({ error: "Profissional não encontrado" });
+      }
+      
+      const signResult = await digitalSignatureService.signDocument({
+        type: 'certificate',
+        id: certificate.id,
+        content: certificate.content,
+        signerId: certificate.professionalId,
+        signerName: professional.name,
+        signerCRM: professional.councilNumber,
+        unitId: certificate.unitId,
+      });
+      
+      await db
+        .update(schema.medicalCertificates)
+        .set({
+          status: 'signed',
+          signedAt: new Date().toISOString(),
+          signatureHash: signResult.hash,
+        })
+        .where(eq(schema.medicalCertificates.id, certificate.id));
+      
+      res.json({ success: true, signatureHash: signResult.hash });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/medical-certificates/:id/pdf", enforceUnitScope(), async (req, res) => {
+    try {
+      const [certificate] = await db
+        .select()
+        .from(schema.medicalCertificates)
+        .where(eq(schema.medicalCertificates.id, parseInt(req.params.id)))
+        .limit(1);
+      
+      if (!certificate) {
+        return res.status(404).json({ error: "Atestado não encontrado" });
+      }
+      
+      const valid = await validateEntityAccess(req, certificate.unitId);
+      if (!valid) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      
+      res.json({
+        success: true,
+        message: "PDF generation endpoint - implement jsPDF generation here",
+        certificate,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // DOCUMENT VALIDATION API
+  // ============================================================================
+
+  app.post("/api/validate/cpf", async (req, res) => {
+    try {
+      const { cpf } = req.body;
+      if (!cpf) {
+        return res.status(400).json({ error: "CPF é obrigatório" });
+      }
+      const result = documentValidationService.validateCPF(cpf);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/validate/cns", async (req, res) => {
+    try {
+      const { cns } = req.body;
+      if (!cns) {
+        return res.status(400).json({ error: "CNS é obrigatório" });
+      }
+      const result = documentValidationService.validateCNS(cns);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/validate/cep", async (req, res) => {
+    try {
+      const { cep } = req.body;
+      if (!cep) {
+        return res.status(400).json({ error: "CEP é obrigatório" });
+      }
+      const result = await documentValidationService.validateCEP(cep);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/validate/cep/:cep", async (req, res) => {
+    try {
+      const result = await documentValidationService.validateCEP(req.params.cep);
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

@@ -1,0 +1,79 @@
+#### 2.1.3 Prescrição Médica Eletrônica
+
+**Objetivo:** Eliminação de receitas manuscritas, controle de medicamentos e integração com farmácia
+
+**Funcionalidades Principais:**
+
+**Prescrição Integrada:**
+- Catálogo RENAME (Relação Nacional de Medicamentos Essenciais)
+- Busca inteligente por nome comercial ou princípio ativo
+- Posologia estruturada:
+  - Medicamento
+  - Dosagem (mg, ml, comprimidos)
+  - Frequência (a cada X horas, X vezes ao dia)
+  - Duração do tratamento
+  - Via de administração (oral, tópica, injetável)
+  - Orientações especiais
+
+**Validação e Segurança:**
+- **Interações medicamentosas:** Sistema alerta em tempo real
+  - Exemplo: "⚠️ Atenção: Warfarina + AAS = risco de sangramento"
+- **Alergias:** Verifica alergias registradas do paciente
+- **Dose pediátrica:** Calcula dose por peso automaticamente
+- **Medicamentos controlados:** Sinaliza portaria 344/98 ANVISA
+
+**Impressão Profissional:**
+- PDF com cabeçalho da unidade de saúde
+- Logo oficial do município
+- Dados do profissional (nome, CRM, carimbo digital)
+- QR Code para validação de autenticidade
+- Validade da receita (padrão 30 dias, controlados 30 dias)
+
+**Integração Farmácia:**
+- Notificação automática para farmácia da unidade
+- Controle de estoque (se disponível)
+- Histórico de dispensação
+
+**Fluxo Completo:**
+```
+Médico prescreve → Sistema valida → Gera PDF → Paciente imprime na recepção 
+→ Farmácia dispensa → Sistema registra → Controle de estoque atualizado
+```
+
+---
+
+#### 2.1.4 Solicitação de Exames
+
+**Objetivo:** Gestão completa de exames laboratoriais e procedimentos diagnósticos
+
+**Funcionalidades:**
+
+**Catálogo SIGTAP:**
+- 25+ exames mais comuns pré-cadastrados
+- Códigos SIGTAP (Tabela SUS de Procedimentos)
+- Categorias: exame laboratorial, imagem, procedimento
+
+**Exemplos de Exames:**
+- Hemograma completo (02.02.02.038-0)
+- Glicemia de jejum (02.02.02.042-8)
+- Raio-X tórax PA (02.05.02.001-5)
+- Ultrassonografia obstétrica (02.05.02.015-5)
+- Eletrocardiograma (02.11.07.007-0)
+
+**Solicitação Estruturada:**
+- Seleção do exame (busca inteligente)
+- Prioridade (rotina, urgente, emergencial)
+- Justificativa clínica obrigatória
+- Hipótese diagnóstica
+- Data desejada de realização
+
+**Gestão e Rastreamento:**
+- Status: solicitado → agendado → coletado → resultado disponível
+- Notificação ao paciente (SMS/WhatsApp)
+- Anexo de resultados digitalizados
+- Histórico completo de exames por paciente
+
+**Integração e-SUS:**
+- Exportação automática para SISAB
+- Contabilização de procedimentos realizados
+- Alimentação de indicadores de produção
