@@ -41,7 +41,7 @@ import aiRoutes from "./routes-ai";
 import alertsRoutes from "./routes-alerts";
 import { generatePrescriptionPDF, generateMedicalCertificatePDF } from "./services/pdf-generator";
 import { CareLineResolutionService } from "./services/care-line-resolution";
-import { ProtocolAlertService } from "./services/protocol-alert.service";
+import { protocolAlertService } from "./services/protocol-alert-drizzle.service";
 import { rawSqlite, db } from "./db";
 import { sugerirEspecialidades, invalidateRulesCache } from "./services/sugestorEspecialidade";
 import * as ciap2Cid10Service from "./services/ciap2Cid10Service";
@@ -52,9 +52,6 @@ import * as clinicalJourneyService from "./services/clinicalJourneyService";
 import * as documentValidationService from "./services/documentValidationService";
 import { eq, and, sql } from "drizzle-orm";
 import { specialtySuggestionInputSchema, insertReferralRuleSchema } from "@shared/schema";
-
-// Initialize Protocol Alert Service using SHARED SQLite instance (transactional consistency) ✅
-const protocolAlertService = new ProtocolAlertService(rawSqlite);
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
