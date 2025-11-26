@@ -1417,26 +1417,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Stock movements
   app.post("/api/pharmacy/stock-movements", async (req, res) => {
     try {
-      const { medicationId, type, quantity, batchNumber, expirationDate, reason, unitId, professionalId } = req.body;
-      
-      if (!medicationId || !type || !quantity || !reason) {
-        return res.status(400).json({ error: "Campos obrigatórios: medicationId, type, quantity, reason" });
+      // SECURITY: Multi-tenant enforcement - force unitId from session
+      const sessionUnitId = req.session?.user?.unitId;
+      if (!sessionUnitId) {
+        return res.status(401).json({ error: "Usuário não autenticado" });
       }
 
-      // Multi-tenant security
-      const sessionUnitId = req.session?.user?.unitId;
-      if (sessionUnitId && unitId !== sessionUnitId) {
-        return res.status(403).json({ error: "Acesso negado: unidade diferente da sessão" });
+      // Validate with Zod and enforce unitId from session
+      const validation = schema.stockMovementSchema.safeParse({
+        ...req.body,
+        unitId: sessionUnitId, // Force unitId from session (security)
+      });
+
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Dados inválidos",
+          details: validation.error.errors 
+        });
       }
+
+      const { medicationId, movementType, quantity, batchNumber, expirationDate, reason } = validation.data;
 
       const movement = {
         medicationId,
-        unitId,
-        professionalId,
-        type,
-        quantity: type === "saida" ? -Math.abs(quantity) : Math.abs(quantity),
+        unitId: sessionUnitId, // Use session unitId (security-enforced)
+        professionalId: req.session?.user?.id,
+        type: movementType,
+        quantity: movementType === "saida" ? -Math.abs(quantity) : Math.abs(quantity),
         batchNumber,
-        expirationDate: expirationDate ? new Date(expirationDate) : undefined,
+        expirationDate,
         reason,
         createdAt: new Date(),
       };
@@ -1444,7 +1453,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const created = await storage.createStockMovement(movement);
       res.status(201).json(created);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(400).json({ error: error.message });
     }
   });
 
@@ -2994,12 +3003,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/clinical-protocols", async (req, res) => {
     try {
-      // Admin-only endpoint (role check would go here in production)
-      if (!req.body.name || !req.body.careLineId) {
-        return res.status(400).json({ error: "Campos obrigatórios: name, careLineId" });
+      // Admin-only endpoint - validate role
+      if (req.session?.user?.role !== "admin" && req.session?.user?.role !== "gestor") {
+        return res.status(403).json({ error: "Acesso negado: apenas administradores podem criar protocolos" });
+      }
+
+      // Validate with Zod schema
+      const validation = schema.insertClinicalProtocolSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Dados inválidos",
+          details: validation.error.errors 
+        });
       }
       
-      const protocol = await storage.createClinicalProtocol(req.body);
+      const protocol = await storage.createClinicalProtocol(validation.data);
       res.status(201).json(protocol);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -3008,7 +3026,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/clinical-protocols/:id", async (req, res) => {
     try {
-      const protocol = await storage.updateClinicalProtocol(req.params.id, req.body);
+      // Admin-only endpoint
+      if (req.session?.user?.role !== "admin" && req.session?.user?.role !== "gestor") {
+        return res.status(403).json({ error: "Acesso negado: apenas administradores podem atualizar protocolos" });
+      }
+
+      // Partial validation (allow partial updates)
+      const validation = schema.insertClinicalProtocolSchema.partial().safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Dados inválidos",
+          details: validation.error.errors 
+        });
+      }
+
+      const protocol = await storage.updateClinicalProtocol(req.params.id, validation.data);
       if (!protocol) {
         return res.status(404).json({ error: "Protocolo não encontrado" });
       }
@@ -3020,6 +3052,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/clinical-protocols/:id", async (req, res) => {
     try {
+      // Admin-only endpoint
+      if (req.session?.user?.role !== "admin" && req.session?.user?.role !== "gestor") {
+        return res.status(403).json({ error: "Acesso negado: apenas administradores podem deletar protocolos" });
+      }
+
       const success = await storage.deleteClinicalProtocol(req.params.id);
       if (!success) {
         return res.status(404).json({ error: "Protocolo não encontrado" });
@@ -3054,12 +3091,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/consultation-templates", async (req, res) => {
     try {
-      // Basic validation
-      if (!req.body.name || !req.body.careLineId) {
-        return res.status(400).json({ error: "Campos obrigatórios: name, careLineId" });
+      // Admin-only endpoint - validate role
+      if (req.session?.user?.role !== "admin" && req.session?.user?.role !== "gestor") {
+        return res.status(403).json({ error: "Acesso negado: apenas administradores podem criar templates" });
+      }
+
+      // Validate with Zod schema
+      const validation = schema.insertConsultationTemplateSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Dados inválidos",
+          details: validation.error.errors 
+        });
       }
       
-      const template = await storage.createConsultationTemplate(req.body);
+      const template = await storage.createConsultationTemplate(validation.data);
       res.status(201).json(template);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -3068,7 +3114,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/consultation-templates/:id", async (req, res) => {
     try {
-      const template = await storage.updateConsultationTemplate(req.params.id, req.body);
+      // Admin-only endpoint
+      if (req.session?.user?.role !== "admin" && req.session?.user?.role !== "gestor") {
+        return res.status(403).json({ error: "Acesso negado: apenas administradores podem atualizar templates" });
+      }
+
+      // Partial validation (allow partial updates)
+      const validation = schema.insertConsultationTemplateSchema.partial().safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Dados inválidos",
+          details: validation.error.errors 
+        });
+      }
+
+      const template = await storage.updateConsultationTemplate(req.params.id, validation.data);
       if (!template) {
         return res.status(404).json({ error: "Template não encontrado" });
       }
@@ -3080,6 +3140,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/consultation-templates/:id", async (req, res) => {
     try {
+      // Admin-only endpoint
+      if (req.session?.user?.role !== "admin" && req.session?.user?.role !== "gestor") {
+        return res.status(403).json({ error: "Acesso negado: apenas administradores podem deletar templates" });
+      }
+
       const success = await storage.deleteConsultationTemplate(req.params.id);
       if (!success) {
         return res.status(404).json({ error: "Template não encontrado" });

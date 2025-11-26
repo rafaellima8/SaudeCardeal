@@ -2605,8 +2605,23 @@ export class DbStorage implements IStorage {
       )
       .limit(1);
 
+    // SECURITY: Validate negative balance (prevent stock from going below zero)
+    const currentQuantity = currentStock.length > 0 ? currentStock[0].quantity : 0;
+    const newQuantity = currentQuantity + movement.quantity;
+
+    if (newQuantity < 0) {
+      throw new Error(
+        `Estoque insuficiente: ${medication.name}. ` +
+        `Disponível: ${currentQuantity}, Solicitado: ${Math.abs(movement.quantity)}`
+      );
+    }
+
     if (currentStock.length === 0) {
-      // Create new stock record
+      // Create new stock record (only for positive quantities)
+      if (movement.quantity <= 0) {
+        throw new Error("Não é possível criar estoque com quantidade negativa ou zero");
+      }
+
       await db.insert(schema.medicationStock).values({
         medicationId: movement.medicationId,
         unitId: movement.unitId,
@@ -2617,11 +2632,11 @@ export class DbStorage implements IStorage {
         lastUpdated: new Date(),
       });
     } else {
-      // Update existing stock
+      // Update existing stock with validated new quantity
       await db
         .update(schema.medicationStock)
         .set({
-          quantity: currentStock[0].quantity + movement.quantity,
+          quantity: newQuantity,
           lastUpdated: new Date(),
         })
         .where(eq(schema.medicationStock.id, currentStock[0].id));
@@ -2632,6 +2647,8 @@ export class DbStorage implements IStorage {
       ...movement,
       createdAt: new Date(),
       medicationName: medication.name,
+      previousQuantity: currentQuantity,
+      newQuantity: newQuantity,
     };
   }
 

@@ -1125,3 +1125,16 @@ export type InsertCareLineDiagnosis = z.infer<typeof insertCareLineDiagnosisSche
 export type CareLineTrigger = typeof careLineTriggers.$inferSelect;
 export type InsertCareLineTrigger = z.infer<typeof insertCareLineTriggerSchema>;
 
+// Stock Movement Validation Schemas (for API validation)
+export const stockMovementSchema = z.object({
+  medicationId: z.string().uuid(),
+  unitId: z.string().uuid(),
+  movementType: z.enum(["entrada", "saida", "ajuste"]),
+  quantity: z.number().int().positive(), // Always positive in schema, route handles negation for saida
+  batchNumber: z.string().min(1).optional(), // Optional for adjustments/outputs
+  expirationDate: z.coerce.date().optional(), // Optional for adjustments/outputs
+  reason: z.string().min(1), // Required for audit purposes
+});
+
+export type StockMovement = z.infer<typeof stockMovementSchema>;
+

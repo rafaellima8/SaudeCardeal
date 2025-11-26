@@ -4,6 +4,7 @@ import { db } from "./db";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import seedSIGTAPMappings from "./seed-sigtap";
+import { seed as seedMinimal } from "./seed-minimal";
 
 const app = express();
 
@@ -66,6 +67,15 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Seed usuários de teste (apenas em desenvolvimento)
+  if (process.env.NODE_ENV === "development") {
+    try {
+      await seedMinimal();
+    } catch (error) {
+      console.warn("[STARTUP] Aviso: Seed usuários falhou (pode já estar populado):", error);
+    }
+  }
+
   // Garantir seed SIGTAP no startup (SISAB compliance)
   try {
     await seedSIGTAPMappings();
