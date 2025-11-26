@@ -60,13 +60,15 @@ export class ReferralWorkflowService {
       
       const queuePosition = (existingQueue[0]?.count || 0) + 1;
       
-      const statusHistory = (referral.statusHistory || []) as any[];
-      statusHistory.push({
+      const existingHistory = Array.isArray(referral.statusHistory) 
+        ? referral.statusHistory 
+        : [];
+      const statusHistory = [...existingHistory, {
         status: "queue_added",
         changedAt: new Date().toISOString(),
         changedBy: context.userName,
         reason: `Adicionado à fila: ${careLine.name}`,
-      });
+      }];
       
       const [updated] = await db
         .update(schema.medicalReferrals)
@@ -123,13 +125,15 @@ export class ReferralWorkflowService {
         };
       }
       
-      const statusHistory = (referral.statusHistory || []) as any[];
-      statusHistory.push({
+      const existingHistory = Array.isArray(referral.statusHistory) 
+        ? referral.statusHistory 
+        : [];
+      const statusHistory = [...existingHistory, {
         status: newStatus,
         changedAt: new Date().toISOString(),
         changedBy: context.userName,
         reason: reason || `Status alterado para ${newStatus}`,
-      });
+      }];
       
       const updateData: any = {
         status: newStatus,
@@ -177,19 +181,31 @@ export class ReferralWorkflowService {
         };
       }
       
-      const statusHistory = (referral.statusHistory || []) as any[];
-      statusHistory.push({
+      const existingHistory = Array.isArray(referral.statusHistory) 
+        ? referral.statusHistory 
+        : [];
+      const statusHistory = [...existingHistory, {
         status: "counter_referral",
         changedAt: new Date().toISOString(),
         changedBy: context.userName,
         reason: "Contra-referência registrada",
-      });
+      }];
       
-      const [professional] = await db
+      const [user] = await db
         .select()
-        .from(schema.professionals)
-        .where(eq(schema.professionals.userId, context.userId))
+        .from(schema.users)
+        .where(eq(schema.users.id, context.userId))
         .limit(1);
+      
+      let professional = null;
+      if (user?.cpf) {
+        const [prof] = await db
+          .select()
+          .from(schema.professionals)
+          .where(eq(schema.professionals.cpf, user.cpf))
+          .limit(1);
+        professional = prof;
+      }
       
       const [updated] = await db
         .update(schema.medicalReferrals)
