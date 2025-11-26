@@ -50,12 +50,12 @@ The backend uses Express.js and TypeScript on Node.js, providing a RESTful API w
 -   **Endemic Disease Surveillance (ACE)**: Full-stack module for ACE, including geolocated vector foci registration and auditing.
 -   **Reports & Indicators**: Aggregated health indicators with professional PDF export and customizable filters.
 -   **Appointment Scheduling**: Complete scheduling and queue management with calendar views.
--   **Electronic Prescriptions**: Prescription management with transactional integrity and robust PDF export.
+-   **Electronic Prescriptions**: Prescription management with transactional integrity, digital signatures, and robust PDF export.
 -   **Medical Referrals**: Production-ready referral system with multi-tenant security, destination/priority tracking, and status workflow.
 -   **AI Medical Assistant**: AI assistant powered by OpenAI GPT-5 for diagnostic suggestions (CIAP-2/CID-10), drug interaction checks, prescription validation, and care plan generation.
 -   **SOAP Consultation System**: Medical consultations adhering to e-SUS PEC v5.3 standards, including vital signs, CIAP-2/CID-10 codes, and integrated prescription management.
 -   **Medical Attendance Module**: A 4-tab workflow integrating patient selection, SOAP consultation, electronic prescriptions, medical referrals, exam requests, and clinical history visualization, with multi-tenant security and cache synchronization.
--   **Exams & Procedures Management**: CRUD system for laboratory exam and procedure requests integrated into medical consultations, with SIGTAP integration and multi-tenant security.
+-   **Exams & Procedures Management**: CRUD system for laboratory exam and procedure requests integrated into medical consultations, with SIGTAP integration, clinical validation, and multi-tenant security.
 -   **Medical History Visualization**: Comprehensive patient longitudinal record displaying clinical timeline, active problems, prescriptions, referrals, and exam requests.
 -   **Medical Document Generation (PDF)**: Backend-based PDF generation for official medical documents like prescriptions and medical certificates, with institutional branding and multi-tenant security.
 -   **e-SUS AB/SISAB Export Module**: Data export system for DATASUS compliance, mapping consultations to Ficha de Atendimento Individual (FAI) format with validation.
@@ -63,6 +63,19 @@ The backend uses Express.js and TypeScript on Node.js, providing a RESTful API w
 -   **Clinical Protocol Alerts**: Automated clinical decision support with real-time alert triggering, transactional consistency, and integration into consultation workflows.
 -   **Pharmacy Management**: Dispensation system with patient search, prescription listing, and validation. Stock management for entry/exit/adjustment movements and low stock alerts.
 -   **Admin Configuration**: Interfaces for managing clinical protocols and dynamic consultation forms.
+-   **Medical Certificates**: Template-based certificate generation with digital signatures and PDF export.
+-   **Queue Panel**: Real-time queue management with ticket calling system and speech synthesis for patient announcements.
+-   **Encryption Service**: AES-256-GCM encryption for sensitive citizen data (CPF, RG, CNS, email, phone).
+
+### Backend Services (server/services/)
+
+-   **encryptionService.ts**: AES-256-GCM encryption with environment-specific keys for LGPD compliance.
+-   **documentValidationService.ts**: CPF/CNS/CEP validation using Brazilian standard algorithms.
+-   **examValidationService.ts**: Clinical exam validation with SIGTAP integration and specialty-specific rules.
+-   **clinicalJourneyService.ts**: Full clinical pathway orchestration with digital signatures and protocol alerts.
+-   **protocolAlertService.ts**: Automated clinical alerts with real-time triggering and severity classification.
+-   **digitalSignatureService.ts**: Digital signature generation and validation for medical documents.
+-   **notificationService.ts**: Push notifications for pharmacy, queue, and clinical alerts.
 
 ## External Dependencies
 
