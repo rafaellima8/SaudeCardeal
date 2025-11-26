@@ -38,6 +38,7 @@ import {
   CROSS_UNIT_ROLES
 } from "./auth";
 import aiRoutes from "./routes-ai";
+import alertsRoutes from "./routes-alerts";
 import { generatePrescriptionPDF, generateMedicalCertificatePDF } from "./services/pdf-generator";
 import { CareLineResolutionService } from "./services/care-line-resolution";
 import { ProtocolAlertService } from "./services/protocol-alert.service";
@@ -117,6 +118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // AI MEDICAL ASSISTANT ROUTES
   // ============================================================================
   app.use("/api/ai", aiRoutes);
+  app.use("/api", alertsRoutes);
 
   // Citizens API
   // Note: Citizens may be shared across units (e.g., patient transfers), 

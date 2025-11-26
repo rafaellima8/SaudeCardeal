@@ -1554,21 +1554,57 @@ export const consultationFieldData = sqliteTable("consultation_field_data", {
 export const clinicalProtocols = sqliteTable("clinical_protocols", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   name: text("name").notNull(), // "HbA1c descompensada", "VDRL pendente"
+  description: text("description"), // Descrição detalhada do protocolo
+  category: text("category", { 
+    enum: ["vital_signs", "diagnosis", "medication", "age_gender", "exam", "pregnancy", "chronic"] 
+  }).notNull().default("diagnosis"),
   careLineId: text("care_line_id").references(() => careLines.id),
   specialtyId: text("specialty_id").references(() => specialties.id),
-  triggerCondition: text("trigger_condition", { mode: "json" }).$type<{
-    field: string;
-    operator: "gt" | "lt" | "eq" | "gte" | "lte" | "contains";
-    value: any;
-  }[]>(), // Condições para disparar alerta
+  unitId: text("unit_id").references(() => healthUnits.id), // Multi-tenant, null = global
+  triggerConditions: text("trigger_conditions", { mode: "json" }).$type<{
+    vitalSigns?: Array<{ field: string; operator: string; value: number }>;
+    age?: { min?: number; max?: number };
+    gender?: "M" | "F";
+    diagnoses?: string[]; // CIAP-2/CID-10 codes
+    medications?: string[]; // Medication names or codes
+    exams?: Array<{ code: string; operator?: string; value?: number }>;
+  }>(),
   alertMessage: text("alert_message").notNull(),
   alertLevel: text("alert_level", { enum: ["info", "warning", "critical"] }).notNull().default("info"),
+  recommendation: text("recommendation"), // Ação recomendada
+  protocolReference: text("protocol_reference"), // Referência (ex: "MS 2019", "CFM 2020")
   action: text("action", { mode: "json" }).$type<{
-    type: "notify" | "auto_referral" | "schedule_followup";
+    type: "notify" | "auto_referral" | "schedule_followup" | "require_justification";
     target?: string;
     days?: number;
   }>(),
   active: integer("active", { mode: "boolean" }).default(true).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Protocol Alerts (Alertas Disparados por Protocolos)
+export const protocolAlerts = sqliteTable("protocol_alerts", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  consultationId: text("consultation_id").notNull().references(() => consultations.id, { onDelete: "cascade" }),
+  protocolId: text("protocol_id").notNull().references(() => clinicalProtocols.id),
+  citizenId: text("citizen_id").notNull().references(() => citizens.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  alertLevel: text("alert_level", { enum: ["info", "warning", "critical"] }).notNull(),
+  message: text("message").notNull(),
+  recommendation: text("recommendation"),
+  triggeredData: text("triggered_data", { mode: "json" }).$type<{
+    vitalSigns?: Array<{ field: string; value: number; expected: number }>;
+    age?: number;
+    diagnoses?: string[];
+    medications?: string[];
+  }>(),
+  status: text("status", { 
+    enum: ["active", "acknowledged", "dismissed", "resolved"] 
+  }).notNull().default("active"),
+  acknowledgedBy: text("acknowledged_by").references(() => professionals.id),
+  acknowledgedAt: integer("acknowledged_at", { mode: "timestamp" }),
+  dismissReason: text("dismiss_reason"), // Justificativa se ignorado
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
@@ -1660,6 +1696,19 @@ export const insertConsultationFieldDataSchema = createInsertSchema(consultation
 export const insertClinicalProtocolSchema = createInsertSchema(clinicalProtocols).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
+});
+
+export const insertProtocolAlertSchema = createInsertSchema(protocolAlerts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const updateProtocolAlertSchema = z.object({
+  status: z.enum(["active", "acknowledged", "dismissed", "resolved"]).optional(),
+  acknowledgedBy: z.string().uuid().optional(),
+  acknowledgedAt: z.date().optional(),
+  dismissReason: z.string().optional(),
 });
 
 export const insertTherapeuticPlanSchema = createInsertSchema(therapeuticPlans).omit({
@@ -1821,6 +1870,10 @@ export type ConsultationFieldData = typeof consultationFieldData.$inferSelect;
 export type InsertClinicalProtocol = z.infer<typeof insertClinicalProtocolSchema>;
 export type ClinicalProtocol = typeof clinicalProtocols.$inferSelect;
 
+export type InsertProtocolAlert = z.infer<typeof insertProtocolAlertSchema>;
+export type UpdateProtocolAlert = z.infer<typeof updateProtocolAlertSchema>;
+export type ProtocolAlert = typeof protocolAlerts.$inferSelect;
+
 export type InsertTherapeuticPlan = z.infer<typeof insertTherapeuticPlanSchema>;
 export type TherapeuticPlan = typeof therapeuticPlans.$inferSelect;
 
@@ -1844,7 +1897,7 @@ export const stockMovementSchema = z.object({
   reason: z.string().min(1), // Required for audit purposes
 });
 
-export type StockMovement = z.infer<typeof stockMovementSchema>;
+export type StockMovementInput = z.infer<typeof stockMovementSchema>;
 
 // ============================================================================
 // SPECIALTY SUGGESTION ENGINE SCHEMAS

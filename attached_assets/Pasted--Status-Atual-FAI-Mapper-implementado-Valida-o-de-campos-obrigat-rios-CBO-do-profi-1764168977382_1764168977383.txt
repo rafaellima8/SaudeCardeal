@@ -1,0 +1,180 @@
+**Status Atual:**
+- ✅ FAI Mapper implementado
+- ✅ Validação de campos obrigatórios
+- ⚠️ CBO do profissional (campo faltante no banco - documentado)
+- ⚠️ Dados antropométricos (integração com FAD pendente)
+- ⚠️ Códigos SIGTAP dos exames (campo faltante - documentado)
+
+---
+
+### 2.7 INTELIGÊNCIA ARTIFICIAL MÉDICA
+
+**Objetivo:** Assistência clínica com IA para suporte à decisão médica
+
+**Integração OpenAI GPT-5:**
+- Conexão via Replit AI Integrations (gerenciamento automático de chaves)
+- Sem necessidade de configurar API keys manualmente
+- Rotação automática de segredos
+
+**Funcionalidades:**
+
+**1. Sugestão de Diagnósticos:**
+```
+Médico digita: "Paciente 45 anos, sexo masculino, dor torácica em aperto, 
+irradiando para braço esquerdo, sudorese, PA 150/100"
+
+IA sugere:
+- I21.9 - Infarto Agudo do Miocárdio (CID-10) - PRIORIDADE ALTA ⚠️
+- I20.0 - Angina Instável (CID-10)
+- K21 - CIAP-2: Dor precordial/torácica
+
+Recomendação: ENCAMINHAR URGÊNCIA CARDIOLOGIA OU UPA
+```
+
+**2. Validação de Prescrição:**
+```
+Médico prescreve: Warfarina 5mg + AAS 100mg
+
+IA alerta:
+⚠️ INTERAÇÃO MEDICAMENTOSA GRAVE
+Warfarina + AAS aumentam risco de sangramento
+Recomendação: Evitar associação ou monitorar INR rigorosamente
+```
+
+**3. Plano de Cuidado:**
+```
+Paciente: Diabético tipo 2, HbA1c 9.5%, sedentário, IMC 32
+
+IA sugere:
+✅ Ajustar medicação hipoglicemiante
+✅ Encaminhar para nutricionista (dieta low carb)
+✅ Prescrever atividade física supervisionada
+✅ Agendar retorno em 30 dias para reavaliação
+✅ Solicitar: Hemograma, ureia, creatinina, perfil lipídico
+```
+
+**4. Busca em Protocolos:**
+```
+Médico pergunta: "Protocolo de tratamento de ITU na gestante"
+
+IA responde:
+📋 Protocolo ITU em Gestantes (MS 2019):
+- 1ª escolha: Cefalexina 500mg 6/6h por 7 dias
+- 2ª escolha: Amoxicilina 500mg 8/8h por 7 dias
+- Contraindicado: Quinolonas, Sulfametoxazol no 1º trimestre
+- Solicitar: Urocultura + TSA
+- Seguimento: Retorno em 7 dias com resultado
+```
+
+**Segurança e Compliance:**
+- IA é **assistente**, decisão final é SEMPRE do médico
+- Logs auditáveis de todas as sugestões
+- Disclaimer legal em todas as respostas
+- Não substitui julgamento clínico
+- Compliance com CFM (Conselho Federal de Medicina)
+
+---
+
+### 2.8 SISTEMA DE ALERTAS CLÍNICOS 🆕
+
+**Objetivo:** Segurança do paciente através de alertas automáticos baseados em protocolos clínicos
+
+**Arquitetura:**
+- Avaliação automática em tempo real durante consultas
+- Base de dados de protocolos clínicos configuráveis
+- Integração transparente (não invasivo ao fluxo médico)
+
+**Tipos de Alertas:**
+
+**1. Sinais Vitais Críticos:**
+```yaml
+Protocolo: Hipertensão Arterial Grave
+Condição: PA sistólica ≥180 ou PA diastólica ≥110
+Ação:
+  - Alerta CRÍTICO ao médico
+  - Sugestão: Considerar emergência hipertensiva
+  - Protocolo: Verificar lesão de órgão-alvo
+  - Conduta: Reduzir PA em 25% nas primeiras 2h
+```
+
+**2. Idade de Risco:**
+```yaml
+Protocolo: Rastreamento Diabetes em Idosos
+Condição: Idade >60 anos E glicemia não verificada nos últimos 6 meses
+Ação:
+  - Alerta: Solicitar glicemia de jejum
+  - Justificativa: Rastreamento preconizado MS
+```
+
+**3. Diagnósticos com Protocolo Obrigatório:**
+```yaml
+Protocolo: Tuberculose
+Condição: Diagnóstico CID-10 = A15.* (Tuberculose respiratória)
+Ação:
+  - Alerta ALTA PRIORIDADE
+  - Notificação compulsória SINAN obrigatória
+  - Iniciar tratamento diretamente observado (TDO)
+  - Rastreamento de contatos
+  - Encaminhar para programa TB
+```
+
+**4. Interações Medicamentosas:**
+```yaml
+Protocolo: Anticoagulante + AINE
+Condição: Prescrição simultânea de Warfarina + Anti-inflamatório
+Ação:
+  - Alerta GRAVE: Risco de sangramento aumentado
+  - Sugestão: Substituir AINE por paracetamol
+  - Se necessário manter: Monitorar INR rigorosamente
+```
+
+**5. Protocolos de Gênero/Idade:**
+```yaml
+Protocolo: Pré-natal
+Condição: Mulher em idade fértil + Amenorreia + β-hCG positivo
+Ação:
+  - Alerta: Iniciar protocolo pré-natal
+  - Solicitar bateria de exames 1º trimestre
+  - Prescrever ácido fólico
+  - Agendar consultas mensais
+  - Encaminhar para grupo de gestantes
+```
+
+**Como Funciona:**
+
+**Durante a Consulta:**
+1. Médico registra sinais vitais → Sistema avalia protocolos
+2. Médico insere diagnóstico → Sistema verifica protocolos associados
+3. Médico prescreve medicamento → Sistema valida interações
+4. Médico finaliza consulta → Sistema gera relatório de alertas
+
+**Exemplo Real - Fluxo Completo:**
+```
+Paciente: Maria Silva, 68 anos, sexo feminino
+Queixa: Dor torácica há 2 horas
+
+Triagem:
+- PA: 170/100 mmHg ⚠️ ALERTA 1: Hipertensão estágio 2
+- FC: 95 bpm
+- Glicemia: 180 mg/dL ⚠️ ALERTA 2: Hiperglicemia
+
+Diagnóstico médico:
+- I20.0 - Angina instável ⚠️ ALERTA 3: Protocolo síndrome coronariana aguda
+
+Prescrição:
+- AAS 200mg ✅
+- Clopidogrel 75mg ✅  
+- Atorvastatina 80mg ✅
+- Anlodipino 5mg ✅
+
+Sistema gera:
+✅ 3 alertas disparados
+✅ Protocolo SCA seguido corretamente
+✅ Recomendação: ENCAMINHAR CARDIOLOGIA URGENTE
+```
+
+**Painel de Alertas:**
+- Médico visualiza todos os alertas em um card lateral
+- Pode marcar como "visto" ou "não aplicável"
+- Justificativa obrigatória se ignorar alerta crítico
+- Auditoria: alertas ignorados são rastreados
