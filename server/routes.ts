@@ -1917,6 +1917,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================================================
+  // PHARMACY STOCK API (Estoque de Medicamentos) ✅
+  // ============================================================================
+
+  app.get("/api/pharmacy/stock", enforceUnitScope(), async (req, res) => {
+    try {
+      const sessionUnitId = req.session?.user?.unitId;
+      if (!sessionUnitId) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      const { search, status, includeExpired } = req.query;
+
+      const stock = await storage.getAllMedicationStock({
+        unitId: sessionUnitId,
+        search: search as string,
+        status: status as string,
+        includeExpired: includeExpired === "true",
+      });
+
+      res.json(stock);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/pharmacy/stock/low", enforceUnitScope(), async (req, res) => {
+    try {
+      const sessionUnitId = req.session?.user?.unitId;
+      if (!sessionUnitId) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      const lowStock = await storage.getLowStockMedications(sessionUnitId);
+      res.json(lowStock);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/pharmacy/stock/expiring", enforceUnitScope(), async (req, res) => {
+    try {
+      const sessionUnitId = req.session?.user?.unitId;
+      if (!sessionUnitId) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      const { days } = req.query;
+      const daysAhead = days ? parseInt(days as string) : 90;
+
+      const expiringStock = await storage.getExpiringStock(sessionUnitId, daysAhead);
+      res.json(expiringStock);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/pharmacy/stock/:id", async (req, res) => {
+    try {
+      const stock = await storage.getMedicationStock(req.params.id);
+      res.json(stock);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/pharmacy/stock", enforceUnitScope(), async (req, res) => {
+    try {
+      const sessionUnitId = req.session?.user?.unitId;
+      if (!sessionUnitId) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      const stockData = {
+        ...req.body,
+        unitId: sessionUnitId,
+      };
+
+      const created = await storage.createMedicationStock(stockData);
+      res.status(201).json(created);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/pharmacy/stock/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const updated = await storage.updateMedicationStock(req.params.id, req.body);
+      if (!updated) {
+        return res.status(404).json({ error: "Estoque não encontrado" });
+      }
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/pharmacy/stock/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const deleted = await storage.deleteMedicationStock(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Estoque não encontrado" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Pharmacy Dispensation API
   app.post("/api/pharmacy/dispense", async (req, res) => {
     try {

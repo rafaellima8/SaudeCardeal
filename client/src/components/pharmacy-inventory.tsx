@@ -1,9 +1,12 @@
 import { useState } from "react";
-import { Search, AlertCircle, Package, Plus } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { Search, AlertCircle, Package, Plus, Calendar, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -12,44 +15,88 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { format, differenceInDays } from "date-fns";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import type { MedicationStock } from "@shared/schema";
 
-interface Medication {
-  id: string;
-  name: string;
-  category: string;
-  stock: number;
-  minStock: number;
-  unit: string;
-  expiration: string;
-  batch: string;
+interface PharmacyInventoryProps {
+  onAddMedication?: () => void;
 }
 
-//todo: remove mock functionality
-const mockMedications: Medication[] = [
-  { id: '1', name: 'Losartana 50mg', category: 'Anti-hipertensivo', stock: 450, minStock: 200, unit: 'comp', expiration: '2025-12-15', batch: 'L2024-001' },
-  { id: '2', name: 'Dipirona 500mg', category: 'Analgésico', stock: 180, minStock: 300, unit: 'comp', expiration: '2025-08-20', batch: 'D2024-032' },
-  { id: '3', name: 'Amoxicilina 500mg', category: 'Antibiótico', stock: 95, minStock: 150, unit: 'cáps', expiration: '2025-06-10', batch: 'A2024-015' },
-  { id: '4', name: 'Paracetamol 750mg', category: 'Analgésico', stock: 520, minStock: 250, unit: 'comp', expiration: '2026-03-25', batch: 'P2024-098' },
-  { id: '5', name: 'Metformina 850mg', category: 'Antidiabético', stock: 140, minStock: 180, unit: 'comp', expiration: '2025-09-30', batch: 'M2024-056' },
-];
-
-export function PharmacyInventory() {
+export function PharmacyInventory({ onAddMedication }: PharmacyInventoryProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [medications] = useState(mockMedications);
+  const { user, isLoading: userLoading } = useCurrentUser();
 
-  const filteredMedications = medications.filter(med =>
-    med.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    med.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const { data: stockItems = [], isLoading, refetch, isRefetching } = useQuery<MedicationStock[]>({
+    queryKey: ["/api/pharmacy/stock", { search: searchTerm }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (searchTerm.length >= 2) params.append("search", searchTerm);
+      const url = `/api/pharmacy/stock${params.toString() ? `?${params}` : ""}`;
+      return apiRequest<MedicationStock[]>("GET", url);
+    },
+    enabled: !userLoading,
+  });
 
-  const getStockStatus = (stock: number, minStock: number) => {
-    if (stock === 0) return { label: 'Esgotado', variant: 'destructive' as const };
-    if (stock < minStock) return { label: 'Crítico', variant: 'destructive' as const };
-    if (stock < minStock * 1.5) return { label: 'Baixo', variant: 'default' as const };
-    return { label: 'Normal', variant: 'outline' as const };
+  const { data: lowStockItems = [] } = useQuery<MedicationStock[]>({
+    queryKey: ["/api/pharmacy/stock/low"],
+    queryFn: async () => apiRequest<MedicationStock[]>("GET", "/api/pharmacy/stock/low"),
+    enabled: !userLoading,
+  });
+
+  const { data: expiringItems = [] } = useQuery<MedicationStock[]>({
+    queryKey: ["/api/pharmacy/stock/expiring"],
+    queryFn: async () => apiRequest<MedicationStock[]>("GET", "/api/pharmacy/stock/expiring"),
+    enabled: !userLoading,
+  });
+
+  const getStockStatus = (item: MedicationStock) => {
+    const now = new Date();
+    const expDate = new Date(item.expirationDate);
+    const daysUntilExpiry = differenceInDays(expDate, now);
+
+    if (expDate < now) return { label: "Vencido", variant: "destructive" as const, priority: 1 };
+    if (daysUntilExpiry <= 30) return { label: "Vence em breve", variant: "destructive" as const, priority: 2 };
+    if (item.currentQuantity === 0) return { label: "Esgotado", variant: "destructive" as const, priority: 3 };
+    if (item.currentQuantity < item.minStock) return { label: "Crítico", variant: "destructive" as const, priority: 4 };
+    if (item.currentQuantity < item.minStock * 1.5) return { label: "Baixo", variant: "default" as const, priority: 5 };
+    return { label: "Normal", variant: "outline" as const, priority: 6 };
   };
 
-  const criticalCount = medications.filter(m => m.stock < m.minStock).length;
+  const getExpiryInfo = (expirationDate: Date | string) => {
+    const expDate = new Date(expirationDate);
+    const daysUntilExpiry = differenceInDays(expDate, new Date());
+
+    if (daysUntilExpiry < 0) {
+      return { text: "Vencido", className: "text-destructive font-semibold" };
+    } else if (daysUntilExpiry <= 30) {
+      return { text: `${daysUntilExpiry}d`, className: "text-destructive" };
+    } else if (daysUntilExpiry <= 90) {
+      return { text: `${daysUntilExpiry}d`, className: "text-yellow-600 dark:text-yellow-400" };
+    }
+    return { text: format(expDate, "dd/MM/yyyy"), className: "text-muted-foreground" };
+  };
+
+  const criticalCount = lowStockItems.length;
+  const expiringCount = expiringItems.length;
+
+  if (isLoading || userLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <Skeleton className="h-10 w-64" />
+          <Skeleton className="h-10 w-48" />
+        </div>
+        <Card>
+          <div className="p-4 space-y-3">
+            {[1, 2, 3, 4, 5].map(i => (
+              <Skeleton key={i} className="h-12 w-full" />
+            ))}
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -57,24 +104,44 @@ export function PharmacyInventory() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar medicamento ou categoria..."
+            placeholder="Buscar medicamento, lote ou princípio ativo..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
             data-testid="input-search-medication"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => refetch()}
+            disabled={isRefetching}
+            data-testid="button-refresh-stock"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefetching ? "animate-spin" : ""}`} />
+          </Button>
+          
           {criticalCount > 0 && (
             <Badge variant="destructive" className="gap-1">
               <AlertCircle className="h-3 w-3" />
-              {criticalCount} crítico{criticalCount > 1 ? 's' : ''}
+              {criticalCount} crítico{criticalCount > 1 ? "s" : ""}
             </Badge>
           )}
-          <Button size="default" data-testid="button-new-medication">
-            <Plus className="h-4 w-4 mr-2" />
-            Adicionar Medicamento
-          </Button>
+          
+          {expiringCount > 0 && (
+            <Badge variant="default" className="gap-1 bg-yellow-500/80 hover:bg-yellow-500/70">
+              <Calendar className="h-3 w-3" />
+              {expiringCount} vencendo
+            </Badge>
+          )}
+          
+          {onAddMedication && (
+            <Button size="default" onClick={onAddMedication} data-testid="button-new-medication">
+              <Plus className="h-4 w-4 mr-2" />
+              Adicionar
+            </Button>
+          )}
         </div>
       </div>
 
@@ -83,47 +150,79 @@ export function PharmacyInventory() {
           <TableHeader>
             <TableRow>
               <TableHead>Medicamento</TableHead>
-              <TableHead>Categoria</TableHead>
+              <TableHead>Apresentação</TableHead>
               <TableHead className="text-right">Estoque</TableHead>
-              <TableHead className="text-right">Mín. Estoque</TableHead>
-              <TableHead>Validade</TableHead>
+              <TableHead className="text-right">Mín.</TableHead>
               <TableHead>Lote</TableHead>
+              <TableHead>Validade</TableHead>
               <TableHead>Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredMedications.map((medication) => {
-              const status = getStockStatus(medication.stock, medication.minStock);
-              return (
-                <TableRow key={medication.id} data-testid={`row-medication-${medication.id}`}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      <Package className="h-4 w-4 text-muted-foreground" />
-                      {medication.name}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{medication.category}</TableCell>
-                  <TableCell className="text-right font-mono">
-                    {medication.stock} {medication.unit}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-muted-foreground">
-                    {medication.minStock} {medication.unit}
-                  </TableCell>
-                  <TableCell className="font-mono text-sm">
-                    {new Date(medication.expiration).toLocaleDateString('pt-BR')}
-                  </TableCell>
-                  <TableCell className="font-mono text-sm text-muted-foreground">
-                    {medication.batch}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={status.variant}>{status.label}</Badge>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+            {stockItems.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <Package className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                  {searchTerm
+                    ? "Nenhum medicamento encontrado para esta busca"
+                    : "Nenhum medicamento cadastrado no estoque"}
+                </TableCell>
+              </TableRow>
+            ) : (
+              stockItems.map((item) => {
+                const status = getStockStatus(item);
+                const expiryInfo = getExpiryInfo(item.expirationDate);
+                
+                return (
+                  <TableRow key={item.id} data-testid={`row-medication-${item.id}`}>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <div>
+                          <div>{item.medicationName}</div>
+                          {item.genericName && (
+                            <div className="text-xs text-muted-foreground">{item.genericName}</div>
+                          )}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      <div>{item.presentation}</div>
+                      {item.concentration && (
+                        <div className="text-xs">{item.concentration}</div>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      <span className={item.currentQuantity < item.minStock ? "text-destructive font-semibold" : ""}>
+                        {item.currentQuantity}
+                      </span>
+                      {" "}{item.unit || "un"}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-muted-foreground">
+                      {item.minStock} {item.unit || "un"}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm text-muted-foreground">
+                      {item.batch}
+                    </TableCell>
+                    <TableCell className={`font-mono text-sm ${expiryInfo.className}`}>
+                      {expiryInfo.text}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={status.variant}>{status.label}</Badge>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
           </TableBody>
         </Table>
       </Card>
+
+      {stockItems.length > 0 && (
+        <div className="text-xs text-muted-foreground text-right">
+          Exibindo {stockItems.length} itens
+        </div>
+      )}
     </div>
   );
 }

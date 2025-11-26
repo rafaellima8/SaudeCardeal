@@ -156,6 +156,8 @@ export interface IStorage {
 
   // Medication Stock
   getMedicationStock(medicationId: string): Promise<MedicationStock[]>;
+  getAllMedicationStock(params: { unitId?: string; search?: string; status?: string; includeExpired?: boolean }): Promise<MedicationStock[]>;
+  getExpiringStock(unitId: string, daysAhead?: number): Promise<MedicationStock[]>;
   createMedicationStock(stock: InsertMedicationStock): Promise<MedicationStock>;
   updateMedicationStock(id: string, stock: Partial<InsertMedicationStock>): Promise<MedicationStock | undefined>;
   deleteMedicationStock(id: string): Promise<boolean>;
@@ -831,18 +833,72 @@ export class DbStorage implements IStorage {
   }
 
   async getLowStockMedications(unitId: string): Promise<any[]> {
-    return db.select({
-      medication: schema.medications,
-      stock: schema.medicationStock,
-    })
-      .from(schema.medications)
-      .innerJoin(schema.medicationStock, eq(schema.medications.id, schema.medicationStock.medicationId))
+    return db.select()
+      .from(schema.medicationStock)
       .where(
         and(
-          eq(schema.medications.unitId, unitId),
-          sql`${schema.medicationStock.quantity} < ${schema.medicationStock.minStock}`
+          eq(schema.medicationStock.unitId, unitId),
+          sql`${schema.medicationStock.currentQuantity} < ${schema.medicationStock.minStock}`
         )
+      )
+      .orderBy(asc(schema.medicationStock.medicationName));
+  }
+
+  async getAllMedicationStock(params: { 
+    unitId?: string; 
+    search?: string; 
+    status?: string;
+    includeExpired?: boolean;
+  }): Promise<MedicationStock[]> {
+    const conditions: any[] = [];
+
+    if (params.unitId) {
+      conditions.push(eq(schema.medicationStock.unitId, params.unitId));
+    }
+
+    if (params.search) {
+      conditions.push(
+        or(
+          like(schema.medicationStock.medicationName, `%${params.search}%`),
+          like(schema.medicationStock.genericName, `%${params.search}%`),
+          like(schema.medicationStock.batch, `%${params.search}%`)
+        )!
       );
+    }
+
+    if (params.status) {
+      conditions.push(eq(schema.medicationStock.status, params.status as any));
+    }
+
+    if (!params.includeExpired) {
+      conditions.push(sql`${schema.medicationStock.expirationDate} > ${Date.now() / 1000}`);
+    }
+
+    let query = db.select().from(schema.medicationStock);
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    return query.orderBy(asc(schema.medicationStock.medicationName));
+  }
+
+  async getExpiringStock(unitId: string, daysAhead: number = 90): Promise<MedicationStock[]> {
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + daysAhead);
+    const futureDateTs = Math.floor(futureDate.getTime() / 1000);
+    const nowTs = Math.floor(Date.now() / 1000);
+
+    return db.select()
+      .from(schema.medicationStock)
+      .where(
+        and(
+          eq(schema.medicationStock.unitId, unitId),
+          sql`${schema.medicationStock.expirationDate} > ${nowTs}`,
+          sql`${schema.medicationStock.expirationDate} < ${futureDateTs}`
+        )
+      )
+      .orderBy(asc(schema.medicationStock.expirationDate));
   }
 
   // Exams
@@ -2219,6 +2275,8 @@ export class DbStorage implements IStorage {
 
     const treatmentsByType = await treatmentsByTypeQuery;
 
+    const liraaClassification = this.calculateLiraaClassification(iip);
+
     return {
       indicators: {
         iip: Number(iip.toFixed(2)),
@@ -2226,6 +2284,7 @@ export class DbStorage implements IStorage {
         dwellingsInspected: Number(iipData.inspected) || 0,
         dwellingsPositive: Number(iipData.positive) || 0,
         containersWithLarvae: Number(ibData.containers) || 0,
+        liraa: liraaClassification,
       },
       fociByType: fociByType.map(f => ({
         depositType: f.depositType,
@@ -2236,6 +2295,43 @@ export class DbStorage implements IStorage {
         count: Number(t.count)
       })),
     };
+  }
+
+  private calculateLiraaClassification(iip: number): { 
+    risk: "low" | "medium" | "high" | "very_high"; 
+    riskLabel: string;
+    riskColor: string;
+    description: string;
+  } {
+    if (iip < 1) {
+      return {
+        risk: "low",
+        riskLabel: "Baixo Risco",
+        riskColor: "#22c55e",
+        description: "Situação satisfatória. Manutenção das ações de rotina."
+      };
+    } else if (iip < 3.9) {
+      return {
+        risk: "medium", 
+        riskLabel: "Médio Risco",
+        riskColor: "#eab308",
+        description: "Situação de alerta. Intensificação das ações de controle."
+      };
+    } else if (iip < 4) {
+      return {
+        risk: "high",
+        riskLabel: "Alto Risco",
+        riskColor: "#f97316",
+        description: "Situação de risco. Intensificação emergencial das ações."
+      };
+    } else {
+      return {
+        risk: "very_high",
+        riskLabel: "Muito Alto Risco",
+        riskColor: "#ef4444",
+        description: "Situação crítica. Ações emergenciais e intensivas."
+      };
+    }
   }
 
   // ===================================================================

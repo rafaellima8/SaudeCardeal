@@ -32,7 +32,7 @@ import EsusExports from "@/pages/admin/esus-exports";
 import ClinicalProtocols from "@/pages/admin/clinical-protocols";
 import DynamicFormsAdmin from "@/pages/admin/dynamic-forms-admin";
 import TerritoryPage from "@/pages/territorio";
-import AceDashboard from "@modules/ace/client/pages/ace-dashboard";
+import AceDashboard from "@/pages/ace-dashboard";
 import AceDwellings from "@/pages/ace-dwellings";
 import AceVisits from "@/pages/ace-visits";
 import AceFoci from "@/pages/ace-foci";

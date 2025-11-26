@@ -50,13 +50,13 @@ export default function PharmacyStock() {
     enabled: !!user?.unitId,
   });
 
-  const { data: lowStock = [] } = useQuery({
-    queryKey: ["/api/medications/stock/low", user?.unitId],
+  const { data: lowStock = [] } = useQuery<any[]>({
+    queryKey: ["/api/pharmacy/stock/low"],
     enabled: !!user?.unitId,
   });
 
-  const { data: stockMovements = [] } = useQuery({
-    queryKey: ["/api/pharmacy/stock-movements", user?.unitId],
+  const { data: stockMovements = [] } = useQuery<any[]>({
+    queryKey: ["/api/pharmacy/stock-movements"],
     enabled: !!user?.unitId,
   });
 
@@ -65,13 +65,13 @@ export default function PharmacyStock() {
       return apiRequest("POST", "/api/pharmacy/stock-movements", {
         ...data,
         unitId: user?.unitId,
-        professionalId: user?.professionalId,
+        professionalId: user?.id,
       });
     },
     onSuccess: () => {
       toast({ title: "Movimentação registrada", description: "Estoque atualizado com sucesso" });
-      queryClient.invalidateQueries({ queryKey: ["/api/medications/stock/low", user?.unitId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/pharmacy/stock-movements", user?.unitId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pharmacy/stock/low"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pharmacy/stock-movements"] });
       setIsDialogOpen(false);
       form.reset();
     },

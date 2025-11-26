@@ -321,19 +321,6 @@ export const medications = sqliteTable("medications", {
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
-// Medication Stock (Estoque de Medicamentos)
-export const medicationStock = sqliteTable("medication_stock", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  medicationId: text("medication_id").notNull().references(() => medications.id),
-  unitId: text("unit_id").notNull().references(() => healthUnits.id),
-  batchNumber: text("batch_number").notNull(),
-  quantity: integer("quantity").notNull(),
-  minStock: integer("min_stock").notNull().default(10),
-  expirationDate: integer("expiration_date", { mode: "timestamp" }).notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
 // Prescriptions (Receitas Médicas) - Estrutura Completa e-SUS
 export const prescriptions = sqliteTable("prescriptions", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
@@ -408,6 +395,88 @@ export const dispensations = sqliteTable("dispensations", {
 export type Dispensation = typeof dispensations.$inferSelect;
 export const insertDispensationSchema = createInsertSchema(dispensations).omit({ id: true, createdAt: true });
 export type InsertDispensation = z.infer<typeof insertDispensationSchema>;
+
+// Medication Stock (Estoque de Medicamentos) - Controle por Lote ✅
+export const medicationStock = sqliteTable("medication_stock", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  
+  medicationName: text("medication_name").notNull(),
+  genericName: text("generic_name"),
+  commercialName: text("commercial_name"),
+  activeIngredient: text("active_ingredient"),
+  
+  presentation: text("presentation").notNull(),
+  concentration: text("concentration"),
+  pharmaceuticalForm: text("pharmaceutical_form", { 
+    enum: ["comprimido", "capsula", "xarope", "injetavel", "pomada", "creme", "gotas", "suspensao", "aerosol", "supositorio", "solucao", "outro"] 
+  }).default("comprimido"),
+  
+  batch: text("batch").notNull(),
+  expirationDate: integer("expiration_date", { mode: "timestamp" }).notNull(),
+  manufacturer: text("manufacturer"),
+  supplier: text("supplier"),
+  
+  currentQuantity: integer("current_quantity").notNull().default(0),
+  minStock: integer("min_stock").notNull().default(10),
+  maxStock: integer("max_stock"),
+  unit: text("unit").default("unidade"),
+  
+  unitCost: real("unit_cost"),
+  totalCost: real("total_cost"),
+  
+  location: text("location"),
+  storageConditions: text("storage_conditions"),
+  
+  isControlled: integer("is_controlled", { mode: "boolean" }).default(false),
+  controlType: text("control_type", { enum: ["A1", "A2", "A3", "B1", "B2", "C1", "C2", "C3", "C4", "C5", "D1", "D2"] }),
+  renameCode: text("rename_code"),
+  
+  status: text("status", { enum: ["active", "low_stock", "expired", "depleted", "blocked"] }).default("active"),
+  active: integer("active", { mode: "boolean" }).default(true),
+  
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+export type MedicationStock = typeof medicationStock.$inferSelect;
+export const insertMedicationStockSchema = createInsertSchema(medicationStock).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertMedicationStock = z.infer<typeof insertMedicationStockSchema>;
+
+// Stock Movements (Movimentações de Estoque) ✅
+export const stockMovements = sqliteTable("stock_movements", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  stockId: text("stock_id").notNull().references(() => medicationStock.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  
+  movementType: text("movement_type", { 
+    enum: ["entrada", "saida", "ajuste_positivo", "ajuste_negativo", "transferencia_entrada", "transferencia_saida", "perda", "vencimento", "devolucao"] 
+  }).notNull(),
+  
+  quantity: integer("quantity").notNull(),
+  previousQuantity: integer("previous_quantity").notNull(),
+  newQuantity: integer("new_quantity").notNull(),
+  
+  reason: text("reason").notNull(),
+  documentNumber: text("document_number"),
+  
+  dispensationId: text("dispensation_id").references(() => dispensations.id),
+  prescriptionId: text("prescription_id").references(() => prescriptions.id),
+  
+  sourceUnitId: text("source_unit_id").references(() => healthUnits.id),
+  destinationUnitId: text("destination_unit_id").references(() => healthUnits.id),
+  
+  professionalId: text("professional_id").notNull().references(() => professionals.id),
+  authorizedBy: text("authorized_by").references(() => professionals.id),
+  
+  observations: text("observations"),
+  
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+export type StockMovement = typeof stockMovements.$inferSelect;
+export const insertStockMovementSchema = createInsertSchema(stockMovements).omit({ id: true, createdAt: true });
+export type InsertStockMovement = z.infer<typeof insertStockMovementSchema>;
 
 // ============================================================================
 // EXAMS AND TFD TABLES
@@ -916,12 +985,6 @@ export const insertMedicationSchema = createInsertSchema(medications).omit({
   createdAt: true,
 });
 
-export const insertMedicationStockSchema = createInsertSchema(medicationStock).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
 export const insertPrescriptionSchema = createInsertSchema(prescriptions).omit({
   id: true,
   createdAt: true,
@@ -1392,9 +1455,6 @@ export type CitizenProblem = typeof citizenProblems.$inferSelect;
 
 export type InsertMedication = z.infer<typeof insertMedicationSchema>;
 export type Medication = typeof medications.$inferSelect;
-
-export type InsertMedicationStock = z.infer<typeof insertMedicationStockSchema>;
-export type MedicationStock = typeof medicationStock.$inferSelect;
 
 export type InsertPrescription = z.infer<typeof insertPrescriptionSchema>;
 export type Prescription = typeof prescriptions.$inferSelect;
