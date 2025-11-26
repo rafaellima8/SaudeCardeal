@@ -2315,9 +2315,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Acesso negado: solicitação TFD de outra unidade" });
       }
       
-      const request = await storage.updateTfdRequest(req.params.id, req.body);
+      const updateData = schema.updateTfdRequestSchema.parse(req.body);
+      const request = await storage.updateTfdRequest(req.params.id, updateData);
       res.json(request);
     } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
       res.status(500).json({ error: error.message });
     }
   });
@@ -2333,6 +2337,651 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const success = await storage.deleteTfdRequest(req.params.id);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // TFD WORKFLOW ENDPOINTS
+  // ============================================================================
+
+  app.post("/api/tfd/:id/approve", enforceUnitScope(), async (req, res) => {
+    try {
+      const existing = await storage.getTfdRequestById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Solicitação TFD não encontrada" });
+      }
+      if (!validateEntityAccess(req, existing.originUnitId)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      if (existing.status !== "pending") {
+        return res.status(400).json({ error: `Solicitação não pode ser aprovada. Status atual: ${existing.status}` });
+      }
+
+      const { justification, budgetVerified, budgetNotes } = req.body;
+      const userId = req.session?.user?.id;
+      const userName = req.session?.user?.name || "Sistema";
+
+      const statusHistory = existing.statusHistory || [];
+      statusHistory.push({
+        status: "approved",
+        changedAt: new Date().toISOString(),
+        changedBy: userName,
+        reason: justification,
+      });
+
+      const updated = await storage.updateTfdRequest(req.params.id, {
+        status: "approved",
+        approvedBy: userId,
+        approvedAt: new Date(),
+        approvalJustification: justification,
+        budgetVerified: budgetVerified || false,
+        budgetNotes: budgetNotes,
+        statusHistory,
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/tfd/:id/reject", enforceUnitScope(), async (req, res) => {
+    try {
+      const existing = await storage.getTfdRequestById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Solicitação TFD não encontrada" });
+      }
+      if (!validateEntityAccess(req, existing.originUnitId)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      if (existing.status !== "pending") {
+        return res.status(400).json({ error: `Solicitação não pode ser rejeitada. Status atual: ${existing.status}` });
+      }
+
+      const { reason } = req.body;
+      if (!reason) {
+        return res.status(400).json({ error: "Motivo da rejeição é obrigatório" });
+      }
+
+      const userId = req.session?.user?.id;
+      const userName = req.session?.user?.name || "Sistema";
+
+      const statusHistory = existing.statusHistory || [];
+      statusHistory.push({
+        status: "rejected",
+        changedAt: new Date().toISOString(),
+        changedBy: userName,
+        reason,
+      });
+
+      const updated = await storage.updateTfdRequest(req.params.id, {
+        status: "rejected",
+        rejectedBy: userId,
+        rejectedAt: new Date(),
+        rejectionReason: reason,
+        statusHistory,
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/tfd/:id/schedule", enforceUnitScope(), async (req, res) => {
+    try {
+      const existing = await storage.getTfdRequestById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Solicitação TFD não encontrada" });
+      }
+      if (!validateEntityAccess(req, existing.originUnitId)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      if (existing.status !== "approved") {
+        return res.status(400).json({ error: `Solicitação precisa estar aprovada para agendar. Status atual: ${existing.status}` });
+      }
+
+      const { tripId, travelDate, returnDate } = req.body;
+      if (!tripId) {
+        return res.status(400).json({ error: "tripId é obrigatório" });
+      }
+
+      const trip = await storage.getTfdTripById(tripId);
+      if (!trip) {
+        return res.status(404).json({ error: "Viagem não encontrada" });
+      }
+
+      const userId = req.session?.user?.id;
+      const userName = req.session?.user?.name || "Sistema";
+
+      const statusHistory = existing.statusHistory || [];
+      statusHistory.push({
+        status: "scheduled",
+        changedAt: new Date().toISOString(),
+        changedBy: userName,
+        reason: `Agendado na viagem ${tripId}`,
+      });
+
+      const updated = await storage.updateTfdRequest(req.params.id, {
+        status: "scheduled",
+        tripId,
+        travelDate: travelDate ? new Date(travelDate) : trip.scheduledDeparture,
+        returnDate: returnDate ? new Date(returnDate) : trip.scheduledReturn,
+        scheduledBy: userId,
+        scheduledAt: new Date(),
+        statusHistory,
+      });
+
+      await storage.createTfdTripPassenger({
+        tripId,
+        tfdRequestId: req.params.id,
+        citizenId: existing.citizenId,
+        isCompanion: false,
+      });
+
+      if (existing.companion && existing.accompaniedBy) {
+        await storage.createTfdTripPassenger({
+          tripId,
+          tfdRequestId: req.params.id,
+          citizenId: existing.citizenId,
+          isCompanion: true,
+        });
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/tfd/:id/start-transit", enforceUnitScope(), async (req, res) => {
+    try {
+      const existing = await storage.getTfdRequestById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Solicitação TFD não encontrada" });
+      }
+      if (!validateEntityAccess(req, existing.originUnitId)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      if (existing.status !== "scheduled") {
+        return res.status(400).json({ error: `Solicitação precisa estar agendada. Status atual: ${existing.status}` });
+      }
+
+      const userName = req.session?.user?.name || "Sistema";
+      const statusHistory = existing.statusHistory || [];
+      statusHistory.push({
+        status: "in_transit",
+        changedAt: new Date().toISOString(),
+        changedBy: userName,
+      });
+
+      const updated = await storage.updateTfdRequest(req.params.id, {
+        status: "in_transit",
+        statusHistory,
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/tfd/:id/complete", enforceUnitScope(), async (req, res) => {
+    try {
+      const existing = await storage.getTfdRequestById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Solicitação TFD não encontrada" });
+      }
+      if (!validateEntityAccess(req, existing.originUnitId)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      if (!["scheduled", "in_transit"].includes(existing.status)) {
+        return res.status(400).json({ error: `Solicitação não pode ser concluída. Status atual: ${existing.status}` });
+      }
+
+      const userName = req.session?.user?.name || "Sistema";
+      const statusHistory = existing.statusHistory || [];
+      statusHistory.push({
+        status: "completed",
+        changedAt: new Date().toISOString(),
+        changedBy: userName,
+      });
+
+      const updated = await storage.updateTfdRequest(req.params.id, {
+        status: "completed",
+        returnDate: new Date(),
+        statusHistory,
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/tfd/:id/no-show", enforceUnitScope(), async (req, res) => {
+    try {
+      const existing = await storage.getTfdRequestById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Solicitação TFD não encontrada" });
+      }
+      if (!validateEntityAccess(req, existing.originUnitId)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      if (existing.status !== "scheduled") {
+        return res.status(400).json({ error: `Solicitação precisa estar agendada para registrar falta. Status atual: ${existing.status}` });
+      }
+
+      const { reason } = req.body;
+      const userName = req.session?.user?.name || "Sistema";
+      const statusHistory = existing.statusHistory || [];
+      statusHistory.push({
+        status: "no_show",
+        changedAt: new Date().toISOString(),
+        changedBy: userName,
+        reason,
+      });
+
+      const updated = await storage.updateTfdRequest(req.params.id, {
+        status: "no_show",
+        statusHistory,
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // TFD VEHICLES CRUD
+  // ============================================================================
+
+  app.get("/api/tfd-vehicles", enforceUnitScope(), async (req, res) => {
+    try {
+      const { status, active } = req.query;
+      const effectiveUnitId = getEffectiveUnitId(req);
+      
+      const vehicles = await storage.getTfdVehicles({
+        unitId: effectiveUnitId || undefined,
+        status: status as string,
+        active: active === "true" ? true : active === "false" ? false : undefined,
+      });
+      res.json(vehicles);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/tfd-vehicles/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const vehicle = await storage.getTfdVehicleById(req.params.id);
+      if (!vehicle) {
+        return res.status(404).json({ error: "Veículo não encontrado" });
+      }
+      if (!validateEntityAccess(req, vehicle.unitId)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      res.json(vehicle);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/tfd-vehicles", enforceUnitScope(), async (req, res) => {
+    try {
+      const sessionUnitId = req.session?.user?.unitId;
+      const data = schema.insertTfdVehicleSchema.parse(req.body);
+      
+      if (sessionUnitId && !CROSS_UNIT_ROLES.includes(req.session?.user?.role as any)) {
+        data.unitId = sessionUnitId;
+      }
+
+      const vehicle = await storage.createTfdVehicle(data);
+      res.status(201).json(vehicle);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/tfd-vehicles/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const existing = await storage.getTfdVehicleById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Veículo não encontrado" });
+      }
+      if (!validateEntityAccess(req, existing.unitId)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      const updateData = schema.updateTfdVehicleSchema.parse(req.body);
+      const vehicle = await storage.updateTfdVehicle(req.params.id, updateData);
+      res.json(vehicle);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/tfd-vehicles/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const existing = await storage.getTfdVehicleById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Veículo não encontrado" });
+      }
+      if (!validateEntityAccess(req, existing.unitId)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      await storage.deleteTfdVehicle(req.params.id);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // TFD DRIVERS CRUD
+  // ============================================================================
+
+  app.get("/api/tfd-drivers", enforceUnitScope(), async (req, res) => {
+    try {
+      const { status, active } = req.query;
+      const effectiveUnitId = getEffectiveUnitId(req);
+      
+      const drivers = await storage.getTfdDrivers({
+        unitId: effectiveUnitId || undefined,
+        status: status as string,
+        active: active === "true" ? true : active === "false" ? false : undefined,
+      });
+      res.json(drivers);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/tfd-drivers/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const driver = await storage.getTfdDriverById(req.params.id);
+      if (!driver) {
+        return res.status(404).json({ error: "Motorista não encontrado" });
+      }
+      if (!validateEntityAccess(req, driver.unitId)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      res.json(driver);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/tfd-drivers", enforceUnitScope(), async (req, res) => {
+    try {
+      const sessionUnitId = req.session?.user?.unitId;
+      const data = schema.insertTfdDriverSchema.parse(req.body);
+      
+      if (sessionUnitId && !CROSS_UNIT_ROLES.includes(req.session?.user?.role as any)) {
+        data.unitId = sessionUnitId;
+      }
+
+      const driver = await storage.createTfdDriver(data);
+      res.status(201).json(driver);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/tfd-drivers/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const existing = await storage.getTfdDriverById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Motorista não encontrado" });
+      }
+      if (!validateEntityAccess(req, existing.unitId)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      const updateData = schema.updateTfdDriverSchema.parse(req.body);
+      const driver = await storage.updateTfdDriver(req.params.id, updateData);
+      res.json(driver);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/tfd-drivers/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const existing = await storage.getTfdDriverById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Motorista não encontrado" });
+      }
+      if (!validateEntityAccess(req, existing.unitId)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      await storage.deleteTfdDriver(req.params.id);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // TFD TRIPS CRUD
+  // ============================================================================
+
+  app.get("/api/tfd-trips", enforceUnitScope(), async (req, res) => {
+    try {
+      const { vehicleId, driverId, status, startDate, endDate } = req.query;
+      const effectiveUnitId = getEffectiveUnitId(req);
+      
+      const trips = await storage.getTfdTrips({
+        unitId: effectiveUnitId || undefined,
+        vehicleId: vehicleId as string,
+        driverId: driverId as string,
+        status: status as string,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+      });
+      res.json(trips);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/tfd-trips/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const trip = await storage.getTfdTripById(req.params.id);
+      if (!trip) {
+        return res.status(404).json({ error: "Viagem não encontrada" });
+      }
+      if (!validateEntityAccess(req, trip.unitId)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      res.json(trip);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/tfd-trips/:id/passengers", enforceUnitScope(), async (req, res) => {
+    try {
+      const trip = await storage.getTfdTripById(req.params.id);
+      if (!trip) {
+        return res.status(404).json({ error: "Viagem não encontrada" });
+      }
+      if (!validateEntityAccess(req, trip.unitId)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      const passengers = await storage.getTfdTripPassengers(req.params.id);
+      res.json(passengers);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/tfd-trips", enforceUnitScope(), async (req, res) => {
+    try {
+      const sessionUnitId = req.session?.user?.unitId;
+      const userId = req.session?.user?.id;
+      const data = schema.insertTfdTripSchema.parse(req.body);
+      
+      if (sessionUnitId && !CROSS_UNIT_ROLES.includes(req.session?.user?.role as any)) {
+        data.unitId = sessionUnitId;
+      }
+      data.createdBy = userId;
+
+      const vehicle = await storage.getTfdVehicleById(data.vehicleId);
+      if (!vehicle) {
+        return res.status(400).json({ error: "Veículo não encontrado" });
+      }
+      if (vehicle.status !== "disponivel") {
+        return res.status(400).json({ error: `Veículo não está disponível. Status: ${vehicle.status}` });
+      }
+
+      const driver = await storage.getTfdDriverById(data.driverId);
+      if (!driver) {
+        return res.status(400).json({ error: "Motorista não encontrado" });
+      }
+      if (driver.status !== "disponivel") {
+        return res.status(400).json({ error: `Motorista não está disponível. Status: ${driver.status}` });
+      }
+
+      const trip = await storage.createTfdTrip(data);
+      res.status(201).json(trip);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/tfd-trips/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const existing = await storage.getTfdTripById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Viagem não encontrada" });
+      }
+      if (!validateEntityAccess(req, existing.unitId)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      const updateData = schema.updateTfdTripSchema.parse(req.body);
+      const trip = await storage.updateTfdTrip(req.params.id, updateData);
+      res.json(trip);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/tfd-trips/:id/start", enforceUnitScope(), async (req, res) => {
+    try {
+      const existing = await storage.getTfdTripById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Viagem não encontrada" });
+      }
+      if (!validateEntityAccess(req, existing.unitId)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      if (existing.status !== "agendada") {
+        return res.status(400).json({ error: `Viagem precisa estar agendada. Status atual: ${existing.status}` });
+      }
+
+      const { initialKm } = req.body;
+      
+      await storage.updateTfdVehicle(existing.vehicleId, { status: "em_viagem" });
+      await storage.updateTfdDriver(existing.driverId, { status: "em_viagem" });
+
+      const trip = await storage.updateTfdTrip(req.params.id, {
+        status: "em_andamento",
+        actualDeparture: new Date(),
+        initialKm: initialKm || null,
+      });
+
+      res.json(trip);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/tfd-trips/:id/complete", enforceUnitScope(), async (req, res) => {
+    try {
+      const existing = await storage.getTfdTripById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Viagem não encontrada" });
+      }
+      if (!validateEntityAccess(req, existing.unitId)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      if (existing.status !== "em_andamento") {
+        return res.status(400).json({ error: `Viagem precisa estar em andamento. Status atual: ${existing.status}` });
+      }
+
+      const { finalKm, fuelLiters, fuelCost, tollCost, otherCosts, tripReport, incidents } = req.body;
+      const userId = req.session?.user?.id;
+
+      const totalKm = finalKm && existing.initialKm ? finalKm - existing.initialKm : null;
+      const totalCost = (fuelCost || 0) + (tollCost || 0) + (otherCosts || 0);
+
+      await storage.updateTfdVehicle(existing.vehicleId, { 
+        status: "disponivel",
+        currentKm: finalKm || undefined,
+      });
+      await storage.updateTfdDriver(existing.driverId, { status: "disponivel" });
+
+      const trip = await storage.updateTfdTrip(req.params.id, {
+        status: "concluida",
+        actualReturn: new Date(),
+        finalKm,
+        totalKm,
+        fuelLiters,
+        fuelCost,
+        tollCost,
+        otherCosts,
+        totalCost,
+        tripReport,
+        incidents,
+        completedBy: userId,
+      });
+
+      res.json(trip);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/tfd-trips/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const existing = await storage.getTfdTripById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Viagem não encontrada" });
+      }
+      if (!validateEntityAccess(req, existing.unitId)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      if (existing.status !== "agendada") {
+        return res.status(400).json({ error: "Apenas viagens agendadas podem ser excluídas" });
+      }
+
+      await storage.deleteTfdTrip(req.params.id);
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ error: error.message });

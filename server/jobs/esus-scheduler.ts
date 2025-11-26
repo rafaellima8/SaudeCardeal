@@ -46,12 +46,17 @@ function parseArgs(): SchedulerOptions {
 
 function calculateDateRange(days: number) {
   const endDate = new Date();
+  endDate.setHours(23, 59, 59, 999);
+  
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
+  startDate.setHours(0, 0, 0, 0);
   
   return {
-    from: startDate.toISOString().split("T")[0], // YYYY-MM-DD
-    to: endDate.toISOString().split("T")[0],
+    startDate,
+    endDate,
+    fromFormatted: startDate.toISOString().split("T")[0], // YYYY-MM-DD
+    toFormatted: endDate.toISOString().split("T")[0],
   };
 }
 
@@ -68,8 +73,8 @@ async function run() {
   console.log("Configuração:");
   console.log(`  Modo: ${options.execute ? "EXECUÇÃO" : "DRY-RUN (simulação)"}`);
   console.log(`  Período: últimos ${options.days} dias`);
-  console.log(`  Data inicial: ${dateRange.from}`);
-  console.log(`  Data final: ${dateRange.to}`);
+  console.log(`  Data inicial: ${dateRange.fromFormatted}`);
+  console.log(`  Data final: ${dateRange.toFormatted}`);
   console.log(`  CNES: ${defaultCNES}`);
   console.log();
   
@@ -89,29 +94,36 @@ async function run() {
   
   try {
     const result = await generateExport({
-      from: dateRange.from,
-      to: dateRange.to,
-      healthUnitCNES: defaultCNES,
+      startDate: dateRange.startDate,
+      endDate: dateRange.endDate,
+      unitCNES: defaultCNES,
     });
+    
+    const { batch, errors } = result;
     
     console.log("✅ Exportação concluída com sucesso!");
     console.log();
     console.log("Resultados:");
-    console.log(`  Batch ID: ${result.batchId}`);
-    console.log(`  JSON: ${result.jsonPath}`);
-    console.log(`  XML: ${result.xmlPath}`);
+    console.log(`  Batch ID: ${batch.batchId}`);
+    console.log(`  Export Date: ${batch.exportDate}`);
     console.log();
     console.log("Registros exportados:");
-    console.log(`  Cidadãos: ${result.totalRegistros.cidadaos}`);
-    console.log(`  Atendimentos: ${result.totalRegistros.atendimentos}`);
-    console.log(`  Procedimentos: ${result.totalRegistros.procedimentos}`);
-    console.log(`  Exames: ${result.totalRegistros.exames}`);
-    console.log(`  TFD: ${result.totalRegistros.solicitacoesTFD}`);
+    console.log(`  Cidadãos: ${batch.totalRegistros.cidadaos}`);
+    console.log(`  Atendimentos: ${batch.totalRegistros.atendimentos}`);
+    console.log(`  Procedimentos: ${batch.totalRegistros.procedimentos}`);
+    console.log(`  Exames: ${batch.totalRegistros.exames}`);
+    console.log(`  TFD: ${batch.totalRegistros.solicitacoesTFD}`);
     console.log();
     
-    const total = Object.values(result.totalRegistros).reduce((a, b) => a + b, 0);
+    const total = Object.values(batch.totalRegistros).reduce((a, b) => a + b, 0);
     console.log(`  TOTAL: ${total} registros`);
     console.log();
+    
+    if (errors.length > 0) {
+      console.log("⚠️  Avisos:");
+      errors.forEach(err => console.log(`  - ${err}`));
+      console.log();
+    }
     
     process.exit(0);
     

@@ -22,6 +22,15 @@ import type {
   MedicalReferral,
   InsertTfdRequest,
   TfdRequest,
+  UpdateTfdRequest,
+  InsertTfdVehicle,
+  TfdVehicle,
+  InsertTfdDriver,
+  TfdDriver,
+  InsertTfdTrip,
+  TfdTrip,
+  InsertTfdTripPassenger,
+  TfdTripPassenger,
   InsertAttendanceQueue,
   AttendanceQueue,
   InsertHealthUnit,
@@ -192,12 +201,38 @@ export interface IStorage {
   updateMedicalReferral(id: string, referral: Partial<InsertMedicalReferral>): Promise<MedicalReferral | undefined>;
   deleteMedicalReferral(id: string): Promise<boolean>;
 
-  // TFD
+  // TFD Requests
   getTfdRequests(params: { citizenId?: string; status?: string; unitId?: string }): Promise<TfdRequest[]>;
   getTfdRequestById(id: string): Promise<TfdRequest | undefined>;
   createTfdRequest(request: InsertTfdRequest): Promise<TfdRequest>;
   updateTfdRequest(id: string, request: Partial<InsertTfdRequest>): Promise<TfdRequest | undefined>;
   deleteTfdRequest(id: string): Promise<boolean>;
+
+  // TFD Vehicles
+  getTfdVehicles(params: { unitId?: string; status?: string; active?: boolean }): Promise<TfdVehicle[]>;
+  getTfdVehicleById(id: string): Promise<TfdVehicle | undefined>;
+  createTfdVehicle(vehicle: InsertTfdVehicle): Promise<TfdVehicle>;
+  updateTfdVehicle(id: string, vehicle: Partial<InsertTfdVehicle>): Promise<TfdVehicle | undefined>;
+  deleteTfdVehicle(id: string): Promise<boolean>;
+
+  // TFD Drivers
+  getTfdDrivers(params: { unitId?: string; status?: string; active?: boolean }): Promise<TfdDriver[]>;
+  getTfdDriverById(id: string): Promise<TfdDriver | undefined>;
+  createTfdDriver(driver: InsertTfdDriver): Promise<TfdDriver>;
+  updateTfdDriver(id: string, driver: Partial<InsertTfdDriver>): Promise<TfdDriver | undefined>;
+  deleteTfdDriver(id: string): Promise<boolean>;
+
+  // TFD Trips
+  getTfdTrips(params: { unitId?: string; vehicleId?: string; driverId?: string; status?: string; startDate?: Date; endDate?: Date }): Promise<TfdTrip[]>;
+  getTfdTripById(id: string): Promise<TfdTrip | undefined>;
+  createTfdTrip(trip: InsertTfdTrip): Promise<TfdTrip>;
+  updateTfdTrip(id: string, trip: Partial<InsertTfdTrip>): Promise<TfdTrip | undefined>;
+  deleteTfdTrip(id: string): Promise<boolean>;
+
+  // TFD Trip Passengers
+  getTfdTripPassengers(tripId: string): Promise<TfdTripPassenger[]>;
+  createTfdTripPassenger(passenger: InsertTfdTripPassenger): Promise<TfdTripPassenger>;
+  updateTfdTripPassenger(id: string, passenger: Partial<InsertTfdTripPassenger>): Promise<TfdTripPassenger | undefined>;
 
   // Health Units
   getHealthUnits(): Promise<HealthUnit[]>;
@@ -1004,11 +1039,152 @@ export class DbStorage implements IStorage {
     return created;
   }
 
-  async updateTfdRequest(id: string, request: Partial<InsertTfdRequest>): Promise<TfdRequest | undefined> {
+  async updateTfdRequest(id: string, request: UpdateTfdRequest): Promise<TfdRequest | undefined> {
     const [updated] = await db
       .update(schema.tfdRequests)
-      .set(request)
+      .set({ ...request, updatedAt: new Date() } as any)
       .where(eq(schema.tfdRequests.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTfdRequest(id: string): Promise<boolean> {
+    const result = await db.delete(schema.tfdRequests).where(eq(schema.tfdRequests.id, id));
+    return result.changes > 0;
+  }
+
+  // TFD Vehicles
+  async getTfdVehicles(params: { unitId?: string; status?: string; active?: boolean }): Promise<TfdVehicle[]> {
+    const conditions: any[] = [];
+    if (params.unitId) conditions.push(eq(schema.tfdVehicles.unitId, params.unitId));
+    if (params.status) conditions.push(eq(schema.tfdVehicles.status, params.status as any));
+    if (params.active !== undefined) conditions.push(eq(schema.tfdVehicles.active, params.active));
+
+    let query = db.select().from(schema.tfdVehicles);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    return query.orderBy(asc(schema.tfdVehicles.plate));
+  }
+
+  async getTfdVehicleById(id: string): Promise<TfdVehicle | undefined> {
+    const [vehicle] = await db.select().from(schema.tfdVehicles).where(eq(schema.tfdVehicles.id, id));
+    return vehicle;
+  }
+
+  async createTfdVehicle(vehicle: InsertTfdVehicle): Promise<TfdVehicle> {
+    const [created] = await db.insert(schema.tfdVehicles).values(vehicle).returning();
+    return created;
+  }
+
+  async updateTfdVehicle(id: string, vehicle: Partial<InsertTfdVehicle>): Promise<TfdVehicle | undefined> {
+    const [updated] = await db
+      .update(schema.tfdVehicles)
+      .set({ ...vehicle, updatedAt: new Date() })
+      .where(eq(schema.tfdVehicles.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTfdVehicle(id: string): Promise<boolean> {
+    const result = await db.delete(schema.tfdVehicles).where(eq(schema.tfdVehicles.id, id));
+    return result.changes > 0;
+  }
+
+  // TFD Drivers
+  async getTfdDrivers(params: { unitId?: string; status?: string; active?: boolean }): Promise<TfdDriver[]> {
+    const conditions: any[] = [];
+    if (params.unitId) conditions.push(eq(schema.tfdDrivers.unitId, params.unitId));
+    if (params.status) conditions.push(eq(schema.tfdDrivers.status, params.status as any));
+    if (params.active !== undefined) conditions.push(eq(schema.tfdDrivers.active, params.active));
+
+    let query = db.select().from(schema.tfdDrivers);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    return query.orderBy(asc(schema.tfdDrivers.name));
+  }
+
+  async getTfdDriverById(id: string): Promise<TfdDriver | undefined> {
+    const [driver] = await db.select().from(schema.tfdDrivers).where(eq(schema.tfdDrivers.id, id));
+    return driver;
+  }
+
+  async createTfdDriver(driver: InsertTfdDriver): Promise<TfdDriver> {
+    const [created] = await db.insert(schema.tfdDrivers).values(driver).returning();
+    return created;
+  }
+
+  async updateTfdDriver(id: string, driver: Partial<InsertTfdDriver>): Promise<TfdDriver | undefined> {
+    const [updated] = await db
+      .update(schema.tfdDrivers)
+      .set({ ...driver, updatedAt: new Date() })
+      .where(eq(schema.tfdDrivers.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTfdDriver(id: string): Promise<boolean> {
+    const result = await db.delete(schema.tfdDrivers).where(eq(schema.tfdDrivers.id, id));
+    return result.changes > 0;
+  }
+
+  // TFD Trips
+  async getTfdTrips(params: { unitId?: string; vehicleId?: string; driverId?: string; status?: string; startDate?: Date; endDate?: Date }): Promise<TfdTrip[]> {
+    const conditions: any[] = [];
+    if (params.unitId) conditions.push(eq(schema.tfdTrips.unitId, params.unitId));
+    if (params.vehicleId) conditions.push(eq(schema.tfdTrips.vehicleId, params.vehicleId));
+    if (params.driverId) conditions.push(eq(schema.tfdTrips.driverId, params.driverId));
+    if (params.status) conditions.push(eq(schema.tfdTrips.status, params.status as any));
+    if (params.startDate) conditions.push(gte(schema.tfdTrips.scheduledDeparture, params.startDate));
+    if (params.endDate) conditions.push(lte(schema.tfdTrips.scheduledDeparture, params.endDate));
+
+    let query = db.select().from(schema.tfdTrips);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    return query.orderBy(desc(schema.tfdTrips.scheduledDeparture));
+  }
+
+  async getTfdTripById(id: string): Promise<TfdTrip | undefined> {
+    const [trip] = await db.select().from(schema.tfdTrips).where(eq(schema.tfdTrips.id, id));
+    return trip;
+  }
+
+  async createTfdTrip(trip: InsertTfdTrip): Promise<TfdTrip> {
+    const [created] = await db.insert(schema.tfdTrips).values(trip).returning();
+    return created;
+  }
+
+  async updateTfdTrip(id: string, trip: Partial<InsertTfdTrip>): Promise<TfdTrip | undefined> {
+    const [updated] = await db
+      .update(schema.tfdTrips)
+      .set({ ...trip, updatedAt: new Date() })
+      .where(eq(schema.tfdTrips.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTfdTrip(id: string): Promise<boolean> {
+    const result = await db.delete(schema.tfdTrips).where(eq(schema.tfdTrips.id, id));
+    return result.changes > 0;
+  }
+
+  // TFD Trip Passengers
+  async getTfdTripPassengers(tripId: string): Promise<TfdTripPassenger[]> {
+    return db.select().from(schema.tfdTripPassengers).where(eq(schema.tfdTripPassengers.tripId, tripId));
+  }
+
+  async createTfdTripPassenger(passenger: InsertTfdTripPassenger): Promise<TfdTripPassenger> {
+    const [created] = await db.insert(schema.tfdTripPassengers).values(passenger).returning();
+    return created;
+  }
+
+  async updateTfdTripPassenger(id: string, passenger: Partial<InsertTfdTripPassenger>): Promise<TfdTripPassenger | undefined> {
+    const [updated] = await db
+      .update(schema.tfdTripPassengers)
+      .set(passenger)
+      .where(eq(schema.tfdTripPassengers.id, id))
       .returning();
     return updated;
   }
@@ -1223,15 +1399,14 @@ export class DbStorage implements IStorage {
     const [{ count: totalExams }] = await examsQuery;
 
     // TFD requests in period
-    let tfdQuery = db.select({ count: sql<number>`count(*)` })
-      .from(schema.tfdRequests)
-      .where(gte(schema.tfdRequests.requestDate, startDate));
-    
+    const tfdConditions: any[] = [gte(schema.tfdRequests.requestDate, startDate)];
     if (unitId) {
-      tfdQuery = tfdQuery.where(eq(schema.tfdRequests.unitId, unitId)) as any;
+      tfdConditions.push(eq(schema.tfdRequests.originUnitId, unitId));
     }
     
-    const [{ count: tfdRequests }] = await tfdQuery;
+    const [{ count: tfdRequests }] = await db.select({ count: sql<number>`count(*)` })
+      .from(schema.tfdRequests)
+      .where(and(...tfdConditions));
 
     // Consultations by type
     let consultationsByTypeQuery = db.select({

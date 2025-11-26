@@ -605,30 +605,174 @@ export const medicalReferrals = sqliteTable("medical_referrals", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
-// TFD Requests (Solicitações de Transporte Intermunicipal)
+// ============================================================================
+// TFD MODULE (Tratamento Fora do Domicílio) - Complete Implementation
+// ============================================================================
+
+// TFD Vehicles (Frota de Veículos)
+export const tfdVehicles = sqliteTable("tfd_vehicles", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  plate: text("plate").notNull().unique(),
+  model: text("model").notNull(),
+  brand: text("brand").notNull(),
+  year: integer("year").notNull(),
+  capacity: integer("capacity").notNull().default(4),
+  vehicleType: text("vehicle_type", {
+    enum: ["ambulancia", "van", "onibus", "carro", "micro_onibus"]
+  }).notNull().default("van"),
+  fuelType: text("fuel_type", {
+    enum: ["gasolina", "etanol", "diesel", "flex", "eletrico"]
+  }).notNull().default("flex"),
+  currentKm: integer("current_km").notNull().default(0),
+  lastMaintenanceKm: integer("last_maintenance_km"),
+  nextMaintenanceKm: integer("next_maintenance_km"),
+  insuranceExpiry: integer("insurance_expiry", { mode: "timestamp" }),
+  inspectionExpiry: integer("inspection_expiry", { mode: "timestamp" }),
+  status: text("status", {
+    enum: ["disponivel", "em_viagem", "manutencao", "inativo"]
+  }).notNull().default("disponivel"),
+  observations: text("observations"),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// TFD Drivers (Motoristas)
+export const tfdDrivers = sqliteTable("tfd_drivers", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  name: text("name").notNull(),
+  cpf: text("cpf").notNull().unique(),
+  cnh: text("cnh").notNull(),
+  cnhCategory: text("cnh_category", {
+    enum: ["A", "B", "C", "D", "E", "AB", "AC", "AD", "AE"]
+  }).notNull(),
+  cnhExpiry: integer("cnh_expiry", { mode: "timestamp" }).notNull(),
+  phone: text("phone").notNull(),
+  email: text("email"),
+  address: text("address"),
+  emergencyContact: text("emergency_contact"),
+  emergencyPhone: text("emergency_phone"),
+  hireDate: integer("hire_date", { mode: "timestamp" }),
+  status: text("status", {
+    enum: ["disponivel", "em_viagem", "ferias", "afastado", "inativo"]
+  }).notNull().default("disponivel"),
+  observations: text("observations"),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// TFD Trips (Viagens com controle de km/combustível)
+export const tfdTrips = sqliteTable("tfd_trips", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  vehicleId: text("vehicle_id").notNull().references(() => tfdVehicles.id),
+  driverId: text("driver_id").notNull().references(() => tfdDrivers.id),
+  scheduledDeparture: integer("scheduled_departure", { mode: "timestamp" }).notNull(),
+  scheduledReturn: integer("scheduled_return", { mode: "timestamp" }),
+  actualDeparture: integer("actual_departure", { mode: "timestamp" }),
+  actualReturn: integer("actual_return", { mode: "timestamp" }),
+  origin: text("origin").notNull(),
+  destination: text("destination").notNull(),
+  route: text("route"),
+  initialKm: integer("initial_km"),
+  finalKm: integer("final_km"),
+  totalKm: integer("total_km"),
+  fuelLiters: real("fuel_liters"),
+  fuelCost: real("fuel_cost"),
+  tollCost: real("toll_cost"),
+  otherCosts: real("other_costs"),
+  totalCost: real("total_cost"),
+  passengersCount: integer("passengers_count").notNull().default(1),
+  status: text("status", {
+    enum: ["agendada", "em_andamento", "concluida", "cancelada"]
+  }).notNull().default("agendada"),
+  tripReport: text("trip_report"),
+  incidents: text("incidents"),
+  observations: text("observations"),
+  createdBy: text("created_by").references(() => users.id),
+  completedBy: text("completed_by").references(() => users.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// TFD Requests (Solicitações de Transporte Intermunicipal) - Enhanced
 export const tfdRequests = sqliteTable("tfd_requests", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   citizenId: text("citizen_id").notNull().references(() => citizens.id),
   professionalId: text("professional_id").notNull().references(() => professionals.id),
   unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  originUnitId: text("origin_unit_id").references(() => healthUnits.id),
+  tripId: text("trip_id").references(() => tfdTrips.id),
   requestDate: integer("request_date", { mode: "timestamp" }).notNull(),
+  desiredDate: integer("desired_date", { mode: "timestamp" }),
   travelDate: integer("travel_date", { mode: "timestamp" }),
   returnDate: integer("return_date", { mode: "timestamp" }),
   destination: text("destination").notNull(),
-  reason: text("reason").notNull(),
+  destinationMunicipality: text("destination_municipality"),
+  destinationState: text("destination_state").default("BA"),
+  destinationFacility: text("destination_facility"),
+  reason: text("reason", {
+    enum: ["consulta", "exame", "internacao", "quimioterapia", "radioterapia", "hemodialise", "cirurgia", "outro"]
+  }).notNull(),
+  reasonDetail: text("reason_detail"),
   procedure: text("procedure"),
+  procedureCode: text("procedure_code"),
   accompaniedBy: text("accompanied_by"),
   companion: integer("companion", { mode: "boolean" }).default(false),
-  transportType: text("transport_type"),
+  companionJustification: text("companion_justification"),
+  transportType: text("transport_type", {
+    enum: ["ambulancia", "van", "onibus", "carro", "micro_onibus"]
+  }),
+  urgencyLevel: text("urgency_level", {
+    enum: ["eletivo", "urgente", "emergencia"]
+  }).notNull().default("eletivo"),
+  medicalDocument: text("medical_document"),
+  medicalDocumentType: text("medical_document_type", {
+    enum: ["laudo", "encaminhamento", "prescricao", "exame", "outro"]
+  }),
   justification: text("justification"),
   status: text("status", { 
-    enum: ["pending", "approved", "scheduled", "completed", "cancelled", "rejected"] 
+    enum: ["pending", "approved", "rejected", "scheduled", "in_transit", "completed", "cancelled", "no_show"] 
   }).notNull().default("pending"),
-  observations: text("observations"),
-  approvedBy: text("approved_by"),
+  budgetVerified: integer("budget_verified", { mode: "boolean" }).default(false),
+  budgetNotes: text("budget_notes"),
+  approvedBy: text("approved_by").references(() => users.id),
   approvedAt: integer("approved_at", { mode: "timestamp" }),
+  approvalJustification: text("approval_justification"),
+  rejectedBy: text("rejected_by").references(() => users.id),
+  rejectedAt: integer("rejected_at", { mode: "timestamp" }),
+  rejectionReason: text("rejection_reason"),
+  scheduledBy: text("scheduled_by").references(() => users.id),
+  scheduledAt: integer("scheduled_at", { mode: "timestamp" }),
+  observations: text("observations"),
+  statusHistory: text("status_history", { mode: "json" }).$type<{
+    status: string;
+    changedAt: string;
+    changedBy: string;
+    reason?: string;
+  }[]>(),
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// TFD Trip Passengers (Passageiros por viagem - relaciona solicitações à viagem)
+export const tfdTripPassengers = sqliteTable("tfd_trip_passengers", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tripId: text("trip_id").notNull().references(() => tfdTrips.id),
+  tfdRequestId: text("tfd_request_id").notNull().references(() => tfdRequests.id),
+  citizenId: text("citizen_id").notNull().references(() => citizens.id),
+  isCompanion: integer("is_companion", { mode: "boolean" }).notNull().default(false),
+  boardingConfirmed: integer("boarding_confirmed", { mode: "boolean" }).default(false),
+  boardingTime: integer("boarding_time", { mode: "timestamp" }),
+  disembarkingConfirmed: integer("disembarking_confirmed", { mode: "boolean" }).default(false),
+  disembarkingTime: integer("disembarking_time", { mode: "timestamp" }),
+  noShow: integer("no_show", { mode: "boolean" }).default(false),
+  noShowReason: text("no_show_reason"),
+  observations: text("observations"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
 // ============================================================================
@@ -1001,11 +1145,128 @@ export const insertMedicalReferralSchema = createInsertSchema(medicalReferrals).
   updatedAt: true,
 });
 
-export const insertTfdRequestSchema = createInsertSchema(tfdRequests).omit({
+// TFD Module Insert Schemas
+export const insertTfdVehicleSchema = createInsertSchema(tfdVehicles).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
 });
+
+export const insertTfdDriverSchema = createInsertSchema(tfdDrivers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTfdTripSchema = createInsertSchema(tfdTrips).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTfdRequestSchema = createInsertSchema(tfdRequests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  statusHistory: true,
+});
+
+export const insertTfdTripPassengerSchema = createInsertSchema(tfdTripPassengers).omit({
+  id: true,
+  createdAt: true,
+});
+
+// TFD Module Update Schemas (security - only mutable fields)
+export const updateTfdVehicleSchema = z.object({
+  model: z.string().optional(),
+  brand: z.string().optional(),
+  capacity: z.number().min(1).max(50).optional(),
+  currentKm: z.number().min(0).optional(),
+  lastMaintenanceKm: z.number().nullable().optional(),
+  nextMaintenanceKm: z.number().nullable().optional(),
+  insuranceExpiry: z.date().nullable().optional(),
+  inspectionExpiry: z.date().nullable().optional(),
+  status: z.enum(["disponivel", "em_viagem", "manutencao", "inativo"]).optional(),
+  observations: z.string().nullable().optional(),
+  active: z.boolean().optional(),
+}).refine(data => Object.keys(data).length > 0, { message: "Nenhum campo para atualizar" });
+
+export const updateTfdDriverSchema = z.object({
+  name: z.string().min(2).optional(),
+  cnh: z.string().optional(),
+  cnhCategory: z.enum(["A", "B", "C", "D", "E", "AB", "AC", "AD", "AE"]).optional(),
+  cnhExpiry: z.date().optional(),
+  phone: z.string().optional(),
+  email: z.string().email().nullable().optional(),
+  address: z.string().nullable().optional(),
+  emergencyContact: z.string().nullable().optional(),
+  emergencyPhone: z.string().nullable().optional(),
+  status: z.enum(["disponivel", "em_viagem", "ferias", "afastado", "inativo"]).optional(),
+  observations: z.string().nullable().optional(),
+  active: z.boolean().optional(),
+}).refine(data => Object.keys(data).length > 0, { message: "Nenhum campo para atualizar" });
+
+export const updateTfdTripSchema = z.object({
+  scheduledDeparture: z.date().optional(),
+  scheduledReturn: z.date().nullable().optional(),
+  actualDeparture: z.date().nullable().optional(),
+  actualReturn: z.date().nullable().optional(),
+  route: z.string().nullable().optional(),
+  initialKm: z.number().nullable().optional(),
+  finalKm: z.number().nullable().optional(),
+  totalKm: z.number().nullable().optional(),
+  fuelLiters: z.number().nullable().optional(),
+  fuelCost: z.number().nullable().optional(),
+  tollCost: z.number().nullable().optional(),
+  otherCosts: z.number().nullable().optional(),
+  totalCost: z.number().nullable().optional(),
+  passengersCount: z.number().min(1).optional(),
+  status: z.enum(["agendada", "em_andamento", "concluida", "cancelada"]).optional(),
+  tripReport: z.string().nullable().optional(),
+  incidents: z.string().nullable().optional(),
+  observations: z.string().nullable().optional(),
+}).refine(data => Object.keys(data).length > 0, { message: "Nenhum campo para atualizar" });
+
+export const updateTfdRequestSchema = z.object({
+  desiredDate: z.date().nullable().optional(),
+  travelDate: z.date().nullable().optional(),
+  returnDate: z.date().nullable().optional(),
+  destination: z.string().optional(),
+  destinationMunicipality: z.string().nullable().optional(),
+  destinationState: z.string().nullable().optional(),
+  destinationFacility: z.string().nullable().optional(),
+  reason: z.enum(["consulta", "exame", "internacao", "quimioterapia", "radioterapia", "hemodialise", "cirurgia", "outro"]).optional(),
+  reasonDetail: z.string().nullable().optional(),
+  procedure: z.string().nullable().optional(),
+  procedureCode: z.string().nullable().optional(),
+  accompaniedBy: z.string().nullable().optional(),
+  companion: z.boolean().optional(),
+  companionJustification: z.string().nullable().optional(),
+  transportType: z.enum(["ambulancia", "van", "onibus", "carro", "micro_onibus"]).nullable().optional(),
+  urgencyLevel: z.enum(["eletivo", "urgente", "emergencia"]).optional(),
+  medicalDocument: z.string().nullable().optional(),
+  medicalDocumentType: z.enum(["laudo", "encaminhamento", "prescricao", "exame", "outro"]).nullable().optional(),
+  justification: z.string().nullable().optional(),
+  budgetVerified: z.boolean().optional(),
+  budgetNotes: z.string().nullable().optional(),
+  observations: z.string().nullable().optional(),
+  status: z.enum(["pending", "approved", "rejected", "scheduled", "in_transit", "completed", "cancelled", "no_show"]).optional(),
+  tripId: z.string().nullable().optional(),
+  approvedBy: z.string().nullable().optional(),
+  approvedAt: z.date().nullable().optional(),
+  approvalJustification: z.string().nullable().optional(),
+  rejectedBy: z.string().nullable().optional(),
+  rejectedAt: z.date().nullable().optional(),
+  rejectionReason: z.string().nullable().optional(),
+  scheduledBy: z.string().nullable().optional(),
+  scheduledAt: z.date().nullable().optional(),
+  statusHistory: z.array(z.object({
+    status: z.string(),
+    changedAt: z.string(),
+    changedBy: z.string(),
+    reason: z.string().optional(),
+  })).optional(),
+}).refine(data => Object.keys(data).length > 0, { message: "Nenhum campo para atualizar" });
 
 export const insertDwellingSchema = createInsertSchema(dwellings).omit({
   id: true,
@@ -1465,8 +1726,25 @@ export type Exam = typeof exams.$inferSelect;
 export type InsertMedicalReferral = z.infer<typeof insertMedicalReferralSchema>;
 export type MedicalReferral = typeof medicalReferrals.$inferSelect;
 
+// TFD Module Types
+export type InsertTfdVehicle = z.infer<typeof insertTfdVehicleSchema>;
+export type TfdVehicle = typeof tfdVehicles.$inferSelect;
+export type UpdateTfdVehicle = z.infer<typeof updateTfdVehicleSchema>;
+
+export type InsertTfdDriver = z.infer<typeof insertTfdDriverSchema>;
+export type TfdDriver = typeof tfdDrivers.$inferSelect;
+export type UpdateTfdDriver = z.infer<typeof updateTfdDriverSchema>;
+
+export type InsertTfdTrip = z.infer<typeof insertTfdTripSchema>;
+export type TfdTrip = typeof tfdTrips.$inferSelect;
+export type UpdateTfdTrip = z.infer<typeof updateTfdTripSchema>;
+
 export type InsertTfdRequest = z.infer<typeof insertTfdRequestSchema>;
 export type TfdRequest = typeof tfdRequests.$inferSelect;
+export type UpdateTfdRequest = z.infer<typeof updateTfdRequestSchema>;
+
+export type InsertTfdTripPassenger = z.infer<typeof insertTfdTripPassengerSchema>;
+export type TfdTripPassenger = typeof tfdTripPassengers.$inferSelect;
 
 export type InsertDwelling = z.infer<typeof insertDwellingSchema>;
 export type Dwelling = typeof dwellings.$inferSelect;

@@ -1,0 +1,94 @@
+### 2.5 TRANSPORTE DE PACIENTES (TFD)
+
+**Objetivo:** Gestão de solicitações de Tratamento Fora de Domicílio
+
+**Solicitação TFD:**
+- Dados do paciente
+- Município de destino
+- Motivo (consulta, exame, internação, quimioterapia)
+- Data desejada
+- Necessidade de acompanhante
+- Documento médico comprobatório (anexo)
+
+**Aprovação:**
+- Gestor da unidade avalia
+- Verifica disponibilidade orçamentária
+- Aprova ou rejeita com justificativa
+
+**Agendamento:**
+- Veículo disponível
+- Motorista designado
+- Rota planejada
+- Horário de saída/retorno
+
+**Controle:**
+- Status: solicitado → aprovado → agendado → em viagem → concluído
+- Quilometragem rodada
+- Combustível gasto
+- Relatório de viagem
+
+---
+
+### 2.6 RELATÓRIOS E INDICADORES
+
+**Objetivo:** Geração de indicadores de saúde para gestão e compliance e-SUS
+
+#### 2.6.1 Indicadores de Produção
+
+**Atendimentos:**
+- Total de consultas médicas
+- Total de consultas de enfermagem
+- Atendimentos odontológicos
+- Procedimentos realizados
+- Por profissional, por unidade, por período
+
+**Cobertura:**
+- % população cadastrada
+- % famílias cadastradas
+- % gestantes em pré-natal
+- % hipertensos acompanhados
+- % diabéticos acompanhados
+
+**Qualidade:**
+- Taxa de absenteísmo
+- Tempo médio de espera
+- Satisfação do usuário (pesquisa)
+- Resolução na APS (sem encaminhamento)
+
+#### 2.6.2 Indicadores Epidemiológicos
+
+**Morbidade:**
+- Doenças mais prevalentes (Top 10 CID-10)
+- Doenças de notificação compulsória
+- Tendências temporais
+
+**Mortalidade:**
+- Óbitos registrados
+- Causas de óbito (CID-10)
+- Mortalidade infantil
+- Mortalidade materna
+
+**Vigilância:**
+- Casos de dengue/Zika/chikungunya
+- Focos de Aedes aegypti
+- Cobertura vacinal
+
+#### 2.6.3 Exportação e-SUS
+
+**Fichas e-SUS Geradas:**
+- Ficha de Atendimento Individual (FAI) ✅
+- Ficha de Cadastro Domiciliar e Territorial (pendente)
+- Ficha de Visita Domiciliar (pendente)
+- Ficha de Atividade Coletiva (pendente)
+
+**Processo de Exportação:**
+1. Sistema coleta dados das consultas
+2. Converte para formato e-SUS (FAI XML/JSON)
+3. Valida campos obrigatórios:
+   - CNS do paciente ✅
+   - CNES da unidade ✅
+   - CBO do profissional ⚠️ (campo pendente no banco)
+   - Diagnósticos CIAP-2/CID-10 ✅
+   - Turno do atendimento ✅
+4. Gera arquivo para envio ao SISAB
+5. (Futuro) Integração direta via webservice DATASUS
