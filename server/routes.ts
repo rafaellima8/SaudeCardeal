@@ -5088,6 +5088,359 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================================================
+  // PROFESSIONAL SCHEDULE API (Agenda Profissional)
+  // ============================================================================
+
+  app.get("/api/schedules", enforceUnitScope(), async (req, res) => {
+    try {
+      const effectiveUnitId = getEffectiveUnitId(req);
+      const { professionalId, dayOfWeek } = req.query;
+
+      const conditions = [eq(schema.professionalSchedules.active, true)];
+      
+      if (effectiveUnitId) {
+        conditions.push(eq(schema.professionalSchedules.unitId, effectiveUnitId));
+      }
+      if (professionalId) {
+        conditions.push(eq(schema.professionalSchedules.professionalId, professionalId as string));
+      }
+      if (dayOfWeek !== undefined) {
+        conditions.push(eq(schema.professionalSchedules.dayOfWeek, parseInt(dayOfWeek as string)));
+      }
+
+      const schedules = await db.query.professionalSchedules.findMany({
+        where: and(...conditions),
+        orderBy: [asc(schema.professionalSchedules.dayOfWeek), asc(schema.professionalSchedules.startTime)],
+      });
+
+      res.json(schedules);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/schedules", enforceUnitScope(), async (req, res) => {
+    try {
+      const sessionUnitId = req.session?.user?.unitId;
+      if (!sessionUnitId) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      const data = schema.insertProfessionalScheduleSchema.parse({
+        ...req.body,
+        unitId: sessionUnitId,
+      });
+
+      const [created] = await db.insert(schema.professionalSchedules).values(data).returning();
+      res.status(201).json(created);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/schedules/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const schedule = await db.query.professionalSchedules.findFirst({
+        where: eq(schema.professionalSchedules.id, req.params.id),
+      });
+
+      if (!schedule) {
+        return res.status(404).json({ error: "Agenda não encontrada" });
+      }
+
+      const valid = await validateEntityAccess(req, schedule.unitId);
+      if (!valid) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      const updateData = schema.updateProfessionalScheduleSchema.parse(req.body);
+
+      const [updated] = await db
+        .update(schema.professionalSchedules)
+        .set({ ...updateData, updatedAt: new Date() })
+        .where(eq(schema.professionalSchedules.id, req.params.id))
+        .returning();
+
+      res.json(updated);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/schedules/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const schedule = await db.query.professionalSchedules.findFirst({
+        where: eq(schema.professionalSchedules.id, req.params.id),
+      });
+
+      if (!schedule) {
+        return res.status(404).json({ error: "Agenda não encontrada" });
+      }
+
+      const valid = await validateEntityAccess(req, schedule.unitId);
+      if (!valid) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      await db.delete(schema.professionalSchedules).where(eq(schema.professionalSchedules.id, req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/schedules/slots/:professionalId/:date", enforceUnitScope(), async (req, res) => {
+    try {
+      const effectiveUnitId = getEffectiveUnitId(req);
+      if (!effectiveUnitId) {
+        return res.status(400).json({ error: "Unidade não especificada" });
+      }
+
+      const { QueueRoutingService } = await import("./services/queue-routing");
+      const slots = await QueueRoutingService.getAvailableSlots(
+        req.params.professionalId,
+        effectiveUnitId,
+        new Date(req.params.date)
+      );
+
+      res.json(slots);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // WAITING LIST API (Lista de Espera)
+  // ============================================================================
+
+  app.get("/api/waiting-list", enforceUnitScope(), async (req, res) => {
+    try {
+      const effectiveUnitId = getEffectiveUnitId(req);
+      const { status, professionalId, specialtyId, careLineId } = req.query;
+
+      const conditions = [];
+      
+      if (effectiveUnitId) {
+        conditions.push(eq(schema.waitingList.unitId, effectiveUnitId));
+      }
+      if (status) {
+        conditions.push(eq(schema.waitingList.status, status as any));
+      }
+      if (professionalId) {
+        conditions.push(eq(schema.waitingList.professionalId, professionalId as string));
+      }
+      if (specialtyId) {
+        conditions.push(eq(schema.waitingList.specialtyId, specialtyId as string));
+      }
+      if (careLineId) {
+        conditions.push(eq(schema.waitingList.careLineId, careLineId as string));
+      }
+
+      const entries = await db.query.waitingList.findMany({
+        where: conditions.length > 0 ? and(...conditions) : undefined,
+        orderBy: [desc(schema.waitingList.requestDate)],
+      });
+
+      res.json(entries);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/waiting-list", enforceUnitScope(), async (req, res) => {
+    try {
+      const sessionUnitId = req.session?.user?.unitId;
+      if (!sessionUnitId) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      const data = schema.insertWaitingListSchema.parse({
+        ...req.body,
+        unitId: sessionUnitId,
+        requestDate: new Date(),
+      });
+
+      const [created] = await db.insert(schema.waitingList).values(data).returning();
+      res.status(201).json(created);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/waiting-list/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const entry = await db.query.waitingList.findFirst({
+        where: eq(schema.waitingList.id, req.params.id),
+      });
+
+      if (!entry) {
+        return res.status(404).json({ error: "Entrada não encontrada" });
+      }
+
+      const valid = await validateEntityAccess(req, entry.unitId);
+      if (!valid) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      const updateData = schema.updateWaitingListSchema.parse(req.body);
+
+      const [updated] = await db
+        .update(schema.waitingList)
+        .set({ ...updateData, updatedAt: new Date() })
+        .where(eq(schema.waitingList.id, req.params.id))
+        .returning();
+
+      res.json(updated);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/waiting-list/process", enforceUnitScope(), async (req, res) => {
+    try {
+      const effectiveUnitId = getEffectiveUnitId(req);
+      if (!effectiveUnitId) {
+        return res.status(400).json({ error: "Unidade não especificada" });
+      }
+
+      const { QueueRoutingService } = await import("./services/queue-routing");
+      const scheduledCount = await QueueRoutingService.processWaitingList(effectiveUnitId);
+
+      res.json({ success: true, scheduledCount, message: `${scheduledCount} pacientes agendados automaticamente` });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // QUEUE ROUTING RULES API (Regras de Roteamento de Fila)
+  // ============================================================================
+
+  app.get("/api/queue-routing-rules", enforceUnitScope(), async (req, res) => {
+    try {
+      const effectiveUnitId = getEffectiveUnitId(req);
+
+      const conditions = [eq(schema.queueRoutingRules.active, true)];
+      if (effectiveUnitId) {
+        conditions.push(eq(schema.queueRoutingRules.unitId, effectiveUnitId));
+      }
+
+      const rules = await db.query.queueRoutingRules.findMany({
+        where: and(...conditions),
+        orderBy: [desc(schema.queueRoutingRules.priority)],
+      });
+
+      res.json(rules);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/queue-routing-rules", enforceUnitScope(), async (req, res) => {
+    try {
+      const sessionUnitId = req.session?.user?.unitId;
+      if (!sessionUnitId) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      const data = schema.insertQueueRoutingRuleSchema.parse({
+        ...req.body,
+        unitId: sessionUnitId,
+      });
+
+      const [created] = await db.insert(schema.queueRoutingRules).values(data).returning();
+      res.status(201).json(created);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/queue-routing-rules/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const rule = await db.query.queueRoutingRules.findFirst({
+        where: eq(schema.queueRoutingRules.id, req.params.id),
+      });
+
+      if (!rule) {
+        return res.status(404).json({ error: "Regra não encontrada" });
+      }
+
+      const valid = await validateEntityAccess(req, rule.unitId);
+      if (!valid) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      const updateData = schema.updateQueueRoutingRuleSchema.parse(req.body);
+
+      const [updated] = await db
+        .update(schema.queueRoutingRules)
+        .set(updateData)
+        .where(eq(schema.queueRoutingRules.id, req.params.id))
+        .returning();
+
+      res.json(updated);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/queue-routing-rules/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const rule = await db.query.queueRoutingRules.findFirst({
+        where: eq(schema.queueRoutingRules.id, req.params.id),
+      });
+
+      if (!rule) {
+        return res.status(404).json({ error: "Regra não encontrada" });
+      }
+
+      const valid = await validateEntityAccess(req, rule.unitId);
+      if (!valid) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      await db.delete(schema.queueRoutingRules).where(eq(schema.queueRoutingRules.id, req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/queue/routed", enforceUnitScope(), async (req, res) => {
+    try {
+      const sessionUnitId = req.session?.user?.unitId;
+      if (!sessionUnitId) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      const { QueueRoutingService } = await import("./services/queue-routing");
+      
+      const entryData = schema.insertAttendanceQueueSchema.parse({
+        ...req.body,
+        unitId: sessionUnitId,
+      });
+
+      const result = await QueueRoutingService.createRoutedQueueEntry(entryData, {
+        appointmentId: req.body.appointmentId,
+        consultationId: req.body.consultationId,
+      });
+
+      res.status(201).json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // 404 handler for undefined API routes
   app.use("/api/*", (req, res) => {
     res.status(404).json({ error: "Endpoint não encontrado" });

@@ -65,6 +65,7 @@ const allConfigItems = [
   { title: "Unidades", icon: Building2, url: "/unidades" },
   { title: "Profissionais", icon: UserCog, url: "/profissionais" },
   { title: "Indicadores", icon: BarChart3, url: "/indicadores" },
+  { title: "Configuração de Agenda", icon: Calendar, url: "/admin/agenda-config" },
   { title: "Protocolos Clínicos", icon: FileCheck, url: "/admin/protocolos-clinicos" },
   { title: "Formulários Dinâmicos", icon: ClipboardList, url: "/admin/formularios-dinamicos" },
   { title: "Exportação e-SUS", icon: FileText, url: "/admin/esus-exports" },

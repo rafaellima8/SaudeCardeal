@@ -1620,3 +1620,180 @@ export type ReferralComplementaryData = {
   patientGender?: string;
 };
 
+// ============================================================================
+// PROFESSIONAL SCHEDULE MANAGEMENT (Agenda Profissional)
+// ============================================================================
+
+// Professional Schedule Slots - Configuração de horários de atendimento
+export const professionalSchedules = sqliteTable("professional_schedules", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  professionalId: text("professional_id").notNull().references(() => professionals.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  dayOfWeek: integer("day_of_week").notNull(), // 0=domingo, 1=segunda... 6=sábado
+  startTime: text("start_time").notNull(), // "08:00"
+  endTime: text("end_time").notNull(), // "12:00"
+  slotDuration: integer("slot_duration").notNull().default(30), // Minutos por consulta
+  maxAppointments: integer("max_appointments").notNull().default(12), // Vagas por turno
+  appointmentType: text("appointment_type", { 
+    enum: ["consulta", "retorno", "procedimento", "triagem", "urgencia"] 
+  }).notNull().default("consulta"),
+  careLineId: text("care_line_id").references(() => careLines.id), // Opcional: agenda por linha de cuidado
+  active: integer("active", { mode: "boolean" }).default(true).notNull(),
+  observations: text("observations"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Schedule Exceptions - Exceções (férias, feriados, plantões extras)
+export const scheduleExceptions = sqliteTable("schedule_exceptions", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  professionalId: text("professional_id").notNull().references(() => professionals.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  exceptionDate: integer("exception_date", { mode: "timestamp" }).notNull(),
+  exceptionType: text("exception_type", { 
+    enum: ["block", "extra", "holiday", "vacation", "sick_leave"] 
+  }).notNull(),
+  startTime: text("start_time"), // Para exceções parciais
+  endTime: text("end_time"),
+  reason: text("reason"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Waiting List - Lista de Espera Automatizada
+export const waitingList = sqliteTable("waiting_list", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  citizenId: text("citizen_id").notNull().references(() => citizens.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  professionalId: text("professional_id").references(() => professionals.id), // Profissional específico
+  specialtyId: text("specialty_id").references(() => specialties.id), // Ou especialidade
+  careLineId: text("care_line_id").references(() => careLines.id), // Ou linha de cuidado
+  priority: text("priority", { 
+    enum: ["normal", "priority", "urgent", "emergency"] 
+  }).notNull().default("normal"),
+  requestDate: integer("request_date", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  preferredDays: text("preferred_days", { mode: "json" }).$type<number[]>(), // [1,3,5] = seg, qua, sex
+  preferredPeriod: text("preferred_period", { enum: ["manha", "tarde", "noite", "qualquer"] }).default("qualquer"),
+  reason: text("reason"),
+  status: text("status", { 
+    enum: ["waiting", "scheduled", "cancelled", "expired", "no_show"] 
+  }).notNull().default("waiting"),
+  scheduledAppointmentId: text("scheduled_appointment_id").references(() => appointments.id),
+  notifiedAt: integer("notified_at", { mode: "timestamp" }),
+  expiresAt: integer("expires_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Queue Routing Rules - Regras de Roteamento Automático de Fila
+export const queueRoutingRules = sqliteTable("queue_routing_rules", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  priority: integer("priority").default(0).notNull(), // Ordem de avaliação
+  conditions: text("conditions", { mode: "json" }).$type<{
+    ageMin?: number;
+    ageMax?: number;
+    gender?: string;
+    careLineId?: string;
+    appointmentType?: string;
+    priority?: string;
+    diagnosisCodes?: string[];
+  }>(),
+  targetProfessionalId: text("target_professional_id").references(() => professionals.id),
+  targetCareLineId: text("target_care_line_id").references(() => careLines.id),
+  targetRoom: text("target_room"),
+  active: integer("active", { mode: "boolean" }).default(true).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Insert Schemas
+export const insertProfessionalScheduleSchema = createInsertSchema(professionalSchedules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertScheduleExceptionSchema = createInsertSchema(scheduleExceptions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertWaitingListSchema = createInsertSchema(waitingList).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertQueueRoutingRuleSchema = createInsertSchema(queueRoutingRules).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Update Schemas (only mutable fields, preserving multi-tenant security)
+export const updateProfessionalScheduleSchema = z.object({
+  startTime: z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:mm inválido").optional(),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:mm inválido").optional(),
+  slotDuration: z.number().min(5, "Duração mínima: 5 min").max(120, "Duração máxima: 120 min").optional(),
+  maxAppointments: z.number().min(1, "Mínimo 1 vaga").max(50, "Máximo 50 vagas").optional(),
+  appointmentType: z.string().optional(),
+  careLineId: z.string().uuid().nullable().optional(),
+  observations: z.string().nullable().optional(),
+  active: z.boolean().optional(),
+}).refine(
+  (data) => Object.keys(data).length > 0,
+  { message: "Nenhum campo para atualizar" }
+).refine(
+  (data) => {
+    if (data.startTime && data.endTime) {
+      return data.startTime < data.endTime;
+    }
+    return true;
+  },
+  { message: "Hora de início deve ser anterior à hora de fim" }
+);
+
+export const updateWaitingListSchema = z.object({
+  status: z.enum(["waiting", "scheduled", "cancelled", "no_show"]).optional(),
+  priority: z.enum(["normal", "priority", "urgent", "emergency"]).optional(),
+  professionalId: z.string().uuid().nullable().optional(),
+  specialtyId: z.string().uuid().nullable().optional(),
+  preferredDays: z.array(z.number().min(0).max(6)).nullable().optional(),
+  observations: z.string().nullable().optional(),
+  notifiedAt: z.date().nullable().optional(),
+  scheduledAppointmentId: z.string().uuid().nullable().optional(),
+}).refine(
+  (data) => Object.keys(data).length > 0,
+  { message: "Nenhum campo para atualizar" }
+);
+
+export const updateQueueRoutingRuleSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
+  priority: z.number().min(0).max(100).optional(),
+  conditions: z.record(z.any()).nullable().optional(),
+  targetCareLineId: z.string().uuid().nullable().optional(),
+  targetProfessionalId: z.string().uuid().nullable().optional(),
+  targetRoom: z.string().nullable().optional(),
+  active: z.boolean().optional(),
+}).refine(
+  (data) => Object.keys(data).length > 0,
+  { message: "Nenhum campo para atualizar" }
+);
+
+// Types
+export type ProfessionalSchedule = typeof professionalSchedules.$inferSelect;
+export type InsertProfessionalSchedule = z.infer<typeof insertProfessionalScheduleSchema>;
+export type UpdateProfessionalSchedule = z.infer<typeof updateProfessionalScheduleSchema>;
+
+export type ScheduleException = typeof scheduleExceptions.$inferSelect;
+export type InsertScheduleException = z.infer<typeof insertScheduleExceptionSchema>;
+
+export type WaitingListEntry = typeof waitingList.$inferSelect;
+export type InsertWaitingListEntry = z.infer<typeof insertWaitingListSchema>;
+export type UpdateWaitingListEntry = z.infer<typeof updateWaitingListSchema>;
+
+export type QueueRoutingRule = typeof queueRoutingRules.$inferSelect;
+export type InsertQueueRoutingRule = z.infer<typeof insertQueueRoutingRuleSchema>;
+export type UpdateQueueRoutingRule = z.infer<typeof updateQueueRoutingRuleSchema>;
+
