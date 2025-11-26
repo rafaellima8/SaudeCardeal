@@ -55,7 +55,7 @@ export const professionals = sqliteTable("professionals", {
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
-// Citizens/Patients (Cidadãos/Pacientes)
+// Citizens/Patients (Cidadãos/Pacientes) - Conforme e-SUS PEC v5.3
 export const citizens = sqliteTable("citizens", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   name: text("name").notNull(),
@@ -67,14 +67,29 @@ export const citizens = sqliteTable("citizens", {
   motherName: text("mother_name"),
   fatherName: text("father_name"),
   phone: text("phone"),
+  phoneSecondary: text("phone_secondary"),
   email: text("email"),
+  responsibleName: text("responsible_name"),
+  responsiblePhone: text("responsible_phone"),
   address: text("address").notNull(),
+  addressNumber: text("address_number"),
+  addressComplement: text("address_complement"),
   neighborhood: text("neighborhood"),
   city: text("city").notNull().default("Cardeal da Silva"),
   state: text("state").notNull().default("BA"),
   zipCode: text("zip_code"),
+  latitude: real("latitude"),
+  longitude: real("longitude"),
+  bloodType: text("blood_type", { enum: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "desconhecido"] }),
+  allergies: text("allergies"),
+  chronicConditions: text("chronic_conditions"),
+  observations: text("observations"),
+  photoUrl: text("photo_url"),
+  microarea: text("microarea"),
   familyId: text("family_id").references(() => families.id),
   unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  cadsusSync: integer("cadsus_sync", { mode: "boolean" }).default(false),
+  cadsusSyncAt: integer("cadsus_sync_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
@@ -115,6 +130,58 @@ export const attendanceQueue = sqliteTable("attendance_queue", {
   careLineId: text("care_line_id").references(() => careLines.id), // Linha de cuidado para encaninhamento inteligente
   referralReason: text("referral_reason"), // Motivo do encaminhamento (para triagem especializada)
   clinicalRisk: text("clinical_risk", { enum: ["baixo", "medio", "alto"] }), // Classificação de risco clínico
+});
+
+// Nursing Triage (Triagem de Enfermagem) - Etapa obrigatória antes da consulta médica
+export const nursingTriage = sqliteTable("nursing_triage", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  queueEntryId: text("queue_entry_id").notNull().references(() => attendanceQueue.id),
+  citizenId: text("citizen_id").notNull().references(() => citizens.id),
+  nurseId: text("nurse_id").notNull().references(() => professionals.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  triageDate: integer("triage_date", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  
+  // Manchester Triage Classification (Protocolo de Manchester)
+  riskClassification: text("risk_classification", { 
+    enum: ["emergencia", "muito_urgente", "urgente", "pouco_urgente", "nao_urgente"] 
+  }).notNull(),
+  riskColor: text("risk_color", { 
+    enum: ["vermelho", "laranja", "amarelo", "verde", "azul"] 
+  }).notNull(),
+  
+  // Chief Complaint
+  chiefComplaint: text("chief_complaint").notNull(),
+  symptomDuration: text("symptom_duration"),
+  painScale: integer("pain_scale"),
+  
+  // Vital Signs
+  bloodPressureSystolic: integer("blood_pressure_systolic"),
+  bloodPressureDiastolic: integer("blood_pressure_diastolic"),
+  heartRate: integer("heart_rate"),
+  respiratoryRate: integer("respiratory_rate"),
+  temperature: real("temperature"),
+  oxygenSaturation: integer("oxygen_saturation"),
+  bloodGlucose: integer("blood_glucose"),
+  weight: real("weight"),
+  height: real("height"),
+  
+  // Anthropometric (calculated)
+  bmi: real("bmi"),
+  
+  // Glasgow Scale (for emergency cases)
+  glasgowScore: integer("glasgow_score"),
+  
+  // Nursing Notes
+  observations: text("observations"),
+  nursingDiagnosis: text("nursing_diagnosis"),
+  
+  // Allergies/Alerts confirmed at triage
+  allergiesConfirmed: text("allergies_confirmed"),
+  
+  // Status
+  status: text("status", { enum: ["completed", "pending_medical", "cancelled"] }).notNull().default("completed"),
+  
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
 // Consultations (Consultas Médicas) - COM CAMPOS SOAP COMPLETOS ✅
@@ -612,6 +679,11 @@ export const insertAttendanceQueueSchema = createInsertSchema(attendanceQueue).o
   id: true,
 });
 
+export const insertNursingTriageSchema = createInsertSchema(nursingTriage).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertConsultationSchema = createInsertSchema(consultations).omit({
   id: true,
   createdAt: true,
@@ -796,6 +868,29 @@ export const aceAuditLogs = sqliteTable("ace_audit_logs", {
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
+// Medical Records Audit Logs (Auditoria de Acesso a Prontuários - LGPD Compliance)
+export const medicalRecordsAuditLogs = sqliteTable("medical_records_audit_logs", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  citizenId: text("citizen_id").notNull().references(() => citizens.id),
+  userId: text("user_id").notNull().references(() => users.id),
+  professionalId: text("professional_id").references(() => professionals.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  action: text("action", { 
+    enum: ["view", "create", "update", "delete", "print", "export", "share"] 
+  }).notNull(),
+  entityType: text("entity_type", { 
+    enum: ["consultation", "prescription", "exam", "referral", "certificate", "triage", "history", "full_record"] 
+  }).notNull(),
+  entityId: text("entity_id"),
+  accessReason: text("access_reason"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  sessionId: text("session_id"),
+  sensitiveDataAccessed: integer("sensitive_data_accessed", { mode: "boolean" }).default(false).notNull(),
+  metadata: text("metadata", { mode: "json" }).$type<Record<string, any>>().default(sql`'{}'`).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
 // ACE Insert Schemas
 export const insertAceDwellingSchema = createInsertSchema(aceDwellings).omit({
   id: true,
@@ -814,6 +909,11 @@ export const insertAceFocusSchema = createInsertSchema(aceFoci).omit({
 });
 
 export const insertAceAuditLogSchema = createInsertSchema(aceAuditLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertMedicalRecordsAuditLogSchema = createInsertSchema(medicalRecordsAuditLogs).omit({
   id: true,
   createdAt: true,
 });
@@ -1065,6 +1165,9 @@ export type Appointment = typeof appointments.$inferSelect;
 export type InsertAttendanceQueue = z.infer<typeof insertAttendanceQueueSchema>;
 export type AttendanceQueue = typeof attendanceQueue.$inferSelect;
 
+export type InsertNursingTriage = z.infer<typeof insertNursingTriageSchema>;
+export type NursingTriage = typeof nursingTriage.$inferSelect;
+
 export type InsertConsultation = z.infer<typeof insertConsultationSchema>;
 export type Consultation = typeof consultations.$inferSelect;
 
@@ -1138,6 +1241,9 @@ export type AceFocus = typeof aceFoci.$inferSelect;
 
 export type InsertAceAuditLog = z.infer<typeof insertAceAuditLogSchema>;
 export type AceAuditLog = typeof aceAuditLogs.$inferSelect;
+
+export type InsertMedicalRecordsAuditLog = z.infer<typeof insertMedicalRecordsAuditLogSchema>;
+export type MedicalRecordsAuditLog = typeof medicalRecordsAuditLogs.$inferSelect;
 
 // Dynamic Forms System Types
 export type InsertSpecialty = z.infer<typeof insertSpecialtySchema>;
