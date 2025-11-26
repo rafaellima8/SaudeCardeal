@@ -181,14 +181,14 @@ export default function DynamicFormsAdmin() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Linha de Cuidado (Opcional)</FormLabel>
-                      <Select value={field.value || ""} onValueChange={field.onChange}>
+                      <Select value={field.value || "none"} onValueChange={(v) => field.onChange(v === "none" ? "" : v)}>
                         <FormControl>
                           <SelectTrigger data-testid="select-care-line">
                             <SelectValue placeholder="Selecione..." />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">Nenhuma</SelectItem>
+                          <SelectItem value="none">Nenhuma</SelectItem>
                           {careLines.map((line: any) => (
                             <SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>
                           ))}

@@ -197,9 +197,17 @@ export default function Professionals() {
           <h1 className="text-3xl font-bold tracking-tight">Profissionais de Saúde</h1>
           <p className="text-muted-foreground">Gerencie os profissionais cadastrados no sistema</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => {
+          if (open) {
+            setEditingProfessional(null);
+            form.reset();
+            setIsDialogOpen(true);
+          } else {
+            handleDialogClose();
+          }
+        }}>
           <DialogTrigger asChild>
-            <Button>
+            <Button data-testid="button-new-professional">
               <Plus className="mr-2 h-4 w-4" />
               Novo Profissional
             </Button>

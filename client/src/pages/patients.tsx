@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Search, Filter, UserPlus, Edit, Trash2, MoreVertical } from "lucide-react";
+import { Search, Filter, UserPlus, Edit, Trash2, MoreVertical, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -13,10 +13,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { Citizen } from "@shared/schema";
 
 export default function Patients() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [genderFilter, setGenderFilter] = useState<string>("all");
+  const [ageFilter, setAgeFilter] = useState<string>("all");
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [, setLocation] = useLocation();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -36,15 +40,35 @@ export default function Patients() {
   const queryClient = useQueryClient();
 
   const { data: citizens, isLoading } = useQuery<Citizen[]>({
-    queryKey: ['/api/citizens', { search: searchTerm }],
+    queryKey: ['/api/citizens', { search: searchTerm, gender: genderFilter, age: ageFilter }],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchTerm) params.append('search', searchTerm);
+      if (genderFilter !== 'all') params.append('gender', genderFilter);
       const response = await fetch(`/api/citizens?${params}`);
       if (!response.ok) throw new Error('Erro ao buscar cidadãos');
       return response.json();
     },
   });
+
+  const filteredCitizens = citizens?.filter(citizen => {
+    if (ageFilter === 'all') return true;
+    const age = calculateAge(citizen.birthDate);
+    switch (ageFilter) {
+      case 'child': return age < 12;
+      case 'teen': return age >= 12 && age < 18;
+      case 'adult': return age >= 18 && age < 60;
+      case 'senior': return age >= 60;
+      default: return true;
+    }
+  });
+
+  const activeFiltersCount = [genderFilter !== 'all', ageFilter !== 'all'].filter(Boolean).length;
+
+  const clearFilters = () => {
+    setGenderFilter('all');
+    setAgeFilter('all');
+  };
 
   const { data: units } = useQuery({
     queryKey: ['/api/units'],
@@ -237,10 +261,61 @@ export default function Patients() {
             />
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="default" data-testid="button-filter">
-              <Filter className="h-4 w-4 mr-2" />
-              Filtros
-            </Button>
+            <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="default" data-testid="button-filter" className="relative">
+                  <Filter className="h-4 w-4 mr-2" />
+                  Filtros
+                  {activeFiltersCount > 0 && (
+                    <Badge className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs">
+                      {activeFiltersCount}
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72" align="end">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">Filtros</h4>
+                    {activeFiltersCount > 0 && (
+                      <Button variant="ghost" size="sm" onClick={clearFilters} className="h-auto py-1 px-2 text-xs">
+                        <X className="h-3 w-3 mr-1" />
+                        Limpar
+                      </Button>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Gênero</Label>
+                    <Select value={genderFilter} onValueChange={setGenderFilter}>
+                      <SelectTrigger data-testid="select-gender-filter">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="M">Masculino</SelectItem>
+                        <SelectItem value="F">Feminino</SelectItem>
+                        <SelectItem value="Outro">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Faixa Etária</Label>
+                    <Select value={ageFilter} onValueChange={setAgeFilter}>
+                      <SelectTrigger data-testid="select-age-filter">
+                        <SelectValue placeholder="Todas" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas as idades</SelectItem>
+                        <SelectItem value="child">Crianças (0-11 anos)</SelectItem>
+                        <SelectItem value="teen">Adolescentes (12-17 anos)</SelectItem>
+                        <SelectItem value="adult">Adultos (18-59 anos)</SelectItem>
+                        <SelectItem value="senior">Idosos (60+ anos)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
             <Button size="default" onClick={handleNewPatient} data-testid="button-new-patient">
               <UserPlus className="h-4 w-4 mr-2" />
               Novo Paciente
@@ -248,11 +323,33 @@ export default function Patients() {
           </div>
         </div>
 
+        {activeFiltersCount > 0 && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>Filtros ativos:</span>
+            {genderFilter !== 'all' && (
+              <Badge variant="secondary" className="gap-1">
+                {genderFilter === 'M' ? 'Masculino' : genderFilter === 'F' ? 'Feminino' : 'Outro'}
+                <X className="h-3 w-3 cursor-pointer" onClick={() => setGenderFilter('all')} />
+              </Badge>
+            )}
+            {ageFilter !== 'all' && (
+              <Badge variant="secondary" className="gap-1">
+                {ageFilter === 'child' ? 'Crianças' : ageFilter === 'teen' ? 'Adolescentes' : ageFilter === 'adult' ? 'Adultos' : 'Idosos'}
+                <X className="h-3 w-3 cursor-pointer" onClick={() => setAgeFilter('all')} />
+              </Badge>
+            )}
+          </div>
+        )}
+
         {isLoading ? (
           <div className="text-center text-muted-foreground py-8">Carregando pacientes...</div>
+        ) : filteredCitizens?.length === 0 ? (
+          <div className="text-center text-muted-foreground py-8">
+            {activeFiltersCount > 0 ? 'Nenhum paciente encontrado com os filtros aplicados' : 'Nenhum paciente cadastrado'}
+          </div>
         ) : (
           <div className="space-y-3">
-            {citizens?.map((patient) => (
+            {filteredCitizens?.map((patient) => (
               <Card 
                 key={patient.id} 
                 className="p-4 hover-elevate cursor-pointer" 

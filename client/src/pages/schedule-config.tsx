@@ -50,7 +50,7 @@ export default function ScheduleConfig() {
   const { user, isLoading: userLoading } = useCurrentUser();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedProfessional, setSelectedProfessional] = useState<string>("");
+  const [selectedProfessional, setSelectedProfessional] = useState<string>("all");
   const [formData, setFormData] = useState<ScheduleFormData>({
     professionalId: "",
     dayOfWeek: 1,
@@ -74,7 +74,7 @@ export default function ScheduleConfig() {
   const { data: schedules = [], isLoading: schedulesLoading, error } = useQuery<ProfessionalSchedule[]>({
     queryKey: ["/api/schedules", selectedProfessional],
     queryFn: async () => {
-      const params = selectedProfessional ? `?professionalId=${selectedProfessional}` : "";
+      const params = selectedProfessional && selectedProfessional !== "all" ? `?professionalId=${selectedProfessional}` : "";
       return apiRequest<ProfessionalSchedule[]>("GET", `/api/schedules${params}`);
     },
     enabled: !!user,
@@ -122,7 +122,7 @@ export default function ScheduleConfig() {
 
   const resetForm = () => {
     setFormData({
-      professionalId: selectedProfessional || "",
+      professionalId: selectedProfessional === "all" ? "" : selectedProfessional,
       dayOfWeek: 1,
       startTime: "08:00",
       endTime: "12:00",
@@ -197,7 +197,7 @@ export default function ScheduleConfig() {
               <SelectValue placeholder="Selecione o profissional" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos os profissionais</SelectItem>
+              <SelectItem value="all">Todos os profissionais</SelectItem>
               {professionals.map((prof) => (
                 <SelectItem key={prof.id} value={prof.id}>
                   {prof.name} - {prof.specialty}
@@ -226,7 +226,7 @@ export default function ScheduleConfig() {
                   <div className="col-span-2">
                     <Label>Profissional</Label>
                     <Select
-                      value={formData.professionalId || selectedProfessional}
+                      value={formData.professionalId || (selectedProfessional !== "all" ? selectedProfessional : "")}
                       onValueChange={(v) => setFormData({ ...formData, professionalId: v })}
                     >
                       <SelectTrigger data-testid="input-professional">
@@ -327,14 +327,14 @@ export default function ScheduleConfig() {
                   <div className="col-span-2">
                     <Label>Linha de Cuidado (opcional)</Label>
                     <Select
-                      value={formData.careLineId || ""}
-                      onValueChange={(v) => setFormData({ ...formData, careLineId: v || undefined })}
+                      value={formData.careLineId || "all"}
+                      onValueChange={(v) => setFormData({ ...formData, careLineId: v === "all" ? undefined : v })}
                     >
                       <SelectTrigger data-testid="input-care-line">
                         <SelectValue placeholder="Todas as linhas" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todas as linhas</SelectItem>
+                        <SelectItem value="all">Todas as linhas</SelectItem>
                         {careLines.map((cl) => (
                           <SelectItem key={cl.id} value={cl.id}>
                             {cl.name}

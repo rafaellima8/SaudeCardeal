@@ -1278,6 +1278,15 @@ export class DbStorage implements IStorage {
     return created;
   }
 
+  async updateUser(id: string, updates: Partial<schema.InsertUser>): Promise<User | undefined> {
+    const [updated] = await db
+      .update(schema.users)
+      .set(updates)
+      .where(eq(schema.users.id, id))
+      .returning();
+    return updated;
+  }
+
   // Dashboard Stats
   async getDashboardStats(unitId?: string): Promise<any> {
     const today = new Date();

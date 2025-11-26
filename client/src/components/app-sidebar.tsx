@@ -202,8 +202,14 @@ export function AppSidebar() {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem data-testid="menu-perfil">Meu Perfil</DropdownMenuItem>
-            <DropdownMenuItem data-testid="menu-configuracoes">Configurações</DropdownMenuItem>
+            <DropdownMenuItem data-testid="menu-perfil" onClick={() => setLocation("/perfil")}>
+              <Users className="mr-2 h-4 w-4" />
+              Meu Perfil
+            </DropdownMenuItem>
+            <DropdownMenuItem data-testid="menu-configuracoes" onClick={() => setLocation("/configuracoes")}>
+              <UserCog className="mr-2 h-4 w-4" />
+              Configurações
+            </DropdownMenuItem>
             <DropdownMenuItem 
               data-testid="menu-sair" 
               className="text-destructive"

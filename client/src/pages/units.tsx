@@ -173,9 +173,17 @@ export default function Units() {
           <h1 className="text-3xl font-bold tracking-tight">Unidades de Saúde</h1>
           <p className="text-muted-foreground">Gerencie as unidades básicas de saúde do município</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => {
+          if (open) {
+            setEditingUnit(null);
+            form.reset();
+            setIsDialogOpen(true);
+          } else {
+            handleDialogClose();
+          }
+        }}>
           <DialogTrigger asChild>
-            <Button>
+            <Button data-testid="button-new-unit">
               <Plus className="mr-2 h-4 w-4" />
               Nova Unidade
             </Button>

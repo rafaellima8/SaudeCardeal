@@ -39,6 +39,8 @@ import AceFoci from "@/pages/ace-foci";
 import EndemicDashboard from "@/pages/endemic-dashboard";
 import ScheduleConfig from "@/pages/schedule-config";
 import LoginPage from "@/pages/login";
+import Profile from "@/pages/profile";
+import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 
@@ -72,6 +74,8 @@ function ProtectedRoutes() {
       <Route path="/ace/focos" component={AceFoci} />
       <Route path="/endemias" component={EndemicDashboard} />
       <Route path="/admin/agenda-config" component={ScheduleConfig} />
+      <Route path="/perfil" component={Profile} />
+      <Route path="/configuracoes" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -94,6 +94,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(req.session.user);
   });
 
+  // Update user profile
+  app.patch("/api/auth/profile", async (req, res) => {
+    if (!req.session.user) {
+      return res.status(401).json({ error: "Não autenticado" });
+    }
+    try {
+      const { name, email, phone } = req.body;
+      const userId = req.session.user.id;
+      
+      const updatedUser = await storage.updateUser(userId, { name, email, phone });
+      if (updatedUser) {
+        req.session.user = { ...req.session.user, name, email, phone };
+        res.json(req.session.user);
+      } else {
+        res.status(404).json({ error: "Usuário não encontrado" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Change password
+  app.post("/api/auth/change-password", async (req, res) => {
+    if (!req.session.user) {
+      return res.status(401).json({ error: "Não autenticado" });
+    }
+    try {
+      const { currentPassword, newPassword } = req.body;
+      const userId = req.session.user.id;
+      
+      // Verify current password
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "Usuário não encontrado" });
+      }
+      
+      const bcrypt = await import("bcrypt");
+      const isValid = await bcrypt.compare(currentPassword, user.password);
+      if (!isValid) {
+        return res.status(401).json({ error: "Senha atual incorreta" });
+      }
+      
+      // Hash new password and update
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      await storage.updateUser(userId, { password: hashedPassword });
+      
+      res.json({ message: "Senha alterada com sucesso" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ============================================================================
   // GLOBAL PROTECTION MIDDLEWARE - All routes after this require authentication
   // ============================================================================
