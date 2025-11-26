@@ -20,7 +20,7 @@ const router = Router();
 // ============================================================================
 // RBAC MIDDLEWARE - Apenas profissionais clínicos podem usar IA médica
 // ============================================================================
-const requireClinicalRole = requireRole(["doctor", "nurse"]);
+const requireClinicalRole = requireRole(["medico", "enfermeiro"]);
 
 // Apply rate limiting to all AI routes
 router.use(aiRateLimiter);

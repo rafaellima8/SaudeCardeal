@@ -7,6 +7,7 @@ import seedSIGTAPMappings from "./seed-sigtap";
 import seedRENAMECatalog from "./seed-rename";
 import { seed as seedMinimal } from "./seed-minimal";
 import { seedSpecialtiesAndRules } from "./seed-specialties";
+import { seedProtocols } from "./seeds/seed-protocols";
 
 const app = express();
 
@@ -97,6 +98,13 @@ app.use((req, res, next) => {
     await seedRENAMECatalog();
   } catch (error) {
     console.warn("[STARTUP] Aviso: Seed RENAME falhou (pode já estar populado):", error);
+  }
+  
+  // Seed protocolos clínicos padrão (hipertensão, diabetes, TB, gestação)
+  try {
+    await seedProtocols();
+  } catch (error) {
+    console.warn("[STARTUP] Aviso: Seed protocolos clínicos falhou:", error);
   }
   
   const server = await registerRoutes(app);
