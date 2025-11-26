@@ -45,18 +45,20 @@ export function DynamicConsultationForm({
   const [triggeredProtocols, setTriggeredProtocols] = useState<ClinicalProtocol[]>([]);
 
   // Fetch template with SERVER-SIDE resolution (no more hard-coded templateId!)
-  const { data: templateData, isLoading } = useQuery<{
-    careLineId: string | null;
-    careLine: any | null;
-    template: ConsultationTemplate | null;
-    fields: TemplateField[];
-    fieldData: any[];
-    matchReason: "explicit" | "diagnosis" | "specialty" | "trigger" | "none";
-    matchDetails?: string;
-  }>({
+  const { data: templateData, isLoading } = useQuery({
     queryKey: ["/api/consultations", consultationId, "dynamic-form"],
-    queryFn: () => apiRequest("GET", `/api/consultations/${consultationId}/dynamic-form`),
-    // @ts-ignore - TanStack Query type inference issue
+    queryFn: async () => {
+      const response = await apiRequest<{
+        careLineId: string | null;
+        careLine: any | null;
+        template: ConsultationTemplate | null;
+        fields: TemplateField[];
+        fieldData: any[];
+        matchReason: "explicit" | "diagnosis" | "specialty" | "trigger" | "none";
+        matchDetails?: string;
+      }>("GET", `/api/consultations/${consultationId}/dynamic-form`);
+      return response;
+    },
     enabled: !!consultationId,
   });
 
@@ -166,14 +168,16 @@ export function DynamicConsultationForm({
   };
 
   // Initialize form with dynamic schema and server-resolved field data
-  const formSchema = templateData?.fields ? buildValidationSchema(templateData.fields) : z.object({});
+  const formSchema = templateData?.fields && Array.isArray(templateData.fields) 
+    ? buildValidationSchema(templateData.fields) 
+    : z.object({});
   
   // Build defaultValues from templateData.fieldData
   const buildDefaultValues = (): Record<string, any> => {
     if (!templateData?.fieldData || !Array.isArray(templateData.fieldData)) return {};
     
     const defaults: Record<string, any> = {};
-    templateData.fieldData.forEach((item) => {
+    templateData.fieldData.forEach((item: any) => {
       if (item && typeof item === 'object' && 'fieldId' in item && 'value' in item) {
         defaults[item.fieldId as string] = item.value;
       }
@@ -191,8 +195,8 @@ export function DynamicConsultationForm({
   useEffect(() => {
     if (!templateData?.fields || !templateData?.careLine?.id) return;
 
-    const careLineId = templateData.careLine.id;
-    const specialtyId = templateData.careLine.specialtyId || undefined;
+    const careLineId = templateData.careLine?.id;
+    const specialtyId = (templateData.careLine as any)?.specialtyId || undefined;
 
     let timeoutId: NodeJS.Timeout;
 
@@ -259,7 +263,11 @@ export function DynamicConsultationForm({
     );
   }
 
-  const { template, fields = [], matchReason, matchDetails, careLine } = templateData || {};
+  const template = templateData?.template || null;
+  const fields = Array.isArray(templateData?.fields) ? templateData.fields : [];
+  const matchReason = templateData?.matchReason || "none";
+  const matchDetails = templateData?.matchDetails;
+  const careLine = templateData?.careLine;
 
   // No template matched
   if (!template || matchReason === "none") {
@@ -286,7 +294,7 @@ export function DynamicConsultationForm({
             Formulário Detectado Automaticamente
           </AlertTitle>
           <AlertDescription className="text-blue-800 dark:text-blue-200">
-            <strong>Linha de Cuidado:</strong> {careLine.name}
+            <strong>Linha de Cuidado:</strong> {(careLine as any)?.name || 'N/A'}
             <br />
             <strong>Motivo:</strong>{" "}
             {matchReason === "diagnosis" && "Diagnóstico compatível identificado"}
@@ -299,16 +307,16 @@ export function DynamicConsultationForm({
 
       {/* Template Header */}
       <div>
-        <h3 className="text-lg font-semibold">{template.name}</h3>
-        {template.description && (
-          <p className="text-sm text-muted-foreground">{template.description}</p>
+        <h3 className="text-lg font-semibold">{(template as any)?.name || 'Formulário Dinâmico'}</h3>
+        {(template as any)?.description && (
+          <p className="text-sm text-muted-foreground">{(template as any).description}</p>
         )}
       </div>
 
       {/* Clinical Protocol Alerts */}
       {triggeredProtocols.length > 0 && (
         <div className="space-y-2">
-          {triggeredProtocols.map((protocol) => (
+          {triggeredProtocols.map((protocol: any) => (
             <Alert
               key={protocol.id}
               variant={
@@ -331,7 +339,7 @@ export function DynamicConsultationForm({
       {/* Dynamic Form */}
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-          {fields.map((field) => (
+          {fields.map((field: any) => (
             <FormField
               key={field.id}
               control={form.control}
@@ -376,7 +384,7 @@ export function DynamicConsultationForm({
                       />
                     )}
 
-                    {field.fieldType === "select" && field.fieldOptions && (
+                    {field.fieldType === "select" && field.fieldOptions && Array.isArray(field.fieldOptions) && (
                       <Select
                         value={formField.value as string}
                         onValueChange={formField.onChange}
@@ -385,7 +393,7 @@ export function DynamicConsultationForm({
                           <SelectValue placeholder="Selecione..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {field.fieldOptions.map((option) => (
+                          {field.fieldOptions.map((option: string) => (
                             <SelectItem key={option} value={option}>
                               {option}
                             </SelectItem>

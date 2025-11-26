@@ -10,6 +10,8 @@ import type {
   Consultation,
   InsertPrescription,
   Prescription,
+  InsertDispensation,
+  Dispensation,
   InsertMedication,
   Medication,
   InsertMedicationStock,
@@ -114,10 +116,23 @@ export interface IStorage {
     professionalId?: string;
     startDate?: string;
     endDate?: string;
+    status?: string;
+    unitId?: string;
   }): Promise<any[]>;
+  getPrescriptionById(id: string): Promise<Prescription | undefined>;
   createPrescription(prescription: InsertPrescription): Promise<Prescription>;
   updatePrescription(id: string, prescription: Partial<InsertPrescription>): Promise<Prescription | undefined>;
   deletePrescription(id: string): Promise<boolean>;
+
+  // Dispensations
+  createDispensation(dispensation: InsertDispensation): Promise<Dispensation>;
+  getDispensations(params: { 
+    unitId?: string; 
+    citizenId?: string; 
+    startDate?: Date; 
+    endDate?: Date; 
+    limit?: number 
+  }): Promise<Dispensation[]>;
 
   // Medications
   getMedications(params: { search?: string; unitId?: string }): Promise<Medication[]>;
@@ -589,6 +604,8 @@ export class DbStorage implements IStorage {
     professionalId?: string;
     startDate?: string;
     endDate?: string;
+    status?: string;
+    unitId?: string;
   }): Promise<any[]> {
     const conditions = [];
     
@@ -600,6 +617,12 @@ export class DbStorage implements IStorage {
     }
     if (params.professionalId) {
       conditions.push(eq(schema.prescriptions.professionalId, params.professionalId));
+    }
+    if (params.status) {
+      conditions.push(eq(schema.prescriptions.status, params.status));
+    }
+    if (params.unitId) {
+      conditions.push(eq(schema.prescriptions.unitId, params.unitId));
     }
     if (params.startDate) {
       conditions.push(sql`${schema.prescriptions.createdAt} >= ${params.startDate}`);
@@ -649,6 +672,15 @@ export class DbStorage implements IStorage {
     return query.orderBy(desc(schema.prescriptions.createdAt));
   }
 
+  async getPrescriptionById(id: string): Promise<Prescription | undefined> {
+    const [prescription] = await db
+      .select()
+      .from(schema.prescriptions)
+      .where(eq(schema.prescriptions.id, id))
+      .limit(1);
+    return prescription;
+  }
+
   async createPrescription(prescription: InsertPrescription): Promise<Prescription> {
     const [created] = await db.insert(schema.prescriptions).values(prescription).returning();
     return created;
@@ -661,6 +693,54 @@ export class DbStorage implements IStorage {
       .where(eq(schema.prescriptions.id, id))
       .returning();
     return updated;
+  }
+
+  async deletePrescription(id: string): Promise<boolean> {
+    const result = await db.delete(schema.prescriptions).where(eq(schema.prescriptions.id, id));
+    return result.changes > 0;
+  }
+
+  // Dispensations
+  async createDispensation(dispensation: InsertDispensation): Promise<Dispensation> {
+    const [created] = await db.insert(schema.dispensations).values(dispensation).returning();
+    return created;
+  }
+
+  async getDispensations(params: { 
+    unitId?: string; 
+    citizenId?: string; 
+    startDate?: Date; 
+    endDate?: Date; 
+    limit?: number 
+  }): Promise<Dispensation[]> {
+    const conditions = [];
+    
+    if (params.unitId) {
+      conditions.push(eq(schema.dispensations.unitId, params.unitId));
+    }
+    if (params.citizenId) {
+      conditions.push(eq(schema.dispensations.citizenId, params.citizenId));
+    }
+    if (params.startDate) {
+      conditions.push(gte(schema.dispensations.dispensedAt, params.startDate));
+    }
+    if (params.endDate) {
+      conditions.push(lte(schema.dispensations.dispensedAt, params.endDate));
+    }
+
+    let query = db.select().from(schema.dispensations).$dynamic();
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    query = query.orderBy(desc(schema.dispensations.dispensedAt)) as any;
+
+    if (params.limit) {
+      query = query.limit(params.limit) as any;
+    }
+
+    return query;
   }
 
   // Medications

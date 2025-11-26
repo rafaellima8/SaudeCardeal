@@ -1347,6 +1347,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Pharmacy Dispensation API
+  app.post("/api/pharmacy/dispense", async (req, res) => {
+    try {
+      const { prescriptionId, quantity } = req.body;
+      
+      if (!prescriptionId || !quantity) {
+        return res.status(400).json({ error: "prescriptionId e quantity são obrigatórios" });
+      }
+
+      // Buscar prescrição
+      const prescription = await storage.getPrescriptionById(prescriptionId);
+      if (!prescription) {
+        return res.status(404).json({ error: "Prescrição não encontrada" });
+      }
+
+      // SECURITY: Multi-tenant validation
+      const sessionUnitId = req.session?.user?.unitId;
+      if (sessionUnitId && prescription.unitId !== sessionUnitId) {
+        return res.status(403).json({ error: "Acesso negado: prescrição de outra unidade" });
+      }
+
+      // Verificar se prescrição já foi dispensada
+      if (prescription.status === "dispensed") {
+        return res.status(400).json({ error: "Prescrição já foi dispensada" });
+      }
+
+      // Registrar dispensação
+      const dispensation = await storage.createDispensation({
+        prescriptionId,
+        citizenId: prescription.citizenId,
+        professionalId: req.session?.user?.id || prescription.professionalId,
+        unitId: prescription.unitId,
+        medication: prescription.medication,
+        quantity,
+        dispensedAt: new Date(),
+      });
+
+      // Atualizar status da prescrição
+      await storage.updatePrescription(prescriptionId, { status: "dispensed" });
+
+      res.status(201).json(dispensation);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get dispensation history
+  app.get("/api/pharmacy/dispensations", async (req, res) => {
+    try {
+      const { citizenId, startDate, endDate, limit } = req.query;
+      
+      const sessionUnitId = req.session?.user?.unitId;
+      
+      const dispensations = await storage.getDispensations({
+        unitId: sessionUnitId,
+        citizenId: citizenId as string,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+        limit: limit ? parseInt(limit as string) : undefined,
+      });
+      
+      res.json(dispensations);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Exams API
   // ============================================================================
   // EXAMS API (Exames) ✅

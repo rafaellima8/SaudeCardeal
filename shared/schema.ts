@@ -46,6 +46,7 @@ export const professionals = sqliteTable("professionals", {
   councilType: text("council_type").notNull(),
   councilNumber: text("council_number").notNull(),
   councilState: text("council_state").notNull(),
+  cboCode: text("cbo_code"), // CBO (Código Brasileiro de Ocupação) - OBRIGATÓRIO e-SUS SISAB
   phone: text("phone"),
   email: text("email"),
   unitId: text("unit_id").notNull().references(() => healthUnits.id),
@@ -229,6 +230,7 @@ export const prescriptions = sqliteTable("prescriptions", {
   consultationId: text("consultation_id").references(() => consultations.id),
   citizenId: text("citizen_id").notNull().references(() => citizens.id),
   professionalId: text("professional_id").notNull().references(() => professionals.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id), // Multi-tenant safety ✅
   medication: text("medication").notNull(),
   dosage: text("dosage").notNull(),
   frequency: text("frequency").notNull(),
@@ -238,6 +240,23 @@ export const prescriptions = sqliteTable("prescriptions", {
   status: text("status", { enum: ["pending", "dispensed", "cancelled"] }).notNull().default("pending"),
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
+
+// Medication Dispensations (Dispensações de Medicamentos) ✅
+export const dispensations = sqliteTable("dispensations", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  prescriptionId: text("prescription_id").notNull().references(() => prescriptions.id),
+  citizenId: text("citizen_id").notNull().references(() => citizens.id),
+  professionalId: text("professional_id").notNull().references(() => professionals.id), // Profissional que dispensou
+  unitId: text("unit_id").notNull().references(() => healthUnits.id), // Multi-tenant safety ✅
+  medication: text("medication").notNull(),
+  quantity: integer("quantity").notNull(),
+  dispensedAt: integer("dispensed_at", { mode: "timestamp" }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+export type Dispensation = typeof dispensations.$inferSelect;
+export const insertDispensationSchema = createInsertSchema(dispensations).omit({ id: true, createdAt: true });
+export type InsertDispensation = z.infer<typeof insertDispensationSchema>;
 
 // ============================================================================
 // EXAMS AND TFD TABLES

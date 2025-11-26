@@ -21,6 +21,7 @@ import MedicalAttendance from "@/pages/medical-attendance";
 import Consultations from "@/pages/consultations";
 import Prescriptions from "@/pages/prescriptions";
 import Pharmacy from "@/pages/pharmacy";
+import PharmacyDispensation from "@/pages/pharmacy-dispensation";
 import TFD from "@/pages/tfd";
 import Reports from "@/pages/reports";
 import Units from "@/pages/units";
@@ -50,6 +51,7 @@ function ProtectedRoutes() {
       <Route path="/atendimentos" component={Consultations} />
       <Route path="/prescricoes" component={Prescriptions} />
       <Route path="/farmacia" component={Pharmacy} />
+      <Route path="/farmacia/dispensacao" component={PharmacyDispensation} />
       <Route path="/tfd" component={TFD} />
       <Route path="/relatorios" component={Reports} />
       <Route path="/unidades" component={Units} />
