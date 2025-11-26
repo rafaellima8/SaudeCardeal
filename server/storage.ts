@@ -293,8 +293,17 @@ export interface IStorage {
   getSpecialties(params?: { active?: boolean }): Promise<schema.Specialty[]>;
   getSpecialtyById(id: string): Promise<schema.Specialty | undefined>;
   getSpecialtyByCode(code: string): Promise<schema.Specialty | undefined>;
+  getSpecialtyBySlug(slug: string): Promise<schema.Specialty | undefined>;
   createSpecialty(specialty: schema.InsertSpecialty): Promise<schema.Specialty>;
   updateSpecialty(id: string, specialty: Partial<schema.InsertSpecialty>): Promise<schema.Specialty | undefined>;
+
+  // Referral Rules (Regras de Encaminhamento Inteligente)
+  getReferralRules(params?: { specialtyId?: string; active?: boolean }): Promise<schema.ReferralRule[]>;
+  getReferralRuleById(id: string): Promise<schema.ReferralRule | undefined>;
+  createReferralRule(rule: schema.InsertReferralRule): Promise<schema.ReferralRule>;
+  updateReferralRule(id: string, rule: Partial<schema.InsertReferralRule>): Promise<schema.ReferralRule | undefined>;
+  deleteReferralRule(id: string): Promise<boolean>;
+  getReferralRulesWithSpecialties(): Promise<Array<schema.ReferralRule & { specialty: schema.Specialty }>>;
 
   // Dynamic Forms System - Care Lines
   getCareLines(params?: { specialtyId?: string; active?: boolean }): Promise<schema.CareLine[]>;
@@ -2237,6 +2246,11 @@ export class DbStorage implements IStorage {
     return specialty;
   }
 
+  async getSpecialtyBySlug(slug: string): Promise<schema.Specialty | undefined> {
+    const [specialty] = await db.select().from(schema.specialties).where(eq(schema.specialties.slug, slug));
+    return specialty;
+  }
+
   async createSpecialty(specialty: schema.InsertSpecialty): Promise<schema.Specialty> {
     const [created] = await db.insert(schema.specialties).values(specialty).returning();
     return created;
@@ -2249,6 +2263,56 @@ export class DbStorage implements IStorage {
       .where(eq(schema.specialties.id, id))
       .returning();
     return updated;
+  }
+
+  // Referral Rules (Regras de Encaminhamento Inteligente)
+  async getReferralRules(params?: { specialtyId?: string; active?: boolean }): Promise<schema.ReferralRule[]> {
+    const conditions = [];
+    if (params?.specialtyId) conditions.push(eq(schema.referralRules.specialtyId, params.specialtyId));
+    if (params?.active !== undefined) conditions.push(eq(schema.referralRules.active, params.active));
+    
+    if (conditions.length === 0) {
+      return db.select().from(schema.referralRules).orderBy(desc(schema.referralRules.baseWeight));
+    }
+    return db.select().from(schema.referralRules).where(and(...conditions)).orderBy(desc(schema.referralRules.baseWeight));
+  }
+
+  async getReferralRuleById(id: string): Promise<schema.ReferralRule | undefined> {
+    const [rule] = await db.select().from(schema.referralRules).where(eq(schema.referralRules.id, id));
+    return rule;
+  }
+
+  async createReferralRule(rule: schema.InsertReferralRule): Promise<schema.ReferralRule> {
+    const [created] = await db.insert(schema.referralRules).values(rule).returning();
+    return created;
+  }
+
+  async updateReferralRule(id: string, rule: Partial<schema.InsertReferralRule>): Promise<schema.ReferralRule | undefined> {
+    const [updated] = await db
+      .update(schema.referralRules)
+      .set({ ...rule, updatedAt: new Date() })
+      .where(eq(schema.referralRules.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteReferralRule(id: string): Promise<boolean> {
+    const result = await db.delete(schema.referralRules).where(eq(schema.referralRules.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getReferralRulesWithSpecialties(): Promise<Array<schema.ReferralRule & { specialty: schema.Specialty }>> {
+    const rules = await db
+      .select()
+      .from(schema.referralRules)
+      .innerJoin(schema.specialties, eq(schema.referralRules.specialtyId, schema.specialties.id))
+      .where(eq(schema.referralRules.active, true))
+      .orderBy(desc(schema.referralRules.baseWeight));
+    
+    return rules.map(r => ({
+      ...r.referral_rules,
+      specialty: r.specialties,
+    }));
   }
 
   // Care Lines

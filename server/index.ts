@@ -5,6 +5,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import seedSIGTAPMappings from "./seed-sigtap";
 import { seed as seedMinimal } from "./seed-minimal";
+import { seedSpecialtiesAndRules } from "./seed-specialties";
 
 const app = express();
 
@@ -81,6 +82,13 @@ app.use((req, res, next) => {
     await seedSIGTAPMappings();
   } catch (error) {
     console.warn("[STARTUP] Aviso: Seed SIGTAP falhou (pode já estar populado):", error);
+  }
+  
+  // Seed de especialidades e regras de encaminhamento inteligente
+  try {
+    await seedSpecialtiesAndRules();
+  } catch (error) {
+    console.warn("[STARTUP] Aviso: Seed especialidades falhou (pode já estar populado):", error);
   }
   
   const server = await registerRoutes(app);

@@ -33,6 +33,8 @@ import { generatePrescriptionPDF, generateMedicalCertificatePDF } from "./servic
 import { CareLineResolutionService } from "./services/care-line-resolution";
 import { ProtocolAlertService } from "./services/protocol-alert.service";
 import { rawSqlite } from "./db";
+import { sugerirEspecialidades, invalidateRulesCache } from "./services/sugestorEspecialidade";
+import { specialtySuggestionInputSchema, insertReferralRuleSchema } from "@shared/schema";
 
 // Initialize Protocol Alert Service using SHARED SQLite instance (transactional consistency) ✅
 const protocolAlertService = new ProtocolAlertService(rawSqlite);
@@ -1309,6 +1311,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!success) {
         return res.status(404).json({ error: "Encaminhamento não encontrado" });
       }
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // ENCAMINHAMENTO INTELIGENTE - Sugestão de Especialidade
+  // ============================================================================
+  
+  /**
+   * POST /api/encaminhamentos/sugerir-especialidades
+   * 
+   * Motor rule-based para sugestão automática de especialidades.
+   * Analisa motivo do encaminhamento, hipótese diagnóstica e CID para
+   * sugerir especialidades com score de relevância e justificativa.
+   */
+  app.post("/api/encaminhamentos/sugerir-especialidades", async (req, res) => {
+    try {
+      if (!req.session?.user) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+      
+      const validatedInput = specialtySuggestionInputSchema.safeParse(req.body);
+      if (!validatedInput.success) {
+        return res.status(400).json({ 
+          error: "Dados inválidos",
+          details: validatedInput.error.flatten().fieldErrors 
+        });
+      }
+      
+      const sugestoes = await sugerirEspecialidades(validatedInput.data);
+      res.json({ sugestoes });
+    } catch (error: any) {
+      console.error("[Encaminhamento Inteligente] Erro:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  /**
+   * GET /api/especialidades
+   * Lista todas as especialidades disponíveis para encaminhamento.
+   */
+  app.get("/api/especialidades", async (req, res) => {
+    try {
+      const especialidades = await storage.getSpecialties({ active: true });
+      res.json(especialidades);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  /**
+   * GET /api/referral-rules
+   * Lista regras de encaminhamento (apenas admin/gestor).
+   */
+  app.get("/api/referral-rules", async (req, res) => {
+    try {
+      if (req.session?.user?.role !== "admin" && req.session?.user?.role !== "gestor") {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      
+      const { specialtyId, active } = req.query;
+      const rules = await storage.getReferralRules({
+        specialtyId: specialtyId as string,
+        active: active === "true" ? true : active === "false" ? false : undefined,
+      });
+      res.json(rules);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  /**
+   * POST /api/referral-rules
+   * Cria nova regra de encaminhamento (apenas admin).
+   */
+  app.post("/api/referral-rules", async (req, res) => {
+    try {
+      if (req.session?.user?.role !== "admin") {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      
+      const validatedData = insertReferralRuleSchema.parse(req.body);
+      const rule = await storage.createReferralRule(validatedData);
+      invalidateRulesCache();
+      res.status(201).json(rule);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Dados inválidos", details: error.flatten() });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  /**
+   * PATCH /api/referral-rules/:id
+   * Atualiza regra de encaminhamento (apenas admin).
+   */
+  app.patch("/api/referral-rules/:id", async (req, res) => {
+    try {
+      if (req.session?.user?.role !== "admin") {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      
+      const existingRule = await storage.getReferralRuleById(req.params.id);
+      if (!existingRule) {
+        return res.status(404).json({ error: "Regra não encontrada" });
+      }
+      
+      const updated = await storage.updateReferralRule(req.params.id, req.body);
+      invalidateRulesCache();
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  /**
+   * DELETE /api/referral-rules/:id
+   * Remove regra de encaminhamento (apenas admin).
+   */
+  app.delete("/api/referral-rules/:id", async (req, res) => {
+    try {
+      if (req.session?.user?.role !== "admin") {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      
+      const success = await storage.deleteReferralRule(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Regra não encontrada" });
+      }
+      invalidateRulesCache();
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ error: error.message });

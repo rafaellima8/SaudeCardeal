@@ -278,7 +278,7 @@ export const exams = sqliteTable("exams", {
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
-// Medical Referrals (Encaminhamentos Médicos)
+// Medical Referrals (Encaminhamentos Médicos) - COM SUGESTÃO INTELIGENTE ✅
 export const medicalReferrals = sqliteTable("medical_referrals", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   consultationId: text("consultation_id").references(() => consultations.id),
@@ -286,7 +286,29 @@ export const medicalReferrals = sqliteTable("medical_referrals", {
   professionalId: text("professional_id").notNull().references(() => professionals.id),
   unitId: text("unit_id").notNull().references(() => healthUnits.id),
   destination: text("destination").notNull(),
-  specialty: text("specialty"),
+  specialty: text("specialty"), // LEGACY: Texto livre, mantido para compatibilidade
+  
+  // Encaminhamento Inteligente - Sugestão de Especialidade ✅
+  suggestedSpecialtyId: text("suggested_specialty_id").references(() => specialties.id), // Especialidade sugerida pelo motor
+  chosenSpecialtyId: text("chosen_specialty_id").references(() => specialties.id), // Especialidade escolhida pelo médico
+  suggestionScore: integer("suggestion_score"), // Score da sugestão (0-100)
+  suggestionJustification: text("suggestion_justification"), // Justificativa textual da sugestão
+  hypothesisDiagnosis: text("hypothesis_diagnosis"), // Hipótese diagnóstica (texto ou CID)
+  cidCode: text("cid_code"), // Código CID-10 da hipótese diagnóstica
+  complementaryData: text("complementary_data", { mode: "json" }).$type<{
+    alarmSigns?: {
+      fever?: boolean;
+      weightLoss?: boolean;
+      bleeding?: boolean;
+      recentTrauma?: boolean;
+      severeHeadache?: boolean;
+      dyspnea?: boolean;
+    };
+    attendanceType?: "acute" | "chronic" | "followup" | "emergency";
+    patientAge?: number;
+    patientGender?: string;
+  }>(), // Dados complementares para refinamento da sugestão
+  
   reason: text("reason").notNull(),
   priority: text("priority", { enum: ["normal", "urgent", "emergency"] }).notNull().default("normal"),
   status: text("status", { 
@@ -810,9 +832,26 @@ export const specialties = sqliteTable("specialties", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   name: text("name").notNull().unique(), // "Endocrinologia", "Pediatria", etc
   code: text("code").notNull().unique(), // "ENDO", "PEDI", etc
+  slug: text("slug").notNull().unique(), // "endocrino", "pediatria", etc (para matching)
   description: text("description"),
   active: integer("active", { mode: "boolean" }).default(true).notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// Referral Rules (Regras de Encaminhamento Inteligente)
+// Motor rule-based para sugestão automática de especialidades
+export const referralRules = sqliteTable("referral_rules", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  specialtyId: text("specialty_id").notNull().references(() => specialties.id, { onDelete: "cascade" }),
+  keywords: text("keywords", { mode: "json" }).$type<string[]>().notNull(), // ["diabetes", "hipotireoidismo", "tireoide"]
+  cidCodes: text("cid_codes", { mode: "json" }).$type<string[]>(), // ["E11", "E03"] - códigos CID relacionados
+  ciapCodes: text("ciap_codes", { mode: "json" }).$type<string[]>(), // Códigos CIAP-2 relacionados
+  baseWeight: integer("base_weight").notNull().default(10), // Peso base para cálculo de score
+  cidWeight: integer("cid_weight").notNull().default(20), // Peso adicional para match de CID
+  observations: text("observations"), // Notas sobre a regra
+  active: integer("active", { mode: "boolean" }).default(true).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
 // Care Lines (Linhas de Cuidado - transversais a especialidades)
@@ -950,6 +989,12 @@ export const careLineTriggers = sqliteTable("care_line_triggers", {
 export const insertSpecialtySchema = createInsertSchema(specialties).omit({
   id: true,
   createdAt: true,
+});
+
+export const insertReferralRuleSchema = createInsertSchema(referralRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 export const insertCareLineSchema = createInsertSchema(careLines).omit({
@@ -1098,6 +1143,9 @@ export type AceAuditLog = typeof aceAuditLogs.$inferSelect;
 export type InsertSpecialty = z.infer<typeof insertSpecialtySchema>;
 export type Specialty = typeof specialties.$inferSelect;
 
+export type InsertReferralRule = z.infer<typeof insertReferralRuleSchema>;
+export type ReferralRule = typeof referralRules.$inferSelect;
+
 export type InsertCareLine = z.infer<typeof insertCareLineSchema>;
 export type CareLine = typeof careLines.$inferSelect;
 
@@ -1137,4 +1185,56 @@ export const stockMovementSchema = z.object({
 });
 
 export type StockMovement = z.infer<typeof stockMovementSchema>;
+
+// ============================================================================
+// SPECIALTY SUGGESTION ENGINE SCHEMAS
+// ============================================================================
+
+// Input schema para sugestão de especialidade
+export const specialtySuggestionInputSchema = z.object({
+  motivoEncaminhamento: z.string().min(1, "Motivo do encaminhamento é obrigatório"),
+  hipoteseDiagnostica: z.string().optional(),
+  cid: z.string().optional(),
+  dadosComplementares: z.object({
+    sinaisAlarme: z.object({
+      perdaPeso: z.boolean().optional(),
+      febre: z.boolean().optional(),
+      traumaRecente: z.boolean().optional(),
+      sangramento: z.boolean().optional(),
+      cefaleiaSevera: z.boolean().optional(),
+      dispneia: z.boolean().optional(),
+    }).optional(),
+    tipoAtendimento: z.enum(["agudo", "cronico", "acompanhamento", "emergencia"]).optional(),
+    idadePaciente: z.number().optional(),
+    generoPaciente: z.string().optional(),
+  }).optional(),
+});
+
+export type SpecialtySuggestionInput = z.infer<typeof specialtySuggestionInputSchema>;
+
+// Output schema para sugestão de especialidade
+export const specialtySuggestionOutputSchema = z.object({
+  especialidadeId: z.string(),
+  nome: z.string(),
+  slug: z.string(),
+  score: z.number(),
+  justificativa: z.string(),
+});
+
+export type SpecialtySuggestion = z.infer<typeof specialtySuggestionOutputSchema>;
+
+// Complementary data type for referral
+export type ReferralComplementaryData = {
+  alarmSigns?: {
+    fever?: boolean;
+    weightLoss?: boolean;
+    bleeding?: boolean;
+    recentTrauma?: boolean;
+    severeHeadache?: boolean;
+    dyspnea?: boolean;
+  };
+  attendanceType?: "acute" | "chronic" | "followup" | "emergency";
+  patientAge?: number;
+  patientGender?: string;
+};
 
