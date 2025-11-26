@@ -27,7 +27,15 @@ import {
 import { z } from "zod";
 import { generateExport } from "./integrations/esus/exporter";
 import seedSIGTAPMappings from "./seed-sigtap";
-import { authenticateUser, requireAuth, requireRole } from "./auth";
+import { 
+  authenticateUser, 
+  requireAuth, 
+  requireRole, 
+  enforceUnitScope, 
+  getEffectiveUnitId,
+  validateEntityAccess,
+  CROSS_UNIT_ROLES
+} from "./auth";
 import aiRoutes from "./routes-ai";
 import { generatePrescriptionPDF, generateMedicalCertificatePDF } from "./services/pdf-generator";
 import { CareLineResolutionService } from "./services/care-line-resolution";
@@ -103,13 +111,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/ai", aiRoutes);
 
   // Citizens API
-  app.get("/api/citizens", async (req, res) => {
+  // Note: Citizens may be shared across units (e.g., patient transfers), 
+  // but listing is scoped to unit via appointments/consultations association.
+  // Cross-unit roles (admin/gestor) can access all citizens.
+  app.get("/api/citizens", enforceUnitScope({ requireUnitId: false }), async (req, res) => {
     try {
-      const { search, limit, offset } = req.query;
+      const { search, limit, offset, unitId } = req.query;
+      const effectiveUnitId = getEffectiveUnitId(req);
+      
       const citizens = await storage.getCitizens({
         search: search as string,
         limit: limit ? parseInt(limit as string) : undefined,
         offset: offset ? parseInt(offset as string) : undefined,
+        unitId: effectiveUnitId || undefined,
       });
       res.json(citizens);
     } catch (error: any) {
@@ -117,21 +131,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/citizens/:id", async (req, res) => {
+  app.get("/api/citizens/:id", enforceUnitScope({ requireUnitId: false }), async (req, res) => {
     try {
       const citizen = await storage.getCitizenById(req.params.id);
       if (!citizen) {
         return res.status(404).json({ error: "Cidadão não encontrado" });
       }
+      
+      // For non-cross-unit users, validate access via citizen's unit if set
+      if (citizen.unitId && !validateEntityAccess(req, citizen.unitId)) {
+        return res.status(403).json({ error: "Acesso negado: cidadão de outra unidade" });
+      }
+      
       res.json(citizen);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.post("/api/citizens", async (req, res) => {
+  // SECURITY: Multi-tenant enforcement on citizen mutations
+  app.post("/api/citizens", enforceUnitScope({ requireUnitId: false }), async (req, res) => {
     try {
+      const sessionUnitId = req.session?.user?.unitId;
       const data = insertCitizenSchema.parse(req.body);
+      
+      // Associate citizen with user's unit if not cross-unit user
+      if (sessionUnitId && !CROSS_UNIT_ROLES.includes(req.session?.user?.role as any)) {
+        data.unitId = sessionUnitId;
+      }
       
       // Check if CPF or CNS already exists
       const existingCpf = await storage.getCitizenByCpf(data.cpf);
@@ -156,24 +183,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/citizens/:id", async (req, res) => {
+  app.patch("/api/citizens/:id", enforceUnitScope({ requireUnitId: false }), async (req, res) => {
     try {
-      const citizen = await storage.updateCitizen(req.params.id, req.body);
-      if (!citizen) {
+      // Validate citizen belongs to user's unit
+      const existing = await storage.getCitizenById(req.params.id);
+      if (!existing) {
         return res.status(404).json({ error: "Cidadão não encontrado" });
       }
+      if (existing.unitId && !validateEntityAccess(req, existing.unitId)) {
+        return res.status(403).json({ error: "Acesso negado: cidadão de outra unidade" });
+      }
+      
+      const citizen = await storage.updateCitizen(req.params.id, req.body);
       res.json(citizen);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.delete("/api/citizens/:id", async (req, res) => {
+  app.delete("/api/citizens/:id", enforceUnitScope({ requireUnitId: false }), async (req, res) => {
     try {
-      const success = await storage.deleteCitizen(req.params.id);
-      if (!success) {
+      // Validate citizen belongs to user's unit before deletion
+      const existing = await storage.getCitizenById(req.params.id);
+      if (!existing) {
         return res.status(404).json({ error: "Cidadão não encontrado" });
       }
+      if (existing.unitId && !validateEntityAccess(req, existing.unitId)) {
+        return res.status(403).json({ error: "Acesso negado: cidadão de outra unidade" });
+      }
+      
+      const success = await storage.deleteCitizen(req.params.id);
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -199,13 +238,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Appointments API
-  app.get("/api/appointments", async (req, res) => {
+  // SECURITY: Multi-tenant enforcement - scope to session unitId
+  app.get("/api/appointments", enforceUnitScope(), async (req, res) => {
     try {
-      const { citizenId, professionalId, unitId, date, status, limit } = req.query;
+      const { citizenId, professionalId, date, status, limit } = req.query;
+      const effectiveUnitId = getEffectiveUnitId(req);
+      
       const appointments = await storage.getAppointments({
         citizenId: citizenId as string,
         professionalId: professionalId as string,
-        unitId: unitId as string,
+        unitId: effectiveUnitId || undefined,
         date: date ? new Date(date as string) : undefined,
         status: status as string,
         limit: limit ? parseInt(limit as string) : undefined,
@@ -216,21 +258,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/appointments/:id", async (req, res) => {
+  app.get("/api/appointments/:id", enforceUnitScope(), async (req, res) => {
     try {
       const appointment = await storage.getAppointmentById(req.params.id);
       if (!appointment) {
         return res.status(404).json({ error: "Agendamento não encontrado" });
       }
+      
+      // Validate appointment belongs to user's unit
+      if (!validateEntityAccess(req, appointment.unitId)) {
+        return res.status(403).json({ error: "Acesso negado: agendamento de outra unidade" });
+      }
+      
       res.json(appointment);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.post("/api/appointments", async (req, res) => {
+  // SECURITY: Multi-tenant enforcement on mutations
+  app.post("/api/appointments", enforceUnitScope(), async (req, res) => {
     try {
+      const sessionUnitId = req.session?.user?.unitId;
       const data = insertAppointmentSchema.parse(req.body);
+      
+      // Enforce session unitId for non-cross-unit users
+      if (sessionUnitId && !CROSS_UNIT_ROLES.includes(req.session?.user?.role as any)) {
+        if (data.unitId && data.unitId !== sessionUnitId) {
+          return res.status(403).json({ error: "Não é permitido criar agendamento em outra unidade" });
+        }
+        data.unitId = sessionUnitId;
+      }
+      
       const appointment = await storage.createAppointment(data);
       res.status(201).json(appointment);
     } catch (error: any) {
@@ -241,24 +300,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/appointments/:id", async (req, res) => {
+  app.patch("/api/appointments/:id", enforceUnitScope(), async (req, res) => {
     try {
-      const appointment = await storage.updateAppointment(req.params.id, req.body);
-      if (!appointment) {
+      // Validate existing appointment belongs to user's unit
+      const existing = await storage.getAppointmentById(req.params.id);
+      if (!existing) {
         return res.status(404).json({ error: "Agendamento não encontrado" });
       }
+      if (!validateEntityAccess(req, existing.unitId)) {
+        return res.status(403).json({ error: "Acesso negado: agendamento de outra unidade" });
+      }
+      
+      const appointment = await storage.updateAppointment(req.params.id, req.body);
       res.json(appointment);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.delete("/api/appointments/:id", async (req, res) => {
+  app.delete("/api/appointments/:id", enforceUnitScope(), async (req, res) => {
     try {
-      const success = await storage.deleteAppointment(req.params.id);
-      if (!success) {
+      // Validate appointment belongs to user's unit before deletion
+      const existing = await storage.getAppointmentById(req.params.id);
+      if (!existing) {
         return res.status(404).json({ error: "Agendamento não encontrado" });
       }
+      if (!validateEntityAccess(req, existing.unitId)) {
+        return res.status(403).json({ error: "Acesso negado: agendamento de outra unidade" });
+      }
+      
+      const success = await storage.deleteAppointment(req.params.id);
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -350,12 +421,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Consultations API
-  app.get("/api/consultations", async (req, res) => {
+  // SECURITY: Multi-tenant enforcement - scope consultations to session unitId
+  app.get("/api/consultations", enforceUnitScope(), async (req, res) => {
     try {
       const { citizenId, professionalId, limit } = req.query;
+      const effectiveUnitId = getEffectiveUnitId(req);
+      
       const consultations = await storage.getConsultations({
         citizenId: citizenId as string,
         professionalId: professionalId as string,
+        unitId: effectiveUnitId || undefined,
         limit: limit ? parseInt(limit as string) : undefined,
       });
       res.json(consultations);
@@ -364,12 +439,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/consultations/:id", async (req, res) => {
+  app.get("/api/consultations/:id", enforceUnitScope(), async (req, res) => {
     try {
       const consultation = await storage.getConsultationById(req.params.id);
       if (!consultation) {
         return res.status(404).json({ error: "Consulta não encontrada" });
       }
+      
+      // Validate consultation belongs to user's unit
+      if (!validateEntityAccess(req, consultation.unitId)) {
+        return res.status(403).json({ error: "Acesso negado: consulta de outra unidade" });
+      }
+      
       res.json(consultation);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -422,9 +503,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/consultations", async (req, res) => {
+  // SECURITY: Multi-tenant enforcement on consultations
+  app.post("/api/consultations", enforceUnitScope(), async (req, res) => {
     try {
+      const sessionUnitId = req.session?.user?.unitId;
       const data = insertConsultationSchema.parse(req.body);
+      
+      // Enforce session unitId for non-cross-unit users
+      if (sessionUnitId && !CROSS_UNIT_ROLES.includes(req.session?.user?.role as any)) {
+        if (data.unitId && data.unitId !== sessionUnitId) {
+          return res.status(403).json({ error: "Não é permitido criar consulta em outra unidade" });
+        }
+        data.unitId = sessionUnitId;
+      }
+      
       const consultation = await storage.createConsultation(data);
       
       // CLINICAL DECISION SUPPORT: Evaluate protocols and trigger alerts ✅
@@ -444,13 +536,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint transacional para criar consulta + prescrições atomicamente
-  app.post("/api/consultations-with-prescriptions", async (req, res) => {
+  // SECURITY: Multi-tenant enforcement on transactional consultation creation
+  app.post("/api/consultations-with-prescriptions", enforceUnitScope(), async (req, res) => {
     try {
+      const sessionUnitId = req.session?.user?.unitId;
       const { consultation, prescriptions } = req.body;
       
       // Validar consulta
       const validatedConsultation = insertConsultationSchema.parse(consultation);
+      
+      // Enforce session unitId for non-cross-unit users
+      if (sessionUnitId && !CROSS_UNIT_ROLES.includes(req.session?.user?.role as any)) {
+        if (validatedConsultation.unitId && validatedConsultation.unitId !== sessionUnitId) {
+          return res.status(403).json({ error: "Não é permitido criar consulta em outra unidade" });
+        }
+        validatedConsultation.unitId = sessionUnitId;
+      }
       
       // Validar prescrições (parcialmente, sem consultationId/citizenId/professionalId)
       const validatedPrescriptions = prescriptions.map((p: any) =>
@@ -481,12 +582,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/consultations/:id", async (req, res) => {
+  app.delete("/api/consultations/:id", enforceUnitScope(), async (req, res) => {
     try {
-      const success = await storage.deleteConsultation(req.params.id);
-      if (!success) {
+      // Validate consultation belongs to user's unit before deletion
+      const existing = await storage.getConsultationById(req.params.id);
+      if (!existing) {
         return res.status(404).json({ error: "Consulta não encontrada" });
       }
+      if (!validateEntityAccess(req, existing.unitId)) {
+        return res.status(403).json({ error: "Acesso negado: consulta de outra unidade" });
+      }
+      
+      const success = await storage.deleteConsultation(req.params.id);
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1079,15 +1186,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Prescriptions API
-  app.get("/api/prescriptions", async (req, res) => {
+  // SECURITY: Multi-tenant enforcement - scope prescriptions to session unitId
+  app.get("/api/prescriptions", enforceUnitScope(), async (req, res) => {
     try {
       const { citizenId, consultationId, professionalId, startDate, endDate } = req.query;
+      const effectiveUnitId = getEffectiveUnitId(req);
+      
       const prescriptions = await storage.getPrescriptions({
         citizenId: citizenId as string,
         consultationId: consultationId as string,
         professionalId: professionalId as string,
         startDate: startDate as string,
         endDate: endDate as string,
+        unitId: effectiveUnitId || undefined,
       });
       res.json(prescriptions);
     } catch (error: any) {
@@ -1095,9 +1206,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/prescriptions", async (req, res) => {
+  // SECURITY: Multi-tenant enforcement on prescription mutations
+  app.post("/api/prescriptions", enforceUnitScope(), async (req, res) => {
     try {
+      const sessionUnitId = req.session?.user?.unitId;
       const data = insertPrescriptionSchema.parse(req.body);
+      
+      // Enforce session unitId for non-cross-unit users
+      if (sessionUnitId && !CROSS_UNIT_ROLES.includes(req.session?.user?.role as any)) {
+        if (data.unitId && data.unitId !== sessionUnitId) {
+          return res.status(403).json({ error: "Não é permitido criar prescrição em outra unidade" });
+        }
+        data.unitId = sessionUnitId;
+      }
+      
       const prescription = await storage.createPrescription(data);
       res.status(201).json(prescription);
     } catch (error: any) {
@@ -1108,24 +1230,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/prescriptions/:id", async (req, res) => {
+  app.patch("/api/prescriptions/:id", enforceUnitScope(), async (req, res) => {
     try {
-      const prescription = await storage.updatePrescription(req.params.id, req.body);
-      if (!prescription) {
+      // Validate prescription belongs to user's unit
+      const existing = await storage.getPrescriptionById(req.params.id);
+      if (!existing) {
         return res.status(404).json({ error: "Prescrição não encontrada" });
       }
+      if (!validateEntityAccess(req, existing.unitId)) {
+        return res.status(403).json({ error: "Acesso negado: prescrição de outra unidade" });
+      }
+      
+      const prescription = await storage.updatePrescription(req.params.id, req.body);
       res.json(prescription);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.delete("/api/prescriptions/:id", async (req, res) => {
+  app.delete("/api/prescriptions/:id", enforceUnitScope(), async (req, res) => {
     try {
-      const success = await storage.deletePrescription(req.params.id);
-      if (!success) {
+      // Validate prescription belongs to user's unit before deletion
+      const existing = await storage.getPrescriptionById(req.params.id);
+      if (!existing) {
         return res.status(404).json({ error: "Prescrição não encontrada" });
       }
+      if (!validateEntityAccess(req, existing.unitId)) {
+        return res.status(403).json({ error: "Acesso negado: prescrição de outra unidade" });
+      }
+      
+      const success = await storage.deletePrescription(req.params.id);
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1647,12 +1781,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/exams", async (req, res) => {
+  // SECURITY: Multi-tenant enforcement on exam mutations
+  app.post("/api/exams", enforceUnitScope(), async (req, res) => {
     try {
-      // Merge session unitId if not provided
+      const sessionUnitId = req.session?.user?.unitId;
+      
+      // Enforce session unitId for non-cross-unit users
       const dataWithUnit = {
         ...req.body,
-        unitId: req.body.unitId || req.session?.user?.unitId,
+        unitId: sessionUnitId && !CROSS_UNIT_ROLES.includes(req.session?.user?.role as any)
+          ? sessionUnitId 
+          : (req.body.unitId || sessionUnitId),
       };
 
       const data = insertExamSchema.parse(dataWithUnit);
@@ -1666,17 +1805,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/exams/:id", async (req, res) => {
+  app.patch("/api/exams/:id", enforceUnitScope(), async (req, res) => {
     try {
-      // Verify ownership before update
       const existing = await storage.getExamById(req.params.id);
       if (!existing) {
         return res.status(404).json({ error: "Exame não encontrado" });
       }
-
-      // SECURITY: Multi-tenant validation
-      const sessionUnitId = req.session?.user?.unitId;
-      if (sessionUnitId && existing.unitId !== sessionUnitId) {
+      if (!validateEntityAccess(req, existing.unitId)) {
         return res.status(403).json({ error: "Acesso negado: exame de outra unidade" });
       }
 
@@ -1687,17 +1822,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/exams/:id", async (req, res) => {
+  app.delete("/api/exams/:id", enforceUnitScope(), async (req, res) => {
     try {
-      // Verify ownership before delete
       const existing = await storage.getExamById(req.params.id);
       if (!existing) {
         return res.status(404).json({ error: "Exame não encontrado" });
       }
-
-      // SECURITY: Multi-tenant validation
-      const sessionUnitId = req.session?.user?.unitId;
-      if (sessionUnitId && existing.unitId !== sessionUnitId) {
+      if (!validateEntityAccess(req, existing.unitId)) {
         return res.status(403).json({ error: "Acesso negado: exame de outra unidade" });
       }
 
@@ -1709,12 +1840,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // TFD API
-  app.get("/api/tfd", async (req, res) => {
+  // SECURITY: Multi-tenant enforcement - scope TFD requests to session unitId
+  app.get("/api/tfd", enforceUnitScope(), async (req, res) => {
     try {
       const { citizenId, status } = req.query;
+      const effectiveUnitId = getEffectiveUnitId(req);
+      
       const requests = await storage.getTfdRequests({
         citizenId: citizenId as string,
         status: status as string,
+        unitId: effectiveUnitId || undefined,
       });
       res.json(requests);
     } catch (error: any) {
@@ -1722,21 +1857,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/tfd/:id", async (req, res) => {
+  app.get("/api/tfd/:id", enforceUnitScope(), async (req, res) => {
     try {
       const request = await storage.getTfdRequestById(req.params.id);
       if (!request) {
         return res.status(404).json({ error: "Solicitação TFD não encontrada" });
       }
+      
+      // Validate TFD request belongs to user's unit
+      if (!validateEntityAccess(req, request.originUnitId)) {
+        return res.status(403).json({ error: "Acesso negado: solicitação TFD de outra unidade" });
+      }
+      
       res.json(request);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.post("/api/tfd", async (req, res) => {
+  // SECURITY: Multi-tenant enforcement on TFD mutations
+  app.post("/api/tfd", enforceUnitScope(), async (req, res) => {
     try {
+      const sessionUnitId = req.session?.user?.unitId;
       const data = insertTfdRequestSchema.parse(req.body);
+      
+      // Enforce originUnitId for non-cross-unit users
+      if (sessionUnitId && !CROSS_UNIT_ROLES.includes(req.session?.user?.role as any)) {
+        if (data.originUnitId && data.originUnitId !== sessionUnitId) {
+          return res.status(403).json({ error: "Não é permitido criar solicitação TFD de outra unidade" });
+        }
+        data.originUnitId = sessionUnitId;
+      }
+      
       const request = await storage.createTfdRequest(data);
       res.status(201).json(request);
     } catch (error: any) {
@@ -1747,24 +1899,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/tfd/:id", async (req, res) => {
+  app.patch("/api/tfd/:id", enforceUnitScope(), async (req, res) => {
     try {
-      const request = await storage.updateTfdRequest(req.params.id, req.body);
-      if (!request) {
+      const existing = await storage.getTfdRequestById(req.params.id);
+      if (!existing) {
         return res.status(404).json({ error: "Solicitação TFD não encontrada" });
       }
+      if (!validateEntityAccess(req, existing.originUnitId)) {
+        return res.status(403).json({ error: "Acesso negado: solicitação TFD de outra unidade" });
+      }
+      
+      const request = await storage.updateTfdRequest(req.params.id, req.body);
       res.json(request);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.delete("/api/tfd/:id", async (req, res) => {
+  app.delete("/api/tfd/:id", enforceUnitScope(), async (req, res) => {
     try {
-      const success = await storage.deleteTfdRequest(req.params.id);
-      if (!success) {
+      const existing = await storage.getTfdRequestById(req.params.id);
+      if (!existing) {
         return res.status(404).json({ error: "Solicitação TFD não encontrada" });
       }
+      if (!validateEntityAccess(req, existing.originUnitId)) {
+        return res.status(403).json({ error: "Acesso negado: solicitação TFD de outra unidade" });
+      }
+      
+      const success = await storage.deleteTfdRequest(req.params.id);
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1905,10 +2067,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dashboard Stats API
-  app.get("/api/stats/dashboard", async (req, res) => {
+  // SECURITY: Multi-tenant enforcement - scope dashboard stats to session unitId
+  app.get("/api/stats/dashboard", enforceUnitScope(), async (req, res) => {
     try {
-      const { unitId } = req.query;
-      const stats = await storage.getDashboardStats(unitId as string);
+      const effectiveUnitId = getEffectiveUnitId(req);
+      const stats = await storage.getDashboardStats(effectiveUnitId || undefined);
       res.json(stats);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1916,11 +2079,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Reports API
-  app.get("/api/reports", async (req, res) => {
+  // SECURITY: Multi-tenant enforcement - scope reports to session unitId
+  app.get("/api/reports", enforceUnitScope(), async (req, res) => {
     try {
-      const { period, unitId } = req.query;
+      const { period } = req.query;
+      const effectiveUnitId = getEffectiveUnitId(req);
       const days = period ? parseInt(period as string) : 30;
-      const reports = await storage.getReports(days, unitId as string);
+      const reports = await storage.getReports(days, effectiveUnitId || undefined);
       res.json(reports);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -2463,14 +2628,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ============================================================================
   // ENDEMIC CONTROL ROUTES
+  // SECURITY: All endemic routes enforce multi-tenant isolation
   // ============================================================================
 
   // Endemic Cycles
-  app.get("/api/endemic/cycles", async (req, res) => {
+  app.get("/api/endemic/cycles", enforceUnitScope(), async (req, res) => {
     try {
-      const { unitId, status, limit, offset } = req.query;
+      const { status, limit, offset } = req.query;
+      const effectiveUnitId = getEffectiveUnitId(req);
       const cycles = await storage.getEndemicCycles({
-        unitId: unitId as string,
+        unitId: effectiveUnitId || undefined,
         status: status as string,
         limit: limit ? parseInt(limit as string) : undefined,
         offset: offset ? parseInt(offset as string) : undefined,
@@ -2481,11 +2648,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/endemic/cycles/:id", async (req, res) => {
+  app.get("/api/endemic/cycles/:id", enforceUnitScope(), async (req, res) => {
     try {
       const cycle = await storage.getEndemicCycleById(req.params.id);
       if (!cycle) {
         return res.status(404).json({ error: "Ciclo não encontrado" });
+      }
+      if (!validateEntityAccess(req, cycle.unitId)) {
+        return res.status(403).json({ error: "Acesso negado: ciclo de outra unidade" });
       }
       res.json(cycle);
     } catch (error: any) {
@@ -2493,9 +2663,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/endemic/cycles", async (req, res) => {
+  app.post("/api/endemic/cycles", enforceUnitScope(), async (req, res) => {
     try {
+      const sessionUnitId = req.session?.user?.unitId;
       const data = insertEndemicCycleSchema.parse(req.body);
+      
+      // Enforce session unitId for non-cross-unit users
+      if (sessionUnitId && !CROSS_UNIT_ROLES.includes(req.session?.user?.role as any)) {
+        data.unitId = sessionUnitId;
+      }
+      
       const cycle = await storage.createEndemicCycle(data);
       res.status(201).json(cycle);
     } catch (error: any) {
@@ -2506,13 +2683,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/endemic/cycles/:id", async (req, res) => {
+  app.patch("/api/endemic/cycles/:id", enforceUnitScope(), async (req, res) => {
     try {
-      const data = insertEndemicCycleSchema.partial().parse(req.body);
-      const cycle = await storage.updateEndemicCycle(req.params.id, data);
-      if (!cycle) {
+      const existing = await storage.getEndemicCycleById(req.params.id);
+      if (!existing) {
         return res.status(404).json({ error: "Ciclo não encontrado" });
       }
+      if (!validateEntityAccess(req, existing.unitId)) {
+        return res.status(403).json({ error: "Acesso negado: ciclo de outra unidade" });
+      }
+      
+      const data = insertEndemicCycleSchema.partial().parse(req.body);
+      const cycle = await storage.updateEndemicCycle(req.params.id, data);
       res.json(cycle);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
@@ -2522,26 +2704,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/endemic/cycles/:id", async (req, res) => {
+  app.delete("/api/endemic/cycles/:id", enforceUnitScope(), async (req, res) => {
     try {
-      const success = await storage.deleteEndemicCycle(req.params.id);
-      if (!success) {
+      const existing = await storage.getEndemicCycleById(req.params.id);
+      if (!existing) {
         return res.status(404).json({ error: "Ciclo não encontrado" });
       }
+      if (!validateEntityAccess(req, existing.unitId)) {
+        return res.status(403).json({ error: "Acesso negado: ciclo de outra unidade" });
+      }
+      
+      const success = await storage.deleteEndemicCycle(req.params.id);
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  // FAD Evaluations
-  app.get("/api/endemic/fad-evaluations", async (req, res) => {
+  // FAD Evaluations - SECURITY: Multi-tenant isolation via cycle.unitId
+  app.get("/api/endemic/fad-evaluations", enforceUnitScope(), async (req, res) => {
     try {
       const { cycleId, dwellingId, professionalId, limit, offset } = req.query;
+      const effectiveUnitId = getEffectiveUnitId(req);
       const evaluations = await storage.getFadEvaluations({
         cycleId: cycleId as string,
         dwellingId: dwellingId as string,
         professionalId: professionalId as string,
+        unitId: effectiveUnitId || undefined,
         limit: limit ? parseInt(limit as string) : undefined,
         offset: offset ? parseInt(offset as string) : undefined,
       });
@@ -2551,11 +2740,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/endemic/fad-evaluations/:id", async (req, res) => {
+  app.get("/api/endemic/fad-evaluations/:id", enforceUnitScope(), async (req, res) => {
     try {
       const evaluation = await storage.getFadEvaluationById(req.params.id);
       if (!evaluation) {
         return res.status(404).json({ error: "Avaliação FAD não encontrada" });
+      }
+      // Validate via cycle's unitId
+      if (evaluation.cycleId) {
+        const cycle = await storage.getEndemicCycleById(evaluation.cycleId);
+        if (cycle && !validateEntityAccess(req, cycle.unitId)) {
+          return res.status(403).json({ error: "Acesso negado: avaliação FAD de outra unidade" });
+        }
       }
       res.json(evaluation);
     } catch (error: any) {
@@ -2563,9 +2759,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/endemic/fad-evaluations", async (req, res) => {
+  app.post("/api/endemic/fad-evaluations", enforceUnitScope(), async (req, res) => {
     try {
       const data = insertFadEvaluationSchema.parse(req.body);
+      
+      // Validate cycle belongs to user's unit
+      if (data.cycleId) {
+        const cycle = await storage.getEndemicCycleById(data.cycleId);
+        if (cycle && !validateEntityAccess(req, cycle.unitId)) {
+          return res.status(403).json({ error: "Acesso negado: ciclo de outra unidade" });
+        }
+      }
+      
       const evaluation = await storage.createFadEvaluation(data);
       res.status(201).json(evaluation);
     } catch (error: any) {
@@ -2576,13 +2781,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/endemic/fad-evaluations/:id", async (req, res) => {
+  app.patch("/api/endemic/fad-evaluations/:id", enforceUnitScope(), async (req, res) => {
     try {
-      const data = insertFadEvaluationSchema.partial().parse(req.body);
-      const evaluation = await storage.updateFadEvaluation(req.params.id, data);
-      if (!evaluation) {
+      const existing = await storage.getFadEvaluationById(req.params.id);
+      if (!existing) {
         return res.status(404).json({ error: "Avaliação FAD não encontrada" });
       }
+      // Validate via cycle's unitId
+      if (existing.cycleId) {
+        const cycle = await storage.getEndemicCycleById(existing.cycleId);
+        if (cycle && !validateEntityAccess(req, cycle.unitId)) {
+          return res.status(403).json({ error: "Acesso negado: avaliação FAD de outra unidade" });
+        }
+      }
+      
+      const data = insertFadEvaluationSchema.partial().parse(req.body);
+      const evaluation = await storage.updateFadEvaluation(req.params.id, data);
       res.json(evaluation);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
@@ -2592,26 +2806,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/endemic/fad-evaluations/:id", async (req, res) => {
+  app.delete("/api/endemic/fad-evaluations/:id", enforceUnitScope(), async (req, res) => {
     try {
-      const success = await storage.deleteFadEvaluation(req.params.id);
-      if (!success) {
+      const existing = await storage.getFadEvaluationById(req.params.id);
+      if (!existing) {
         return res.status(404).json({ error: "Avaliação FAD não encontrada" });
       }
+      // Validate via cycle's unitId
+      if (existing.cycleId) {
+        const cycle = await storage.getEndemicCycleById(existing.cycleId);
+        if (cycle && !validateEntityAccess(req, cycle.unitId)) {
+          return res.status(403).json({ error: "Acesso negado: avaliação FAD de outra unidade" });
+        }
+      }
+      
+      const success = await storage.deleteFadEvaluation(req.params.id);
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  // Foci
-  app.get("/api/endemic/foci", async (req, res) => {
+  // Foci - SECURITY: Multi-tenant isolation via FAD evaluation's cycle
+  app.get("/api/endemic/foci", enforceUnitScope(), async (req, res) => {
     try {
       const { fadId, dwellingId, depositType, limit, offset } = req.query;
+      const effectiveUnitId = getEffectiveUnitId(req);
       const foci = await storage.getFoci({
         fadId: fadId as string,
         dwellingId: dwellingId as string,
         depositType: depositType as string,
+        unitId: effectiveUnitId || undefined,
         limit: limit ? parseInt(limit as string) : undefined,
         offset: offset ? parseInt(offset as string) : undefined,
       });
@@ -2621,11 +2846,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/endemic/foci/:id", async (req, res) => {
+  app.get("/api/endemic/foci/:id", enforceUnitScope(), async (req, res) => {
     try {
       const focus = await storage.getFocusById(req.params.id);
       if (!focus) {
         return res.status(404).json({ error: "Foco não encontrado" });
+      }
+      // Validate via FAD evaluation's cycle's unitId
+      if (focus.fadId) {
+        const fad = await storage.getFadEvaluationById(focus.fadId);
+        if (fad?.cycleId) {
+          const cycle = await storage.getEndemicCycleById(fad.cycleId);
+          if (cycle && !validateEntityAccess(req, cycle.unitId)) {
+            return res.status(403).json({ error: "Acesso negado: foco de outra unidade" });
+          }
+        }
       }
       res.json(focus);
     } catch (error: any) {
@@ -2633,9 +2868,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/endemic/foci", async (req, res) => {
+  app.post("/api/endemic/foci", enforceUnitScope(), async (req, res) => {
     try {
       const data = insertFocusSchema.parse(req.body);
+      
+      // Validate FAD belongs to user's unit via cycle
+      if (data.fadId) {
+        const fad = await storage.getFadEvaluationById(data.fadId);
+        if (fad?.cycleId) {
+          const cycle = await storage.getEndemicCycleById(fad.cycleId);
+          if (cycle && !validateEntityAccess(req, cycle.unitId)) {
+            return res.status(403).json({ error: "Acesso negado: avaliação FAD de outra unidade" });
+          }
+        }
+      }
+      
       const focus = await storage.createFocus(data);
       res.status(201).json(focus);
     } catch (error: any) {
@@ -2646,13 +2893,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/endemic/foci/:id", async (req, res) => {
+  app.patch("/api/endemic/foci/:id", enforceUnitScope(), async (req, res) => {
     try {
-      const data = insertFocusSchema.partial().parse(req.body);
-      const focus = await storage.updateFocus(req.params.id, data);
-      if (!focus) {
+      const existing = await storage.getFocusById(req.params.id);
+      if (!existing) {
         return res.status(404).json({ error: "Foco não encontrado" });
       }
+      // Validate via FAD evaluation's cycle's unitId
+      if (existing.fadId) {
+        const fad = await storage.getFadEvaluationById(existing.fadId);
+        if (fad?.cycleId) {
+          const cycle = await storage.getEndemicCycleById(fad.cycleId);
+          if (cycle && !validateEntityAccess(req, cycle.unitId)) {
+            return res.status(403).json({ error: "Acesso negado: foco de outra unidade" });
+          }
+        }
+      }
+      
+      const data = insertFocusSchema.partial().parse(req.body);
+      const focus = await storage.updateFocus(req.params.id, data);
       res.json(focus);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
@@ -2662,26 +2921,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/endemic/foci/:id", async (req, res) => {
+  app.delete("/api/endemic/foci/:id", enforceUnitScope(), async (req, res) => {
     try {
-      const success = await storage.deleteFocus(req.params.id);
-      if (!success) {
+      const existing = await storage.getFocusById(req.params.id);
+      if (!existing) {
         return res.status(404).json({ error: "Foco não encontrado" });
       }
+      // Validate via FAD evaluation's cycle's unitId
+      if (existing.fadId) {
+        const fad = await storage.getFadEvaluationById(existing.fadId);
+        if (fad?.cycleId) {
+          const cycle = await storage.getEndemicCycleById(fad.cycleId);
+          if (cycle && !validateEntityAccess(req, cycle.unitId)) {
+            return res.status(403).json({ error: "Acesso negado: foco de outra unidade" });
+          }
+        }
+      }
+      
+      const success = await storage.deleteFocus(req.params.id);
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  // Focal Treatments
-  app.get("/api/endemic/treatments", async (req, res) => {
+  // Focal Treatments - SECURITY: Multi-tenant isolation via cycle.unitId
+  app.get("/api/endemic/treatments", enforceUnitScope(), async (req, res) => {
     try {
       const { cycleId, dwellingId, professionalId, limit, offset } = req.query;
+      const effectiveUnitId = getEffectiveUnitId(req);
       const treatments = await storage.getFocalTreatments({
         cycleId: cycleId as string,
         dwellingId: dwellingId as string,
         professionalId: professionalId as string,
+        unitId: effectiveUnitId || undefined,
         limit: limit ? parseInt(limit as string) : undefined,
         offset: offset ? parseInt(offset as string) : undefined,
       });
@@ -2691,11 +2964,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/endemic/treatments/:id", async (req, res) => {
+  app.get("/api/endemic/treatments/:id", enforceUnitScope(), async (req, res) => {
     try {
       const treatment = await storage.getFocalTreatmentById(req.params.id);
       if (!treatment) {
         return res.status(404).json({ error: "Tratamento não encontrado" });
+      }
+      // Validate via cycle's unitId
+      if (treatment.cycleId) {
+        const cycle = await storage.getEndemicCycleById(treatment.cycleId);
+        if (cycle && !validateEntityAccess(req, cycle.unitId)) {
+          return res.status(403).json({ error: "Acesso negado: tratamento de outra unidade" });
+        }
       }
       res.json(treatment);
     } catch (error: any) {
@@ -2703,9 +2983,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/endemic/treatments", async (req, res) => {
+  app.post("/api/endemic/treatments", enforceUnitScope(), async (req, res) => {
     try {
       const data = insertFocalTreatmentSchema.parse(req.body);
+      
+      // Validate cycle belongs to user's unit
+      if (data.cycleId) {
+        const cycle = await storage.getEndemicCycleById(data.cycleId);
+        if (cycle && !validateEntityAccess(req, cycle.unitId)) {
+          return res.status(403).json({ error: "Acesso negado: ciclo de outra unidade" });
+        }
+      }
+      
       const treatment = await storage.createFocalTreatment(data);
       res.status(201).json(treatment);
     } catch (error: any) {
@@ -2716,13 +3005,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/endemic/treatments/:id", async (req, res) => {
+  app.patch("/api/endemic/treatments/:id", enforceUnitScope(), async (req, res) => {
     try {
-      const data = insertFocalTreatmentSchema.partial().parse(req.body);
-      const treatment = await storage.updateFocalTreatment(req.params.id, data);
-      if (!treatment) {
+      const existing = await storage.getFocalTreatmentById(req.params.id);
+      if (!existing) {
         return res.status(404).json({ error: "Tratamento não encontrado" });
       }
+      // Validate via cycle's unitId
+      if (existing.cycleId) {
+        const cycle = await storage.getEndemicCycleById(existing.cycleId);
+        if (cycle && !validateEntityAccess(req, cycle.unitId)) {
+          return res.status(403).json({ error: "Acesso negado: tratamento de outra unidade" });
+        }
+      }
+      
+      const data = insertFocalTreatmentSchema.partial().parse(req.body);
+      const treatment = await storage.updateFocalTreatment(req.params.id, data);
       res.json(treatment);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
@@ -2732,24 +3030,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/endemic/treatments/:id", async (req, res) => {
+  app.delete("/api/endemic/treatments/:id", enforceUnitScope(), async (req, res) => {
     try {
-      const success = await storage.deleteFocalTreatment(req.params.id);
-      if (!success) {
+      const existing = await storage.getFocalTreatmentById(req.params.id);
+      if (!existing) {
         return res.status(404).json({ error: "Tratamento não encontrado" });
       }
+      // Validate via cycle's unitId
+      if (existing.cycleId) {
+        const cycle = await storage.getEndemicCycleById(existing.cycleId);
+        if (cycle && !validateEntityAccess(req, cycle.unitId)) {
+          return res.status(403).json({ error: "Acesso negado: tratamento de outra unidade" });
+        }
+      }
+      
+      const success = await storage.deleteFocalTreatment(req.params.id);
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  // Endemic Statistics
-  app.get("/api/endemic/stats", async (req, res) => {
+  // Endemic Statistics - SECURITY: Multi-tenant enforcement
+  app.get("/api/endemic/stats", enforceUnitScope(), async (req, res) => {
     try {
-      const { unitId, cycleId, startDate, endDate } = req.query;
+      const { cycleId, startDate, endDate } = req.query;
+      const effectiveUnitId = getEffectiveUnitId(req);
       const stats = await storage.getEndemicStats({
-        unitId: unitId as string,
+        unitId: effectiveUnitId || undefined,
         cycleId: cycleId as string,
         startDate: startDate ? new Date(startDate as string) : undefined,
         endDate: endDate ? new Date(endDate as string) : undefined,

@@ -43,7 +43,7 @@ import type {
 
 export interface IStorage {
   // Citizens
-  getCitizens(params: { search?: string; limit?: number; offset?: number }): Promise<Citizen[]>;
+  getCitizens(params: { search?: string; limit?: number; offset?: number; unitId?: string }): Promise<Citizen[]>;
   getCitizenById(id: string): Promise<Citizen | undefined>;
   getCitizenByCpf(cpf: string): Promise<Citizen | undefined>;
   getCitizenByCns(cns: string): Promise<Citizen | undefined>;
@@ -74,7 +74,7 @@ export interface IStorage {
   deleteQueueEntry(id: string): Promise<boolean>;
 
   // Consultations
-  getConsultations(params?: { citizenId?: string; professionalId?: string; limit?: number }): Promise<Consultation[]>;
+  getConsultations(params?: { citizenId?: string; professionalId?: string; unitId?: string; limit?: number }): Promise<Consultation[]>;
   getConsultationById(id: string): Promise<Consultation | undefined>;
   createConsultation(consultation: InsertConsultation): Promise<Consultation>;
   updateConsultation(id: string, consultation: Partial<InsertConsultation>): Promise<Consultation | undefined>;
@@ -191,7 +191,7 @@ export interface IStorage {
   deleteMedicalReferral(id: string): Promise<boolean>;
 
   // TFD
-  getTfdRequests(params: { citizenId?: string; status?: string }): Promise<TfdRequest[]>;
+  getTfdRequests(params: { citizenId?: string; status?: string; unitId?: string }): Promise<TfdRequest[]>;
   getTfdRequestById(id: string): Promise<TfdRequest | undefined>;
   createTfdRequest(request: InsertTfdRequest): Promise<TfdRequest>;
   updateTfdRequest(id: string, request: Partial<InsertTfdRequest>): Promise<TfdRequest | undefined>;
@@ -353,17 +353,28 @@ export interface IStorage {
 
 export class DbStorage implements IStorage {
   // Citizens
-  async getCitizens(params: { search?: string; limit?: number; offset?: number }): Promise<Citizen[]> {
-    let query = db.select().from(schema.citizens);
+  async getCitizens(params: { search?: string; limit?: number; offset?: number; unitId?: string }): Promise<Citizen[]> {
+    const conditions: any[] = [];
 
     if (params.search) {
-      query = query.where(
+      conditions.push(
         or(
           like(schema.citizens.name, `%${params.search}%`),
           like(schema.citizens.cpf, `%${params.search}%`),
           like(schema.citizens.cns, `%${params.search}%`)
         )
-      ) as any;
+      );
+    }
+    
+    // Multi-tenant filtering: scope to unit if provided
+    if (params.unitId) {
+      conditions.push(eq(schema.citizens.unitId, params.unitId));
+    }
+
+    let query = db.select().from(schema.citizens);
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
     }
 
     return query
@@ -510,7 +521,7 @@ export class DbStorage implements IStorage {
   }
 
   // Consultations
-  async getConsultations(params?: { citizenId?: string; professionalId?: string; limit?: number }): Promise<any[]> {
+  async getConsultations(params?: { citizenId?: string; professionalId?: string; unitId?: string; limit?: number }): Promise<any[]> {
     const conditions = [];
     
     if (params?.citizenId) {
@@ -518,6 +529,10 @@ export class DbStorage implements IStorage {
     }
     if (params?.professionalId) {
       conditions.push(eq(schema.consultations.professionalId, params.professionalId));
+    }
+    // Multi-tenant filtering: scope to unit if provided
+    if (params?.unitId) {
+      conditions.push(eq(schema.consultations.unitId, params.unitId));
     }
 
     let query = db.select({
@@ -907,12 +922,14 @@ export class DbStorage implements IStorage {
   }
 
   // TFD
-  async getTfdRequests(params: { citizenId?: string; status?: string }): Promise<TfdRequest[]> {
+  async getTfdRequests(params: { citizenId?: string; status?: string; unitId?: string }): Promise<TfdRequest[]> {
     let query = db.select().from(schema.tfdRequests);
     const conditions: any[] = [];
 
     if (params.citizenId) conditions.push(eq(schema.tfdRequests.citizenId, params.citizenId));
     if (params.status) conditions.push(eq(schema.tfdRequests.status, params.status as any));
+    // Multi-tenant filtering: scope to origin unit if provided
+    if (params.unitId) conditions.push(eq(schema.tfdRequests.originUnitId, params.unitId));
 
     if (conditions.length > 0) {
       query = query.where(and(...conditions)) as any;

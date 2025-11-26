@@ -16,7 +16,33 @@ The frontend is built with React 18+, TypeScript, Vite, and Wouter for routing. 
 
 ### Technical Implementations
 
-The backend uses Express.js and TypeScript on Node.js, providing a RESTful API with JSON responses. SQLite (Better-SQLite3) is the database, managed with Drizzle ORM. Security includes password-based authentication with bcrypt, session management, and Role-Based Access Control (RBAC) for 7 user roles. Multi-tenancy security is implemented at route, storage, and schema layers for data isolation per health unit. State management uses TanStack Query v5 for server state and React hooks for local state.
+The backend uses Express.js and TypeScript on Node.js, providing a RESTful API with JSON responses. SQLite (Better-SQLite3) is the database, managed with Drizzle ORM. Security includes password-based authentication with bcrypt, session management, and Role-Based Access Control (RBAC) for 7 user roles. State management uses TanStack Query v5 for server state and React hooks for local state.
+
+### Multi-Tenant Security Architecture
+
+**Core Infrastructure (server/auth.ts):**
+- `CROSS_UNIT_ROLES`: Array defining roles with cross-unit access (admin, gestor)
+- `enforceUnitScope()`: Express middleware enforcing tenant isolation on protected routes
+- `getEffectiveUnitId()`: Helper returning appropriate unitId (null for cross-unit roles, session unitId for others)
+- `validateEntityAccess()`: Entity-level validation checking if entity's unitId matches session scope
+
+**Security Pattern Applied:**
+1. GET endpoints: `enforceUnitScope()` + `getEffectiveUnitId()` for query filtering
+2. GET detail: `enforceUnitScope()` + `validateEntityAccess()` for entity validation  
+3. POST mutations: `enforceUnitScope()` + unitId injection from session
+4. PATCH/DELETE: `enforceUnitScope()` + `validateEntityAccess()` before modification
+
+**Protected API Endpoints:**
+- Citizens (CRUD): Full multi-tenant isolation
+- Appointments (CRUD): Full multi-tenant isolation
+- Consultations (CRUD): Full multi-tenant isolation + protocol alerts
+- Prescriptions (CRUD): Full multi-tenant isolation
+- Medical Referrals (CRUD): Full multi-tenant isolation with status workflow
+- Exams (CRUD): Full multi-tenant isolation
+- TFD Requests (CRUD): Full multi-tenant isolation via originUnitId
+- Pharmacy (dispense, stock-movements, dispensations): Full multi-tenant isolation
+- Endemic Control (cycles, FAD evaluations, foci, treatments, stats): Full multi-tenant isolation via cycle.unitId hierarchy
+- Dashboard/Reports: Query-level tenant scoping
 
 ### Feature Specifications
 
