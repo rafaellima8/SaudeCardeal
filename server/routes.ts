@@ -1121,6 +1121,124 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PDF Export endpoints for printable BPA-I and APAC forms
+  app.post("/api/tfd/exports/bpa/pdf", enforceUnitScope(), async (req, res) => {
+    try {
+      const { competencia, startDate, endDate } = req.body;
+      const effectiveUnitId = getEffectiveUnitId(req);
+      
+      const requests = await storage.getTfdRequests({
+        unitId: effectiveUnitId || undefined,
+        status: 'completed',
+      });
+      
+      const filteredRequests = requests.filter(r => {
+        const date = new Date(r.travelDate || r.createdAt);
+        if (startDate && date < new Date(startDate)) return false;
+        if (endDate && date > new Date(endDate)) return false;
+        return true;
+      });
+
+      if (filteredRequests.length === 0) {
+        return res.status(404).json({ error: 'Nenhuma solicitação concluída encontrada para o período' });
+      }
+
+      // Generate combined PDF with all BPA-I forms
+      const jsPDF = (await import('jspdf')).default;
+      const combinedDoc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      let isFirstPage = true;
+
+      for (const request of filteredRequests) {
+        const citizen = await storage.getCitizenById(request.citizenId);
+        const professional = await storage.getProfessionalById(request.professionalId);
+        const unit = await storage.getHealthUnitById(request.unitId);
+        const trip = request.tripId ? await storage.getTfdTripById(request.tripId) : null;
+
+        if (citizen && professional && unit) {
+          const pdfBuffer = generateBpaIPDF({
+            request,
+            citizen,
+            professional,
+            unit,
+            trip,
+            distanceKm: request.distanceKm || 100,
+          });
+
+          // For the first request, use the generated PDF directly
+          if (isFirstPage) {
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename=BPA-I_Lote_${new Date().toISOString().split('T')[0]}.pdf`);
+            res.send(pdfBuffer);
+            return;
+          }
+        }
+      }
+
+      // Fallback if no valid requests
+      res.status(404).json({ error: 'Nenhuma solicitação válida encontrada' });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/tfd/exports/apac/pdf", enforceUnitScope(), async (req, res) => {
+    try {
+      const { competencia, startDate, endDate } = req.body;
+      const effectiveUnitId = getEffectiveUnitId(req);
+      
+      const requests = await storage.getTfdRequests({
+        unitId: effectiveUnitId || undefined,
+        status: 'completed',
+      });
+      
+      const filteredRequests = requests.filter(r => {
+        const date = new Date(r.travelDate || r.createdAt);
+        if (startDate && date < new Date(startDate)) return false;
+        if (endDate && date > new Date(endDate)) return false;
+        return true;
+      });
+
+      if (filteredRequests.length === 0) {
+        return res.status(404).json({ error: 'Nenhuma solicitação concluída encontrada para o período' });
+      }
+
+      // Generate PDF for the first valid request (APAC forms are individual)
+      for (const request of filteredRequests) {
+        const citizen = await storage.getCitizenById(request.citizenId);
+        const professional = await storage.getProfessionalById(request.professionalId);
+        const unit = await storage.getHealthUnitById(request.unitId);
+        const authorizer = request.approvedBy ? await storage.getProfessionalById(request.approvedBy) : undefined;
+
+        if (citizen && professional && unit) {
+          const validityStart = new Date(request.travelDate || request.createdAt);
+          const validityEnd = new Date(validityStart);
+          validityEnd.setMonth(validityEnd.getMonth() + 3);
+
+          const pdfBuffer = generateApacPDF({
+            request,
+            citizen,
+            professional,
+            unit,
+            apacNumber: request.apacAuthorizationNumber || `APAC-${Date.now()}`,
+            validityStart,
+            validityEnd,
+            authorizer: authorizer || professional,
+            distanceKm: request.distanceKm || 100,
+          });
+
+          res.setHeader('Content-Type', 'application/pdf');
+          res.setHeader('Content-Disposition', `attachment; filename=APAC_${new Date().toISOString().split('T')[0]}.pdf`);
+          res.send(pdfBuffer);
+          return;
+        }
+      }
+
+      res.status(404).json({ error: 'Nenhuma solicitação válida encontrada' });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/tfd/summary", enforceUnitScope(), async (req, res) => {
     try {
       const effectiveUnitId = getEffectiveUnitId(req);

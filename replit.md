@@ -114,6 +114,8 @@ MuniSaúde Integrado is a streamlined municipal health management system designe
 - `POST /api/tfd/trips/:id/pdf/report` - Generate trip report PDF
 - `POST /api/tfd/exports/bpa` - Export BPA-I TXT for SIA/SUS
 - `POST /api/tfd/exports/apac` - Export APAC TXT for SIA/SUS
+- `POST /api/tfd/exports/bpa/pdf` - Generate printable BPA-I PDF form
+- `POST /api/tfd/exports/apac/pdf` - Generate printable APAC PDF form
 - `GET /api/tfd/summary` - TFD module statistics
 
 ## Development
@@ -132,7 +134,29 @@ SQLite database with automatic seeding of:
 
 ## Recent Changes (December 2025)
 
-### TFD SUS Compliance Layer (Latest)
+### TFD Companion and Pernoite Enhancements (Latest)
+- Added conditional companion data collection fields:
+  - companionCpf, companionCns, companionName (existing)
+  - companionPhone (new) for contact information
+  - companionJustification for medical justification
+- Companion fields only appear when "Sim" is selected in the form
+- Added pernoite (overnight stay) tracking:
+  - pernoite boolean field
+  - pernoiteQuantity for number of nights
+  - pernoiteNotes for additional information
+- Updated request details dialog to display companion and pernoite info
+- Form state resets when dialog opens/closes
+
+### Printable PDF Export for DATASUS BPA
+- Added PDF export endpoints for printable forms:
+  - `/api/tfd/exports/bpa/pdf` for BPA-I forms
+  - `/api/tfd/exports/apac/pdf` for APAC laudo forms
+- Changed export workflow from TXT to PDF:
+  - Forms are now generated as pre-filled PDFs
+  - User prints forms and manually enters data in DATASUS BPA system
+- Updated SUS Exports Tab with clearer instructions
+
+### TFD SUS Compliance Layer
 - Enhanced tfdRequests schema with SUS compliance fields:
   - CID-10 primary/secondary diagnosis (cidPrimary, cidSecondary)
   - IBGE municipality codes (originIbgeCode, destinationIbgeCode)

@@ -435,6 +435,11 @@ export const tfdRequests = sqliteTable("tfd_requests", {
   companionCpf: text("companion_cpf"),
   companionCns: text("companion_cns"),
   companionName: text("companion_name"),
+  companionPhone: text("companion_phone"),
+  
+  pernoite: integer("pernoite", { mode: "boolean" }).default(false),
+  pernoiteQuantity: integer("pernoite_quantity"),
+  pernoiteNotes: text("pernoite_notes"),
   
   transportType: text("transport_type", { 
     enum: ["ambulancia", "van", "onibus", "carro", "micro_onibus"] 
@@ -719,6 +724,10 @@ export const updateTfdRequestSchema = z.object({
   companionCpf: z.string().nullable().optional(),
   companionCns: z.string().nullable().optional(),
   companionName: z.string().nullable().optional(),
+  companionPhone: z.string().nullable().optional(),
+  pernoite: z.boolean().optional(),
+  pernoiteQuantity: z.number().nullable().optional(),
+  pernoiteNotes: z.string().nullable().optional(),
   transportType: z.enum(["ambulancia", "van", "onibus", "carro", "micro_onibus"]).nullable().optional(),
   urgencyLevel: z.enum(["eletivo", "urgente", "emergencia"]).optional(),
   medicalDocument: z.string().nullable().optional(),

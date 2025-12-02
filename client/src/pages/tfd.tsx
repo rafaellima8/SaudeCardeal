@@ -72,7 +72,14 @@ interface TFDRequest {
   transportType: string | null;
   companion: boolean;
   companionJustification: string | null;
+  companionName: string | null;
+  companionCpf: string | null;
+  companionCns: string | null;
+  companionPhone: string | null;
   accompaniedBy: string | null;
+  pernoite: boolean;
+  pernoiteQuantity: number | null;
+  pernoiteNotes: string | null;
   budgetVerified: boolean;
   approvedBy: string | null;
   approvedAt: string | null;
@@ -259,10 +266,10 @@ function SusExportsTab() {
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      const endpoint = `/api/tfd/exports/${exportType}`;
       const [year, month] = competencia.split('-');
       const competenciaDate = new Date(parseInt(year), parseInt(month) - 1, 1);
       
+      const endpoint = `/api/tfd/exports/${exportType}/pdf`;
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -275,36 +282,27 @@ function SusExportsTab() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Erro ao exportar' }));
-        throw new Error(errorData.error || 'Erro ao exportar');
+        const errorData = await response.json().catch(() => ({ error: 'Erro ao gerar formulário' }));
+        throw new Error(errorData.error || 'Erro ao gerar formulário');
       }
 
-      const data = await response.json();
-      
-      if (data.errors?.length > 0) {
-        toast({
-          title: 'Exportação com avisos',
-          description: `${data.recordCount} registros exportados. ${data.errors.length} avisos.`,
-          variant: 'default',
-        });
-      }
-      
-      const blob = new Blob([data.content], { type: 'text/plain;charset=utf-8' });
+      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = data.filename;
+      const formType = exportType === 'bpa' ? 'BPA-I' : 'APAC';
+      a.download = `Formulario_${formType}_${competencia.replace('-', '')}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       
       toast({
-        title: 'Exportação concluída',
-        description: `${data.recordCount} registros exportados para ${exportType.toUpperCase()}.`,
+        title: 'Formulário gerado',
+        description: `Formulário ${formType} gerado com sucesso. Imprima e insira os dados no sistema DATASUS BPA.`,
       });
     } catch (error: any) {
-      toast({ title: 'Erro na exportação', description: error.message, variant: 'destructive' });
+      toast({ title: 'Erro ao gerar formulário', description: error.message, variant: 'destructive' });
     } finally {
       setIsExporting(false);
     }
@@ -416,22 +414,22 @@ function SusExportsTab() {
       <Card className="md:col-span-2">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Download className="h-5 w-5" />
-            Exportação SUS
+            <FileText className="h-5 w-5" />
+            Formulários para Impressão
           </CardTitle>
-          <CardDescription>Gere arquivos BPA-I e APAC para envio ao SIA/SUS</CardDescription>
+          <CardDescription>Gere formulários BPA-I e APAC preenchidos para impressão e inserção manual no sistema DATASUS BPA</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-4 gap-4 mb-4">
             <div className="space-y-2">
-              <Label>Tipo de Exportação</Label>
+              <Label>Tipo de Formulário</Label>
               <Select value={exportType} onValueChange={(v) => setExportType(v as 'bpa' | 'apac')}>
                 <SelectTrigger data-testid="select-export-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="bpa">BPA-I (Individualizado)</SelectItem>
-                  <SelectItem value="apac">APAC</SelectItem>
+                  <SelectItem value="apac">APAC Laudo</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -473,9 +471,9 @@ function SusExportsTab() {
               {isExporting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                <Download className="mr-2 h-4 w-4" />
+                <FileText className="mr-2 h-4 w-4" />
               )}
-              Gerar Exportação
+              Gerar Formulário PDF
             </Button>
           </div>
 
@@ -483,12 +481,13 @@ function SusExportsTab() {
             <div className="flex items-start gap-2">
               <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5" />
               <div className="text-sm text-muted-foreground">
-                <p className="font-medium">Observações:</p>
+                <p className="font-medium">Como funciona:</p>
                 <ul className="list-disc list-inside mt-1 space-y-1">
-                  <li>BPA-I: Exporta procedimentos individualizados no formato SIA/SUS (TXT)</li>
-                  <li>APAC: Gera autorizações para procedimentos de alta complexidade (TXT)</li>
+                  <li>Este sistema gera formulários <strong>preenchidos</strong> em PDF para impressão</li>
+                  <li>Imprima os formulários e insira os dados manualmente no sistema BPA do DATASUS</li>
+                  <li>BPA-I: Formulário de produção ambulatorial individualizada</li>
+                  <li>APAC: Laudo de solicitação/autorização para procedimentos de alta complexidade</li>
                   <li>Distância mínima TFD: 50km (Portaria SAS/MS nº 55/1999)</li>
-                  <li>Apenas solicitações com status "Concluído" são exportadas</li>
                 </ul>
               </div>
             </div>
@@ -547,6 +546,8 @@ export default function TFD() {
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [completeTripDialogOpen, setCompleteTripDialogOpen] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<TFDTrip | null>(null);
+  const [formCompanion, setFormCompanion] = useState(false);
+  const [formPernoite, setFormPernoite] = useState(false);
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -714,8 +715,15 @@ export default function TFD() {
       justification: formData.get('justification'),
       urgencyLevel: formData.get('urgencyLevel') || 'eletivo',
       transportType: formData.get('transportType'),
-      companion: formData.get('companion') === 'true',
-      companionJustification: formData.get('companionJustification'),
+      companion: formCompanion,
+      companionJustification: formCompanion ? formData.get('companionJustification') : null,
+      companionName: formCompanion ? formData.get('companionName') : null,
+      companionCpf: formCompanion ? formData.get('companionCpf') : null,
+      companionCns: formCompanion ? formData.get('companionCns') : null,
+      companionPhone: formCompanion ? formData.get('companionPhone') : null,
+      pernoite: formPernoite,
+      pernoiteQuantity: formPernoite ? parseInt(formData.get('pernoiteQuantity') as string) || 1 : null,
+      pernoiteNotes: formPernoite ? formData.get('pernoiteNotes') : null,
       desiredDate: formData.get('desiredDate') ? new Date(formData.get('desiredDate') as string) : null,
       requestDate: new Date(),
     });
@@ -885,7 +893,7 @@ export default function TFD() {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button onClick={() => setIsNewRequestOpen(true)} data-testid="button-new-tfd">
+                <Button onClick={() => { setFormCompanion(false); setFormPernoite(false); setIsNewRequestOpen(true); }} data-testid="button-new-tfd">
                   <Plus className="h-4 w-4 mr-2" />
                   Nova Solicitação
                 </Button>
@@ -1318,8 +1326,8 @@ export default function TFD() {
               </div>
               <div className="space-y-2">
                 <Label>Acompanhante</Label>
-                <Select name="companion" defaultValue="false">
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select value={formCompanion ? "true" : "false"} onValueChange={(v) => setFormCompanion(v === "true")}>
+                  <SelectTrigger data-testid="select-companion"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="false">Não</SelectItem>
                     <SelectItem value="true">Sim</SelectItem>
@@ -1327,9 +1335,59 @@ export default function TFD() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Justificativa Acompanhante</Label>
-                <Input name="companionJustification" placeholder="Se necessário" />
+                <Label>Pernoite</Label>
+                <Select value={formPernoite ? "true" : "false"} onValueChange={(v) => setFormPernoite(v === "true")}>
+                  <SelectTrigger data-testid="select-pernoite"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="false">Não</SelectItem>
+                    <SelectItem value="true">Sim</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+              
+              {formCompanion && (
+                <>
+                  <div className="col-span-2 border-t pt-4">
+                    <p className="text-sm font-medium text-muted-foreground mb-3">Dados do Acompanhante</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Nome do Acompanhante *</Label>
+                    <Input name="companionName" placeholder="Nome completo" required data-testid="input-companion-name" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>CPF do Acompanhante</Label>
+                    <Input name="companionCpf" placeholder="000.000.000-00" data-testid="input-companion-cpf" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>CNS do Acompanhante</Label>
+                    <Input name="companionCns" placeholder="Cartão Nacional de Saúde" data-testid="input-companion-cns" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Telefone do Acompanhante</Label>
+                    <Input name="companionPhone" placeholder="(00) 00000-0000" data-testid="input-companion-phone" />
+                  </div>
+                  <div className="space-y-2 col-span-2">
+                    <Label>Justificativa do Acompanhante</Label>
+                    <Input name="companionJustification" placeholder="Ex: Paciente menor de idade, necessita auxílio" data-testid="input-companion-justification" />
+                  </div>
+                </>
+              )}
+
+              {formPernoite && (
+                <>
+                  <div className="col-span-2 border-t pt-4">
+                    <p className="text-sm font-medium text-muted-foreground mb-3">Dados do Pernoite</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Quantidade de Diárias</Label>
+                    <Input name="pernoiteQuantity" type="number" min="1" defaultValue="1" placeholder="1" data-testid="input-pernoite-quantity" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Observações do Pernoite</Label>
+                    <Input name="pernoiteNotes" placeholder="Informações adicionais" data-testid="input-pernoite-notes" />
+                  </div>
+                </>
+              )}
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsNewRequestOpen(false)}>Cancelar</Button>
@@ -1717,10 +1775,32 @@ export default function TFD() {
                   <Label className="text-muted-foreground">Acompanhante</Label>
                   <p className="font-medium">{selectedRequest.companion ? 'Sim' : 'Não'}</p>
                 </div>
+                <div>
+                  <Label className="text-muted-foreground">Pernoite</Label>
+                  <p className="font-medium">
+                    {selectedRequest.pernoite 
+                      ? `Sim (${selectedRequest.pernoiteQuantity || 1} diária${(selectedRequest.pernoiteQuantity || 1) > 1 ? 's' : ''})` 
+                      : 'Não'}
+                  </p>
+                </div>
               </div>
+              
+              {selectedRequest.companion && selectedRequest.companionName && (
+                <div className="p-3 bg-muted/50 rounded-md">
+                  <Label className="text-muted-foreground">Dados do Acompanhante</Label>
+                  <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
+                    <div><span className="text-muted-foreground">Nome:</span> {selectedRequest.companionName}</div>
+                    {selectedRequest.companionCpf && <div><span className="text-muted-foreground">CPF:</span> {selectedRequest.companionCpf}</div>}
+                    {selectedRequest.companionCns && <div><span className="text-muted-foreground">CNS:</span> {selectedRequest.companionCns}</div>}
+                    {selectedRequest.companionPhone && <div><span className="text-muted-foreground">Telefone:</span> {selectedRequest.companionPhone}</div>}
+                    {selectedRequest.companionJustification && <div className="col-span-2"><span className="text-muted-foreground">Justificativa:</span> {selectedRequest.companionJustification}</div>}
+                  </div>
+                </div>
+              )}
+              
               {selectedRequest.justification && (
                 <div>
-                  <Label className="text-muted-foreground">Justificativa</Label>
+                  <Label className="text-muted-foreground">Justificativa Médica</Label>
                   <p className="mt-1 text-sm">{selectedRequest.justification}</p>
                 </div>
               )}
