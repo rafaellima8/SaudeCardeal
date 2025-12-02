@@ -9,7 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Plus, Search, MapPin, Calendar, User, FileText, Loader2, 
   Car, Users, Route, CheckCircle2, XCircle, Clock, AlertTriangle,
-  Fuel, Gauge, Edit, Trash2, Play, Square
+  Fuel, Gauge, Edit, Trash2, Play, Square, Download, Calculator,
+  FileSpreadsheet, AlertCircle, BarChart3
 } from "lucide-react";
 import {
   Table,
@@ -176,6 +177,361 @@ const tripStatusConfig: Record<string, { label: string; variant: 'default' | 'se
   concluida: { label: 'Concluída', variant: 'default' },
   cancelada: { label: 'Cancelada', variant: 'destructive' },
 };
+
+interface SigtapProcedure {
+  codigo: string;
+  nome: string;
+  grupo: string;
+  valorTotal: number;
+  modalidade: string;
+  descricao: string;
+}
+
+interface TfdSummary {
+  totalRequests: number;
+  completedRequests: number;
+  totalTrips: number;
+  completedTrips: number;
+  totalPassengers: number;
+  totalKm: number;
+  totalCost: number;
+  procedureBreakdown: Array<{
+    codigo: string;
+    nome: string;
+    quantidade: number;
+    valorTotal: number;
+  }>;
+}
+
+interface TfdCalculation {
+  procedures: Array<{
+    codigo: string;
+    nome: string;
+    quantidade: number;
+    valorUnitario: number;
+    valorTotal: number;
+  }>;
+  totalValue: number;
+}
+
+function SusExportsTab() {
+  const { toast } = useToast();
+  const [exportType, setExportType] = useState<'bpa' | 'apac'>('bpa');
+  const [competencia, setCompetencia] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [distanceKm, setDistanceKm] = useState(100);
+  const [hasCompanion, setHasCompanion] = useState(false);
+  const [requiresOvernight, setRequiresOvernight] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const MIN_DISTANCE_KM = 50;
+
+  const { data: sigtapCatalog = [] } = useQuery<SigtapProcedure[]>({
+    queryKey: ['/api/tfd/sigtap'],
+  });
+
+  const { data: summary } = useQuery<TfdSummary>({
+    queryKey: ['/api/tfd/summary'],
+  });
+
+  const { data: calculation, error: calculationError } = useQuery<TfdCalculation>({
+    queryKey: ['/api/tfd/calculate', distanceKm, hasCompanion, requiresOvernight],
+    queryFn: async () => {
+      const response = await fetch('/api/tfd/calculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ distanceKm, hasCompanion, requiresOvernight }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Erro ao calcular' }));
+        throw new Error(errorData.error || 'Erro ao calcular');
+      }
+      return response.json();
+    },
+    enabled: distanceKm >= MIN_DISTANCE_KM,
+    retry: false,
+  });
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const endpoint = `/api/tfd/exports/${exportType}`;
+      const [year, month] = competencia.split('-');
+      const competenciaDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          competencia: competenciaDate.toISOString(),
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Erro ao exportar' }));
+        throw new Error(errorData.error || 'Erro ao exportar');
+      }
+
+      const data = await response.json();
+      
+      if (data.errors?.length > 0) {
+        toast({
+          title: 'Exportação com avisos',
+          description: `${data.recordCount} registros exportados. ${data.errors.length} avisos.`,
+          variant: 'default',
+        });
+      }
+      
+      const blob = new Blob([data.content], { type: 'text/plain;charset=utf-8' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = data.filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: 'Exportação concluída',
+        description: `${data.recordCount} registros exportados para ${exportType.toUpperCase()}.`,
+      });
+    } catch (error: any) {
+      toast({ title: 'Erro na exportação', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5" />
+            Resumo TFD
+          </CardTitle>
+          <CardDescription>Estatísticas do módulo de transporte</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-3 bg-muted rounded-md">
+              <p className="text-sm text-muted-foreground">Solicitações</p>
+              <p className="text-2xl font-bold">{summary?.totalRequests || 0}</p>
+              <p className="text-xs text-muted-foreground">{summary?.completedRequests || 0} concluídas</p>
+            </div>
+            <div className="p-3 bg-muted rounded-md">
+              <p className="text-sm text-muted-foreground">Viagens</p>
+              <p className="text-2xl font-bold">{summary?.totalTrips || 0}</p>
+              <p className="text-xs text-muted-foreground">{summary?.completedTrips || 0} concluídas</p>
+            </div>
+            <div className="p-3 bg-muted rounded-md">
+              <p className="text-sm text-muted-foreground">Passageiros</p>
+              <p className="text-2xl font-bold">{summary?.totalPassengers || 0}</p>
+            </div>
+            <div className="p-3 bg-muted rounded-md">
+              <p className="text-sm text-muted-foreground">Km Percorridos</p>
+              <p className="text-2xl font-bold">{summary?.totalKm?.toLocaleString('pt-BR') || 0}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calculator className="h-5 w-5" />
+            Calculadora TFD
+          </CardTitle>
+          <CardDescription>Calcule valores SIGTAP para deslocamentos</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Distância (km) - mínimo {MIN_DISTANCE_KM}km</Label>
+            <Input
+              type="number"
+              value={distanceKm}
+              onChange={(e) => setDistanceKm(Number(e.target.value))}
+              min={MIN_DISTANCE_KM}
+              data-testid="input-distance"
+            />
+            {distanceKm > 0 && distanceKm < MIN_DISTANCE_KM && (
+              <p className="text-xs text-destructive">
+                Distância mínima: {MIN_DISTANCE_KM}km (Portaria SAS/MS nº 55/1999)
+              </p>
+            )}
+          </div>
+          <div className="flex gap-4">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={hasCompanion}
+                onChange={(e) => setHasCompanion(e.target.checked)}
+                className="rounded border-input"
+                data-testid="checkbox-companion"
+              />
+              Acompanhante
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={requiresOvernight}
+                onChange={(e) => setRequiresOvernight(e.target.checked)}
+                className="rounded border-input"
+                data-testid="checkbox-overnight"
+              />
+              Pernoite
+            </label>
+          </div>
+
+          {calculation && (
+            <div className="border rounded-md p-3 space-y-2">
+              <p className="text-sm font-medium">Procedimentos:</p>
+              {calculation.procedures.map((proc, idx) => (
+                <div key={idx} className="flex justify-between text-sm">
+                  <span className="text-muted-foreground truncate max-w-[200px]" title={proc.nome}>
+                    {proc.codigo}
+                  </span>
+                  <span>
+                    {proc.quantidade}x R$ {proc.valorUnitario.toFixed(2)} = R$ {proc.valorTotal.toFixed(2)}
+                  </span>
+                </div>
+              ))}
+              <div className="border-t pt-2 flex justify-between font-medium">
+                <span>Total SIGTAP</span>
+                <span className="text-primary">R$ {calculation.totalValue.toFixed(2)}</span>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="md:col-span-2">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Download className="h-5 w-5" />
+            Exportação SUS
+          </CardTitle>
+          <CardDescription>Gere arquivos BPA-I e APAC para envio ao SIA/SUS</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-4 gap-4 mb-4">
+            <div className="space-y-2">
+              <Label>Tipo de Exportação</Label>
+              <Select value={exportType} onValueChange={(v) => setExportType(v as 'bpa' | 'apac')}>
+                <SelectTrigger data-testid="select-export-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bpa">BPA-I (Individualizado)</SelectItem>
+                  <SelectItem value="apac">APAC</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Competência</Label>
+              <Input
+                type="month"
+                value={competencia}
+                onChange={(e) => setCompetencia(e.target.value)}
+                data-testid="input-competencia"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Data Início</Label>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                data-testid="input-start-date"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Data Fim</Label>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                data-testid="input-end-date"
+              />
+            </div>
+          </div>
+          
+          <div className="flex gap-2">
+            <Button
+              onClick={handleExport}
+              disabled={isExporting}
+              data-testid="button-export"
+            >
+              {isExporting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 h-4 w-4" />
+              )}
+              Gerar Exportação
+            </Button>
+          </div>
+
+          <div className="mt-4 p-3 bg-muted/50 rounded-md">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5" />
+              <div className="text-sm text-muted-foreground">
+                <p className="font-medium">Observações:</p>
+                <ul className="list-disc list-inside mt-1 space-y-1">
+                  <li>BPA-I: Exporta procedimentos individualizados no formato SIA/SUS (TXT)</li>
+                  <li>APAC: Gera autorizações para procedimentos de alta complexidade (TXT)</li>
+                  <li>Distância mínima TFD: 50km (Portaria SAS/MS nº 55/1999)</li>
+                  <li>Apenas solicitações com status "Concluído" são exportadas</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="md:col-span-2">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileSpreadsheet className="h-5 w-5" />
+            Catálogo SIGTAP TFD
+          </CardTitle>
+          <CardDescription>Procedimentos disponíveis para Tratamento Fora do Domicílio</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Código</TableHead>
+                <TableHead>Nome</TableHead>
+                <TableHead>Modalidade</TableHead>
+                <TableHead className="text-right">Valor SP</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sigtapCatalog.map((proc) => (
+                <TableRow key={proc.codigo} data-testid={`row-sigtap-${proc.codigo}`}>
+                  <TableCell className="font-mono">{proc.codigo}</TableCell>
+                  <TableCell className="max-w-[300px] truncate" title={proc.nome}>{proc.nome}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{proc.modalidade}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right">R$ {proc.valorTotal.toFixed(2)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 export default function TFD() {
   const [activeTab, setActiveTab] = useState("requests");
@@ -492,11 +848,12 @@ export default function TFD() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList>
+        <TabsList className="flex-wrap gap-1">
           <TabsTrigger value="requests" data-testid="tab-requests">Solicitações</TabsTrigger>
           <TabsTrigger value="vehicles" data-testid="tab-vehicles">Frota</TabsTrigger>
           <TabsTrigger value="drivers" data-testid="tab-drivers">Motoristas</TabsTrigger>
           <TabsTrigger value="trips" data-testid="tab-trips">Viagens</TabsTrigger>
+          <TabsTrigger value="exports" data-testid="tab-exports">Exportações SUS</TabsTrigger>
         </TabsList>
 
         <TabsContent value="requests" className="space-y-4">
@@ -862,6 +1219,10 @@ export default function TFD() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="exports" className="space-y-4">
+          <SusExportsTab />
         </TabsContent>
       </Tabs>
 

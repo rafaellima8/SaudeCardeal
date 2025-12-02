@@ -14,6 +14,12 @@ MuniSaúde Integrado is a streamlined municipal health management system designe
   - Stock control with low stock alerts and expiration tracking
   - Dispensation workflow linked to prescriptions
 - **TFD (Inter-municipal Transport)**: Complete vehicle, driver, trip, and passenger management for patient transport
+  - SUS compliance layer with Portaria SAS/MS nº 55/1999 adherence
+  - SIGTAP TFD catalog integration (08.03.01.xxx transport procedure codes)
+  - BPA-I and APAC TXT export for SIA/SUS submission
+  - 50km minimum distance enforcement
+  - CID-10 diagnosis, IBGE municipality codes, and race/ethnicity fields
+  - APAC authorization tracking
 
 ### Removed Modules (Refactored Out)
 - Endemic Disease Control (ACE)
@@ -53,6 +59,10 @@ MuniSaúde Integrado is a streamlined municipal health management system designe
 - `server/storage.ts` - Data access layer with IStorage interface
 - `server/auth.ts` - Authentication and multi-tenant security
 - `server/services/pdf-generator.ts` - Prescription PDF generation
+- `server/services/sus-validators.ts` - SUS compliance validators (CPF, CNS, CID-10, IBGE)
+- `server/services/sigtap-tfd.ts` - SIGTAP TFD catalog and value calculation
+- `server/services/tfd-pdf-generator.ts` - BPA-I and APAC PDF generation
+- `server/services/tfd-export-service.ts` - BPA/APAC TXT export for SIA/SUS
 
 ### Frontend
 - `client/src/App.tsx` - Main routing and layout
@@ -95,6 +105,17 @@ MuniSaúde Integrado is a streamlined municipal health management system designe
 - `GET/POST /api/tfd/drivers` - Driver management
 - `GET/POST /api/tfd/trips` - Trip management
 
+### TFD SUS Compliance
+- `GET /api/tfd/sigtap` - SIGTAP TFD procedure catalog
+- `POST /api/tfd/calculate` - Calculate SIGTAP values for distance
+- `POST /api/tfd/validate` - Validate TFD request for SUS compliance
+- `POST /api/tfd/requests/:id/pdf/bpa-i` - Generate BPA-I PDF
+- `POST /api/tfd/requests/:id/pdf/apac` - Generate APAC laudo PDF
+- `POST /api/tfd/trips/:id/pdf/report` - Generate trip report PDF
+- `POST /api/tfd/exports/bpa` - Export BPA-I TXT for SIA/SUS
+- `POST /api/tfd/exports/apac` - Export APAC TXT for SIA/SUS
+- `GET /api/tfd/summary` - TFD module statistics
+
 ## Development
 
 ### Running the Application
@@ -111,7 +132,24 @@ SQLite database with automatic seeding of:
 
 ## Recent Changes (December 2025)
 
-### Refactoring
+### TFD SUS Compliance Layer (Latest)
+- Enhanced tfdRequests schema with SUS compliance fields:
+  - CID-10 primary/secondary diagnosis (cidPrimary, cidSecondary)
+  - IBGE municipality codes (originIbgeCode, destinationIbgeCode)
+  - SIGTAP procedure codes (sigtapCode, sigtapCompanionCode, sigtapValue)
+  - APAC authorization tracking (apacAuthorizationNumber, apacStatus)
+  - Patient demographics (patientRace, patientEthnicity, professionalCbo)
+  - Distance tracking (distanceKm with 50km minimum enforcement)
+  - SUS export tracking (susExported, susExportType, susExportBatch)
+- Added SIGTAP TFD catalog table (sigtapTfdCatalog)
+- Implemented SUS validators service for CPF, CNS, CID-10, IBGE validation
+- Created BPA-I and APAC PDF generators following SUS regulatory layouts
+- Developed TXT export service for SIA/SUS BPA and APAC formats
+- Added frontend SusExportsTab with SIGTAP calculator and export functionality
+- All TFD SUS endpoints now require authentication (enforceUnitScope)
+- 50km minimum distance validation enforced per Portaria SAS/MS nº 55/1999
+
+### Previous Refactoring
 - Removed ACE/Endemic disease control module
 - Removed Medical attendance/consultation workflow
 - Removed Territory management

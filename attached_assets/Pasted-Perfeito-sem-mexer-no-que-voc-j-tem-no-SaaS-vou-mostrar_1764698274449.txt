@@ -1,0 +1,364 @@
+Perfeito — sem mexer no que você já tem no SaaS, vou mostrar exatamente como integrar a geração dos formulários PDF idênticos aos templates que você anexou, usando os dados que já existem nas suas entidades (tfd_requests, tfd_trips, tfd_trip_passengers, tfd_drivers, tfd_vehicles, etc.). Vou entregar:
+
+Plano de implementação com passos concretos (sem alterar o seu modelo de dados).
+
+Mapeamento direto entre campos do SaaS → campos dos PDFs (BPA-I e APAC).
+
+Design técnico dos endpoints / eventos que disparam a geração dos PDFs.
+
+Estratégia para garantir pixel-perfect (UI de calibração + geração com pdf-lib).
+
+Observações de validação, segurança multi-tenant e exportação TXT (layout SIA/BPA).
+
+Trechos de código (Node + pdf-lib) e exemplos de configuração para incorporar já no seu projeto.
+
+Referências dos templates que você já enviou: BPA-I (formulário) 
+
+Formulario_BPA_I
+
+, Layout de Exportação BPA (TXT / layout SIA) 
+
+Layout_Exportacao_BPA
+
+, APAC Laudo (formulário) 
+
+Formulario_APAC_LAUDO
+
+.
+
+1) Princípio de funcionamento (sem alterar o seu modelo)
+
+Mapeamos os campos do SaaS para os campos dos PDFs (veja tabela abaixo).
+
+Quando ocorrer um evento (aprovação, agendamento, início de viagem, conclusão), o sistema chama o gerador de PDF que:
+
+Abre o PDF template original (os que você enviou). 
+
+Formulario_BPA_I
+
+ 
+
+Formulario_APAC_LAUDO
+
+Escreve os textos nas coordenadas calibradas do template (font, tamanho, posição).
+
+Retorna/armazen a cópia preenchida (em storage) e registra auditoria.
+
+Você mantém todas as tabelas e endpoints que já tem — eu proponho endpoints adicionais que usam os dados já existentes para gerar os PDFs.
+
+Vantagem: o modelo de dados permanece intacto; todo o trabalho é de mapping + geração de documento.
+
+2) Mapeamento (SaaS → Campos do PDF)
+
+Abaixo há um mapeamento direto; você pode usar isso para construir a função que prepara o payload (JSON) para a geração do PDF.
+
+2.1 BPA-I (Formulário individualizado) — campos principais
+
+(Template: Formulario_BPA_I.pdf). 
+
+Formulario_BPA_I
+
+Campo no PDF (rótulo visual)	Campo(s) no seu SaaS
+CNES do estabelecimento	tfd_trips.originUnitCNES ou originUnitId -> unit.cnes
+Nome do estabelecimento (solicitante)	originUnit.name
+CNS / CPF do paciente	tfd_requests.citizenId -> citizen.cns ou citizen.cpf
+Nome do paciente	citizen.name
+Data de nascimento	citizen.birthDate
+Município de residência (CEP / IBGE)	citizen.municipalityIbge
+Endereço / bairro / CEP / telefone	citizen.address, citizen.cep, citizen.phone
+Procedimento(s) solicitado(s) (código)	tfd_requests.procedure (normalize para código SIGTAP se houver)
+Data do atendimento	tfd_requests.travelDate ou tfd_trips.scheduledDeparture
+CID	tfd_requests.cid (se você armazena; senão allow null)
+Caráter de atendimento	tfd_requests.urgencyLevel → mapear para códigos do PDF
+Nº da autorização	tfd_requests.authorizationNumber (campo novo se necessário)
+Acompanhante (Sim/Não) e nome	tfd_requests.companion, tfd_requests.accompaniedBy
+Assinatura / carimbo	gerar espaço para assinatura; armazenar versão assinada digitalmente (PAdES) se exigir
+
+Observação: o form tem 3 sequências por página (seq 1/2/3). Em geral você preencherá uma sequência por paciente/atendimento. Se houver múltiplos procedimentos, gerar uma linha por procedimento no mesmo PDF ou gerar um PDF por procedimento — regra do gestor.
+
+2.2 APAC (Laudo de Solicitação / Autorização)
+
+(Template: Formulario_APAC_LAUDO.pdf). 
+
+Formulario_APAC_LAUDO
+
+Campo no PDF	Campo(s) no SaaS
+Estabelecimento solicitante CNES	originUnit.cnes
+Nome do paciente, CPF/CNS, nº prontuário	citizen fields
+Data de nascimento, sexo, raça/etnia	citizen fields
+Procedimento principal (código e nome)	tfd_requests.procedure (mapa pro SIGTAP)
+Procedimentos secundários	tfd_requests.procedureSecondary[] (se houver)
+Dados do diagnóstico histopatológico / CID 10	tfd_requests.cid e tfd_requests.diagnosticDetail
+Justificativa do(s) procedimento(s)	tfd_requests.justification
+Nome e CNS do profissional solicitante	tfd_requests.professionalId -> professional.cns
+Autorizador / assinatura / nº da autorização	preencher quando autorizado pelo gestor
+Período de validade da APAC	authorization.validFrom / validUntil (se houver)
+2.3 Como preencher campos que não existem no seu modelo
+
+Você afirmou que não quer modificar o esquema. Em alguns casos pode faltar authorizationNumber ou procedureSecondary[]. Para isso:
+
+Use campos deriváveis temporários (no payload JSON) sem adicionar colunas (recommended) — ou
+
+Adicione campos opcionais na tabela tfd_requests somente se desejar persistir autorização e histórico (recomendado para rastreabilidade).
+
+Mas a geração do PDF pode acontecer sem persistir todos os campos — basta montar o JSON com dados agregados antes de gerar o PDF.
+
+3) Fluxos / Eventos que disparam geração dos PDFs
+
+Implemente os geradores sem mudar seu modelo. Exemplos de gatilhos:
+
+Ao aprovar a solicitação (status → approved)
+
+Gera um rascunho de BPA-I e coloca disponível para download na solicitação.
+
+Notifica a unidade requisitante.
+
+Ao agendar (status → scheduled)
+
+Gera PDF final de agendamento (BPA-I com data/hora) e APAC caso seja procedimento que exija APAC.
+
+Anexa o PDF ao registro da viagem (tfd_trips.attachments[]).
+
+Ao iniciar a viagem (status viagem → in_transit)
+
+Gera relatório de viagem preliminar (PDF viagem) se desejar.
+
+Ao concluir a viagem (status → completed)
+
+Gera resumo final + documentos de prestação (KM, custos) e insere contabilização.
+
+Endpoints sugeridos (adicionais, não substituem os seus existentes):
+
+POST /api/tfd/requests/:id/generate/bpa-i → gera BPA-I preenchido e retorna PDF.
+
+POST /api/tfd/requests/:id/generate/apac → gera APAC Laudo (quando aplicável).
+
+POST /api/tfd/trips/:id/generate/trip-report → gera relatório de viagem com despesas.
+
+4) Implementação técnica (recomendada — usa o template original sem alterar o PDF)
+4.1 Abordagem recomendada: fundo PDF + pdf-lib (Node)
+
+Serve para gerar PDFs idênticos ao visual original.
+
+Fluxo: carregar PDF template → desenhar textos nas coordenadas → salvar.
+
+Biblioteca: pdf-lib (Node). Alternativa: pdfrw/PyPDF2 (Python) ou borb para geração mais avançada.
+
+Exemplo (outline) — gerar BPA-I (Node + pdf-lib)
+
+(esse código é esqueleto — coordenadas precisam calibrar):
+
+import fs from "fs";
+import { PDFDocument, StandardFonts } from "pdf-lib";
+
+export async function generateBpaIPdf(payload) {
+  const templateBytes = fs.readFileSync("./templates/Formulario_BPA_I.pdf"); // :contentReference[oaicite:7]{index=7}
+  const pdfDoc = await PDFDocument.load(templateBytes);
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const page = pdfDoc.getPage(0);
+
+  // Mapeamento de coordenadas (exemplos)
+  page.drawText(payload.cns || "", { x: 75, y: 900, size: 10, font });
+  page.drawText(payload.nomePaciente || "", { x: 75, y: 880, size: 10, font });
+  page.drawText(payload.dataNascimento || "", { x: 520, y: 880, size: 10, font });
+  // ... resto dos campos
+
+  const pdfBytes = await pdfDoc.save();
+  return pdfBytes; // enviar como application/pdf
+}
+
+
+Calibração: você precisa de um tooling para calibrar (veja seção 5).
+
+4.2 UI: mostrar formulário idêntico no browser (sem alterar PDF)
+
+No frontend: exibir a imagem do PDF (PNG) como fundo e posicionar inputs HTML (absoluto) para que o usuário veja onde preencher — isso ajuda a calibrar e testar rapidamente.
+
+Ao enviar, o frontend monta o JSON com campos e chama /generate/bpa-i.
+
+Para download no browser, salve o PDF retornado.
+
+4.3 Alternativa: Gerar AcroForm (PDF forms)
+
+Criar um PDF preenchível (AcroForm) com campos. Vantagem: pode ser preenchido direto no Acrobat.
+
+Desvantagem: inconsistent UX em browsers. Ainda pode usar pdf-lib para criar campos, mas embutir o template exige mais trabalho.
+
+5) Ferramenta de calibração / mapeamento de coordenadas (essencial para “idêntico”)
+
+Component de calibração no front: exibe template PNG e permite arrastar caixas que definem x,y,width,height de cada campo.
+
+Salvar mapeamento (templates/bpa-i.json) com coordenadas por versão do template.
+
+Gerador usa esse JSON para posicionar textos.
+
+Funcionalidades da UI de calibração:
+
+Zoom 50%–200% (para precisão)
+
+Selecionar fonte e tamanho de teste
+
+Visualizar sobreposição do PDF gerado (preview)
+
+Salvar versão com nome (ex.: BPA_I_v202312) — útil quando o governo muda layout.
+
+6) Exportação TXT (layout SIA/BPA)
+
+Seu layout (arquivo Layout_Exportacao_BPA.pdf) define campos fixos e tamanho das colunas que o SIA espera. 
+
+Layout_Exportacao_BPA
+
+Implemente um gerador de arquivo .txt conforme a especificação (cabeçalho cbc-*, linhas prd-*).
+
+Use os campos do seu SaaS para preencher prd-cnes, prd-cmp, prd-pa, prd-qt, prd-cnspac etc.
+
+Exemplo: função gerarLinhaBpaI(record) que concatena os campos com padding e termina com CRLF. (Podemos usar o snippet que já entreguei para isso.)
+
+Observação importante: valide formatos (AAAAMM, AAAAMMDD, números com padding, soma de controle descrita no layout). 
+
+Layout_Exportacao_BPA
+
+7) Segurança, multi-tenant e auditoria (não mexer nas regras que você já tem)
+
+enforceUnitScope(): continue a usar em todos os endpoints de geração; o gerador deve validar unitId do usuário contra originUnitId para evitar vazamento.
+
+Armazenamento: salvar PDFs em storage por unitId com ACL.
+
+Auditoria: registrar log quando gerar PDF (who, when, reason, templateVersion).
+
+Assinatura digital: se necessário, gerar assinatura PAdES; alternativa mais simples: guardar assinatura escaneada e inserir imagem (menos seguro).
+
+Retenção & GDPR/LGPD: criptografe documentos com PII e aplique políticas de retenção.
+
+8) Validações obrigatórias antes de gerar (checklist)
+
+CNS válido OU CPF válido (não ambos). (Manual BPA: identificar por apenas um documento). 
+
+Layout_Exportacao_BPA
+
+Município IBGE válido (6 dígitos). 
+
+Layout_Exportacao_BPA
+
+Data em formato AAAAMMDD para export TXT. 
+
+Layout_Exportacao_BPA
+
+Para APAC: CID obrigatório + justificativa clínica preenchida. 
+
+Formulario_APAC_LAUDO
+
+Para procedimentos condicionados: verificar se procedimento exige APAC ou BPA (use SIGTAP mapping).
+
+9) Exemplo de endpoints (arquitetura) — sem tocar no seu DB
+
+POST /api/tfd/requests/:id/generate/bpa-i
+
+Autorização: enforceUnitScope(), role: gestor/admin ou user dono da unidade.
+
+Ação: coleta tfd_request, join com citizen, originUnit, trip (se houver), monta payload, chama gerador, grava PDF em storage, registra auditoria.
+
+Retorno: URL temporária do PDF ou stream do PDF.
+
+POST /api/tfd/requests/:id/generate/apac
+
+Mesma ideia para APAC Laudo. Requer justificativa médica.
+
+GET /api/tfd/requests/:id/documents → lista PDFs gerados.
+
+POST /api/tfd/trips/:id/generate/trip-report → gera relatório com KM e custos.
+
+Implementação não altera as tabelas originais — apenas lê dados e gera arquivos.
+
+10) Checklist de entrega e integração (prático — faça nessa ordem)
+
+Preparar templates: coloque Formulario_BPA_I.pdf e Formulario_APAC_LAUDO.pdf em /templates. 
+
+Formulario_BPA_I
+
+ 
+
+Formulario_APAC_LAUDO
+
+Construir UI de calibração (1 dia de dev): ajustar coordenadas por campo. Salvar JSON de mapeamento.
+
+Implementar gerador Node (pdf-lib): endpoints de geração e download. (usar snippets acima).
+
+Implementar gerador TXT (layout SIA): usar especificação Layout_Exportacao_BPA.pdf. 
+
+Layout_Exportacao_BPA
+
+Integrar gatilhos: ao aprovar/agendar/concluir, invocar geração (opcional: manual via botão).
+
+Testes: preencher casos reais, comparar PDF final com rascunho impresso (pixel-perfect).
+
+Auditoria & segurança: logs, ACL, retenção.
+
+Documentação de uso: instruções de calibração + manual para usuário (como gerar e baixar).
+
+11) Trecho de código adicional: endpoint express para gerar e salvar PDF
+// routes/pdf.js (Express)
+import express from "express";
+import { generateBpaIPdf } from "../lib/pdfGenerators.js";
+import { enforceUnitScope } from "../middleware/auth.js";
+import fs from "fs";
+import path from "path";
+
+const router = express.Router();
+
+router.post("/tfd/requests/:id/generate/bpa-i", enforceUnitScope(), async (req, res) => {
+  const reqId = req.params.id;
+  // buscar dados no DB (use seu service)
+  const tfdRequest = await services.tfdRequests.findById(reqId, { include: ["citizen","originUnit","trip"] });
+  if (!tfdRequest) return res.status(404).send({ error: "Not found" });
+
+  // montar payload com mapeamento
+  const payload = mapRequestToBpaPayload(tfdRequest); // implemente essa função conforme tabela acima
+
+  // gerar pdf bytes
+  const pdfBytes = await generateBpaIPdf(payload);
+
+  // salvar em storage / attachments (path por unit)
+  const unitId = tfdRequest.originUnitId;
+  const filename = `BPAI_${reqId}_${Date.now()}.pdf`;
+  const savePath = path.join("/storage", unitId, filename);
+  fs.mkdirSync(path.dirname(savePath), { recursive: true });
+  fs.writeFileSync(savePath, pdfBytes);
+
+  // registrar auditoria (quem, quando, templateVersion)
+  await services.documents.create({ tfdRequestId: reqId, path: savePath, createdBy: req.user.id });
+
+  res.download(savePath);
+});
+
+export default router;
+
+12) Como lidar com versões e atualizações de templates do governo
+
+Sempre armazene templateVersion (ex.: BPA_I_201208a) no registro do documento gerado.
+
+Mantenha mapeamentos por versão (templates/BPA_I_v2023.json) para recalibragem fácil. 
+
+Layout_Exportacao_BPA
+
+13) Relatórios e integração com SIA
+
+Após exportar TXT no layout, envie ao gestor conforme rotina local.
+
+Mantenha histórico das remessas exportadas (nome do arquivo, competência AAAAMM, quem exportou).
+
+Gere relatórios que cruzam tfd_requests com registros exportados (para checagem de TFD e cobrança).
+
+14) Observações finais (importantes)
+
+Pixel-perfect exige calibração — eu recomendo construir a UI de calibração logo no início.
+
+Não é necessário tocar nas suas tabelas; basta montar JSONs e chamar o gerador.
+
+APAC exige justificativa clínica — bloqueie geração se faltarem campos obrigatórios. 
+
+Formulario_APAC_LAUDO
+
+Export TXT deve seguir rigidamente o layout do SIA (padding, zeros, datas). Teste com um gestor local. 
+
+Layout_Exportacao_BPA

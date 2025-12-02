@@ -303,6 +303,30 @@ export const tfdVehicles = sqliteTable("tfd_vehicles", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
+export const sigtapTfdCatalog = sqliteTable("sigtap_tfd_catalog", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  codigo: text("codigo").notNull().unique(),
+  nome: text("nome").notNull(),
+  grupo: text("grupo").notNull(),
+  subgrupo: text("subgrupo"),
+  formaOrganizacao: text("forma_organizacao"),
+  valorSp: real("valor_sp").notNull(),
+  valorSa: real("valor_sa").default(0),
+  valorTotal: real("valor_total").notNull(),
+  unidade: text("unidade").default("km"),
+  modalidade: text("modalidade", { 
+    enum: ["ambulatorial", "hospitalar"] 
+  }).notNull().default("ambulatorial"),
+  descricao: text("descricao"),
+  requerAutorizacao: integer("requer_autorizacao", { mode: "boolean" }).default(false),
+  documentoNecessario: text("documento_necessario"),
+  cboCompativel: text("cbo_compativel"),
+  distanciaMinima: integer("distancia_minima").default(50),
+  ativo: integer("ativo", { mode: "boolean" }).default(true).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
 export const tfdDrivers = sqliteTable("tfd_drivers", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   unitId: text("unit_id").notNull().references(() => healthUnits.id),
@@ -373,6 +397,31 @@ export const tfdRequests = sqliteTable("tfd_requests", {
   destinationState: text("destination_state"),
   destinationFacility: text("destination_facility"),
   
+  originIbgeCode: text("origin_ibge_code"),
+  destinationIbgeCode: text("destination_ibge_code"),
+  distanceKm: integer("distance_km"),
+  
+  cidPrimary: text("cid_primary"),
+  cidSecondary: text("cid_secondary"),
+  
+  sigtapCode: text("sigtap_code"),
+  sigtapCompanionCode: text("sigtap_companion_code"),
+  sigtapQuantity: integer("sigtap_quantity").default(1),
+  sigtapValue: real("sigtap_value"),
+  
+  apacAuthorizationNumber: text("apac_authorization_number"),
+  apacStatus: text("apac_status", { 
+    enum: ["pendente", "autorizada", "negada", "em_analise"] 
+  }),
+  apacIssuedAt: integer("apac_issued_at", { mode: "timestamp" }),
+  
+  patientRace: text("patient_race", { 
+    enum: ["branca", "preta", "parda", "amarela", "indigena", "sem_declaracao"] 
+  }),
+  patientEthnicity: text("patient_ethnicity"),
+  
+  professionalCbo: text("professional_cbo"),
+  
   reason: text("reason", { 
     enum: ["consulta", "exame", "internacao", "quimioterapia", "radioterapia", "hemodialise", "cirurgia", "outro"] 
   }).notNull(),
@@ -383,6 +432,9 @@ export const tfdRequests = sqliteTable("tfd_requests", {
   accompaniedBy: text("accompanied_by"),
   companion: integer("companion", { mode: "boolean" }).default(false),
   companionJustification: text("companion_justification"),
+  companionCpf: text("companion_cpf"),
+  companionCns: text("companion_cns"),
+  companionName: text("companion_name"),
   
   transportType: text("transport_type", { 
     enum: ["ambulancia", "van", "onibus", "carro", "micro_onibus"] 
@@ -400,6 +452,11 @@ export const tfdRequests = sqliteTable("tfd_requests", {
   budgetVerified: integer("budget_verified", { mode: "boolean" }).default(false),
   budgetNotes: text("budget_notes"),
   observations: text("observations"),
+  
+  susExported: integer("sus_exported", { mode: "boolean" }).default(false),
+  susExportedAt: integer("sus_exported_at", { mode: "timestamp" }),
+  susExportType: text("sus_export_type", { enum: ["bpa", "apac"] }),
+  susExportBatch: text("sus_export_batch"),
   
   status: text("status", { 
     enum: ["pending", "approved", "rejected", "scheduled", "in_transit", "completed", "cancelled", "no_show"] 
@@ -637,6 +694,21 @@ export const updateTfdRequestSchema = z.object({
   destinationMunicipality: z.string().nullable().optional(),
   destinationState: z.string().nullable().optional(),
   destinationFacility: z.string().nullable().optional(),
+  originIbgeCode: z.string().nullable().optional(),
+  destinationIbgeCode: z.string().nullable().optional(),
+  distanceKm: z.number().nullable().optional(),
+  cidPrimary: z.string().nullable().optional(),
+  cidSecondary: z.string().nullable().optional(),
+  sigtapCode: z.string().nullable().optional(),
+  sigtapCompanionCode: z.string().nullable().optional(),
+  sigtapQuantity: z.number().nullable().optional(),
+  sigtapValue: z.number().nullable().optional(),
+  apacAuthorizationNumber: z.string().nullable().optional(),
+  apacStatus: z.enum(["pendente", "autorizada", "negada", "em_analise"]).nullable().optional(),
+  apacIssuedAt: z.date().nullable().optional(),
+  patientRace: z.enum(["branca", "preta", "parda", "amarela", "indigena", "sem_declaracao"]).nullable().optional(),
+  patientEthnicity: z.string().nullable().optional(),
+  professionalCbo: z.string().nullable().optional(),
   reason: z.enum(["consulta", "exame", "internacao", "quimioterapia", "radioterapia", "hemodialise", "cirurgia", "outro"]).optional(),
   reasonDetail: z.string().nullable().optional(),
   procedure: z.string().nullable().optional(),
@@ -644,6 +716,9 @@ export const updateTfdRequestSchema = z.object({
   accompaniedBy: z.string().nullable().optional(),
   companion: z.boolean().optional(),
   companionJustification: z.string().nullable().optional(),
+  companionCpf: z.string().nullable().optional(),
+  companionCns: z.string().nullable().optional(),
+  companionName: z.string().nullable().optional(),
   transportType: z.enum(["ambulancia", "van", "onibus", "carro", "micro_onibus"]).nullable().optional(),
   urgencyLevel: z.enum(["eletivo", "urgente", "emergencia"]).optional(),
   medicalDocument: z.string().nullable().optional(),
@@ -652,6 +727,10 @@ export const updateTfdRequestSchema = z.object({
   budgetVerified: z.boolean().optional(),
   budgetNotes: z.string().nullable().optional(),
   observations: z.string().nullable().optional(),
+  susExported: z.boolean().optional(),
+  susExportedAt: z.date().nullable().optional(),
+  susExportType: z.enum(["bpa", "apac"]).nullable().optional(),
+  susExportBatch: z.string().nullable().optional(),
   status: z.enum(["pending", "approved", "rejected", "scheduled", "in_transit", "completed", "cancelled", "no_show"]).optional(),
   tripId: z.string().nullable().optional(),
   approvedBy: z.string().nullable().optional(),
@@ -669,6 +748,12 @@ export const updateTfdRequestSchema = z.object({
     reason: z.string().optional(),
   })).optional(),
 }).refine(data => Object.keys(data).length > 0, { message: "Nenhum campo para atualizar" });
+
+export const insertSigtapTfdCatalogSchema = createInsertSchema(sigtapTfdCatalog).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
 
 // ============================================================================
 // TYPES
@@ -721,3 +806,6 @@ export type DocumentSignature = typeof documentSignatures.$inferSelect;
 
 export type RenameCatalog = typeof renameCatalog.$inferSelect;
 export type CitizenAllergy = typeof citizenAllergies.$inferSelect;
+
+export type SigtapTfdCatalog = typeof sigtapTfdCatalog.$inferSelect;
+export type InsertSigtapTfdCatalog = z.infer<typeof insertSigtapTfdCatalogSchema>;

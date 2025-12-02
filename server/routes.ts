@@ -20,6 +20,10 @@ import {
   CROSS_UNIT_ROLES
 } from "./auth";
 import { generatePrescriptionPDF } from "./services/pdf-generator";
+import { generateBpaIPDF, generateApacPDF, generateTripReportPDF } from "./services/tfd-pdf-generator";
+import { generateBpaIExport, generateApacExport, generateTfdCsvExport, generateTfdSummaryReport } from "./services/tfd-export-service";
+import { validateTfdRequestForSUS, validateCNS, validateCPF, validateCID10, validateIBGECode } from "./services/sus-validators";
+import { SIGTAP_TFD_CATALOG, searchSigtapProcedures, calculateTFDValue, getProcedureByCodigo, validateProcedureForPatient } from "./services/sigtap-tfd";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
@@ -746,6 +750,392 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const data = { ...req.body, tripId: req.params.id };
       const passenger = await storage.createTfdTripPassenger(data);
       res.status(201).json(passenger);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // TFD SUS COMPLIANCE & EXPORTS API
+  // ============================================================================
+
+  app.get("/api/tfd/sigtap", enforceUnitScope(), async (req, res) => {
+    try {
+      const { search } = req.query;
+      const procedures = search 
+        ? searchSigtapProcedures(search as string)
+        : SIGTAP_TFD_CATALOG;
+      res.json(procedures);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/tfd/sigtap/:codigo", enforceUnitScope(), async (req, res) => {
+    try {
+      const procedure = getProcedureByCodigo(req.params.codigo);
+      if (!procedure) {
+        return res.status(404).json({ error: "Procedimento não encontrado" });
+      }
+      res.json(procedure);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/tfd/calculate", enforceUnitScope(), async (req, res) => {
+    try {
+      const { distanceKm, hasCompanion, requiresOvernight } = req.body;
+      
+      if (distanceKm === undefined || distanceKm < 0) {
+        return res.status(400).json({ error: "Distância inválida" });
+      }
+      
+      if (distanceKm < 50) {
+        return res.status(400).json({ 
+          error: "Distância mínima para TFD é 50km conforme Portaria SAS/MS nº 55/1999",
+          minDistance: 50,
+          providedDistance: distanceKm 
+        });
+      }
+      
+      const calculation = calculateTFDValue(distanceKm, hasCompanion || false, requiresOvernight || false);
+      res.json(calculation);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/tfd/validate", enforceUnitScope(), async (req, res) => {
+    try {
+      const { citizenCpf, citizenCns, destinationIbge, procedureCode, cid, companion, companionJustification, urgencyLevel, distanceKm } = req.body;
+      
+      if (distanceKm !== undefined && distanceKm < 50) {
+        return res.status(400).json({
+          valid: false,
+          errors: ["Distância mínima para TFD é 50km conforme Portaria SAS/MS nº 55/1999"],
+          warnings: []
+        });
+      }
+      
+      const result = validateTfdRequestForSUS({
+        citizenCpf,
+        citizenCns,
+        destinationIbge,
+        procedureCode,
+        cid,
+        companion,
+        companionJustification,
+        urgencyLevel,
+        distanceKm,
+      });
+      
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/tfd/requests/:id/pdf/bpa-i", enforceUnitScope(), async (req, res) => {
+    try {
+      const request = await storage.getTfdRequestById(req.params.id);
+      if (!request) {
+        return res.status(404).json({ error: "Solicitação não encontrada" });
+      }
+      
+      const citizen = await storage.getCitizenById(request.citizenId);
+      const professional = await storage.getProfessionalById(request.professionalId);
+      const unit = await storage.getHealthUnitById(request.unitId);
+      
+      if (!citizen || !professional || !unit) {
+        return res.status(404).json({ error: "Dados incompletos para geração do PDF" });
+      }
+      
+      const trip = request.tripId ? await storage.getTfdTripById(request.tripId) : null;
+      
+      const pdfBuffer = generateBpaIPDF({
+        request,
+        citizen,
+        professional,
+        unit,
+        trip,
+        authorizationNumber: req.body.authorizationNumber,
+        distanceKm: req.body.distanceKm || 100,
+      });
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=BPA-I_${request.id}.pdf`);
+      res.send(pdfBuffer);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/tfd/requests/:id/pdf/apac", enforceUnitScope(), async (req, res) => {
+    try {
+      const request = await storage.getTfdRequestById(req.params.id);
+      if (!request) {
+        return res.status(404).json({ error: "Solicitação não encontrada" });
+      }
+      
+      const citizen = await storage.getCitizenById(request.citizenId);
+      const professional = await storage.getProfessionalById(request.professionalId);
+      const unit = await storage.getHealthUnitById(request.unitId);
+      
+      if (!citizen || !professional || !unit) {
+        return res.status(404).json({ error: "Dados incompletos para geração do PDF" });
+      }
+      
+      const authorizer = req.body.authorizerId 
+        ? await storage.getProfessionalById(req.body.authorizerId)
+        : undefined;
+      
+      const pdfBuffer = generateApacPDF({
+        request,
+        citizen,
+        professional,
+        unit,
+        authorizer: authorizer || undefined,
+        authorizationNumber: req.body.authorizationNumber,
+        validityStart: req.body.validityStart ? new Date(req.body.validityStart) : undefined,
+        validityEnd: req.body.validityEnd ? new Date(req.body.validityEnd) : undefined,
+      });
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=APAC_${request.id}.pdf`);
+      res.send(pdfBuffer);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/tfd/trips/:id/pdf/report", enforceUnitScope(), async (req, res) => {
+    try {
+      const trip = await storage.getTfdTripById(req.params.id);
+      if (!trip) {
+        return res.status(404).json({ error: "Viagem não encontrada" });
+      }
+      
+      const vehicle = await storage.getTfdVehicleById(trip.vehicleId);
+      const driver = await storage.getTfdDriverById(trip.driverId);
+      const unit = await storage.getHealthUnitById(trip.unitId);
+      
+      if (!vehicle || !driver || !unit) {
+        return res.status(404).json({ error: "Dados incompletos para geração do relatório" });
+      }
+      
+      const tripPassengers = await storage.getTfdTripPassengers(trip.id);
+      const passengers = [];
+      
+      for (const tp of tripPassengers) {
+        const citizen = await storage.getCitizenById(tp.citizenId);
+        const request = tp.requestId ? await storage.getTfdRequestById(tp.requestId) : null;
+        if (citizen && request) {
+          passengers.push({
+            citizen,
+            request,
+            isCompanion: tp.isCompanion || false,
+          });
+        }
+      }
+      
+      const pdfBuffer = generateTripReportPDF({
+        trip,
+        vehicle,
+        driver,
+        unit,
+        passengers,
+      });
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=Relatorio_Viagem_${trip.id}.pdf`);
+      res.send(pdfBuffer);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/tfd/exports/bpa", enforceUnitScope(), async (req, res) => {
+    try {
+      const { competencia, startDate, endDate } = req.body;
+      const effectiveUnitId = getEffectiveUnitId(req);
+      
+      const requests = await storage.getTfdRequests({
+        unitId: effectiveUnitId || undefined,
+        status: 'completed',
+      });
+      
+      const filteredRequests = requests.filter(r => {
+        const date = new Date(r.travelDate || r.createdAt);
+        if (startDate && date < new Date(startDate)) return false;
+        if (endDate && date > new Date(endDate)) return false;
+        return true;
+      });
+      
+      const records = [];
+      for (const request of filteredRequests) {
+        const citizen = await storage.getCitizenById(request.citizenId);
+        const professional = await storage.getProfessionalById(request.professionalId);
+        const unit = await storage.getHealthUnitById(request.unitId);
+        const trip = request.tripId ? await storage.getTfdTripById(request.tripId) : null;
+        
+        if (citizen && professional && unit) {
+          records.push({
+            request,
+            citizen,
+            professional,
+            unit,
+            trip,
+            distanceKm: trip?.totalKm || 100,
+          });
+        }
+      }
+      
+      const result = generateBpaIExport(records, {
+        competencia: competencia ? new Date(competencia) : new Date(),
+        orgaoResponsavel: 'SECRETARIA MUNICIPAL DE SAUDE',
+        siglaOrgao: 'SMS',
+        cgcCpf: '14126437000176',
+        orgaoDestino: 'SECRETARIA ESTADUAL DE SAUDE - BAHIA',
+        destinoIndicador: 'E',
+        versao: '3.0.0',
+      });
+      
+      res.json({
+        filename: result.filename,
+        content: result.content,
+        recordCount: result.recordCount,
+        sheetCount: result.sheetCount,
+        errors: result.errors,
+        warnings: result.warnings,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/tfd/exports/apac", enforceUnitScope(), async (req, res) => {
+    try {
+      const { competencia, startDate, endDate } = req.body;
+      const effectiveUnitId = getEffectiveUnitId(req);
+      
+      const requests = await storage.getTfdRequests({
+        unitId: effectiveUnitId || undefined,
+        status: 'completed',
+      });
+      
+      const filteredRequests = requests.filter(r => {
+        const date = new Date(r.travelDate || r.createdAt);
+        if (startDate && date < new Date(startDate)) return false;
+        if (endDate && date > new Date(endDate)) return false;
+        return true;
+      });
+      
+      const records = [];
+      let apacCounter = 1;
+      
+      for (const request of filteredRequests) {
+        const citizen = await storage.getCitizenById(request.citizenId);
+        const professional = await storage.getProfessionalById(request.professionalId);
+        const unit = await storage.getHealthUnitById(request.unitId);
+        const authorizer = request.approvedBy ? await storage.getProfessionalById(request.approvedBy) : undefined;
+        
+        if (citizen && professional && unit) {
+          const now = new Date();
+          const validityStart = new Date(request.travelDate || request.createdAt);
+          const validityEnd = new Date(validityStart);
+          validityEnd.setMonth(validityEnd.getMonth() + 3);
+          
+          records.push({
+            request,
+            citizen,
+            professional,
+            unit,
+            authorizer: authorizer || undefined,
+            authorizationNumber: `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(apacCounter++).padStart(7, '0')}`,
+            validityStart,
+            validityEnd,
+          });
+        }
+      }
+      
+      const result = generateApacExport(records, {
+        competencia: competencia ? new Date(competencia) : new Date(),
+        orgaoResponsavel: 'SECRETARIA MUNICIPAL DE SAUDE',
+        siglaOrgao: 'SMS',
+        cgcCpf: '14126437000176',
+        orgaoDestino: 'SECRETARIA ESTADUAL DE SAUDE - BAHIA',
+        destinoIndicador: 'E',
+        versao: '3.0.0',
+        codUf: '29',
+      });
+      
+      res.json({
+        filename: result.filename,
+        content: result.content,
+        recordCount: result.recordCount,
+        errors: result.errors,
+        warnings: result.warnings,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/tfd/exports/csv", enforceUnitScope(), async (req, res) => {
+    try {
+      const { startDate, endDate, status } = req.body;
+      const effectiveUnitId = getEffectiveUnitId(req);
+      
+      const requests = await storage.getTfdRequests({
+        unitId: effectiveUnitId || undefined,
+        status: status || undefined,
+      });
+      
+      const filteredRequests = requests.filter(r => {
+        const date = new Date(r.createdAt);
+        if (startDate && date < new Date(startDate)) return false;
+        if (endDate && date > new Date(endDate)) return false;
+        return true;
+      });
+      
+      const records = [];
+      for (const request of filteredRequests) {
+        const citizen = await storage.getCitizenById(request.citizenId);
+        const professional = await storage.getProfessionalById(request.professionalId);
+        const unit = await storage.getHealthUnitById(request.unitId);
+        const trip = request.tripId ? await storage.getTfdTripById(request.tripId) : null;
+        
+        if (citizen && professional && unit) {
+          records.push({ request, citizen, professional, unit, trip });
+        }
+      }
+      
+      const csvContent = generateTfdCsvExport(records);
+      
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename=TFD_Export_${new Date().toISOString().split('T')[0]}.csv`);
+      res.send('\uFEFF' + csvContent);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/tfd/summary", enforceUnitScope(), async (req, res) => {
+    try {
+      const effectiveUnitId = getEffectiveUnitId(req);
+      
+      const requests = await storage.getTfdRequests({ unitId: effectiveUnitId || undefined });
+      const trips = await storage.getTfdTrips({ unitId: effectiveUnitId || undefined });
+      
+      const allPassengers = [];
+      for (const trip of trips) {
+        const passengers = await storage.getTfdTripPassengers(trip.id);
+        allPassengers.push(...passengers);
+      }
+      
+      const summary = generateTfdSummaryReport(requests, trips, allPassengers);
+      res.json(summary);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
