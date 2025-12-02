@@ -115,6 +115,7 @@ MuniSaúde Integrado is a streamlined municipal health management system designe
 - `POST /api/tfd/exports/bpa` - Export BPA-I TXT for SIA/SUS
 - `POST /api/tfd/exports/apac` - Export APAC TXT for SIA/SUS
 - `POST /api/tfd/exports/bpa/pdf` - Generate printable BPA-I PDF form
+- `POST /api/tfd/exports/bpa-c/pdf` - Generate printable BPA-C (Consolidado) PDF form
 - `POST /api/tfd/exports/apac/pdf` - Generate printable APAC PDF form
 - `GET /api/tfd/summary` - TFD module statistics
 

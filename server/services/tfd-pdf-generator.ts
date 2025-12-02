@@ -983,3 +983,168 @@ export function generateTripReportPDF(data: TripReportData): Buffer {
   
   return Buffer.from(doc.output('arraybuffer'));
 }
+
+// BPA-C (Consolidated) PDF Generator
+interface BpaCData {
+  unit: HealthUnit;
+  competencia: Date;
+  procedures: Array<{ codigo: string; nome: string; quantidade: number }>;
+  totalRequests: number;
+}
+
+export function generateBpaCPDF(data: BpaCData): Buffer {
+  const { unit, competencia, procedures, totalRequests } = data;
+  
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  
+  // Header
+  doc.setFillColor(0, 102, 51);
+  doc.rect(0, 0, pageWidth, 25, 'F');
+  
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Ministério da Saúde', 15, 8);
+  
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Sistema Único de Saúde', 15, 13);
+  
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text('BPA-C', pageWidth - 40, 10);
+  doc.setFontSize(8);
+  doc.text('Boletim de Produção Ambulatorial', pageWidth - 55, 15);
+  doc.text('Consolidado', pageWidth - 45, 20);
+  
+  let y = 32;
+  
+  // Unit identification
+  doc.setTextColor(0, 0, 0);
+  doc.setFillColor(240, 240, 240);
+  doc.rect(10, y, pageWidth - 20, 8, 'F');
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text('IDENTIFICAÇÃO DO ESTABELECIMENTO DE SAÚDE', 15, y + 5.5);
+  y += 12;
+  
+  doc.setDrawColor(0);
+  doc.setLineWidth(0.3);
+  doc.rect(10, y, pageWidth - 20, 20);
+  
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.text('NOME DO ESTABELECIMENTO DE SAÚDE', 12, y + 4);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text(unit.name, 12, y + 10);
+  
+  doc.line(pageWidth - 50, y, pageWidth - 50, y + 20);
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.text('CNES', pageWidth - 48, y + 4);
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text(unit.cnes, pageWidth - 48, y + 12);
+  
+  y += 25;
+  
+  // Competência
+  doc.rect(10, y, 60, 12);
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.text('COMPETÊNCIA (MÊS/ANO)', 12, y + 4);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  const mesAno = `${String(competencia.getMonth() + 1).padStart(2, '0')}/${competencia.getFullYear()}`;
+  doc.text(mesAno, 12, y + 10);
+  
+  doc.rect(70, y, 60, 12);
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.text('TOTAL DE SOLICITAÇÕES', 72, y + 4);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text(String(totalRequests), 72, y + 10);
+  
+  doc.rect(130, y, 70, 12);
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.text('FOLHA', 132, y + 4);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text('001 de 001', 132, y + 10);
+  
+  y += 20;
+  
+  // Procedures table header
+  doc.setFillColor(240, 240, 240);
+  doc.rect(10, y, pageWidth - 20, 8, 'F');
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text('PROCEDIMENTOS CONSOLIDADOS - TFD', 15, y + 5.5);
+  y += 12;
+  
+  // Table
+  autoTable(doc, {
+    startY: y,
+    head: [['CÓD. PROCEDIMENTO', 'DESCRIÇÃO DO PROCEDIMENTO', 'QUANTIDADE']],
+    body: procedures.map(p => [p.codigo, p.nome, String(p.quantidade)]),
+    theme: 'grid',
+    headStyles: { 
+      fillColor: [0, 102, 51], 
+      fontSize: 8,
+      fontStyle: 'bold',
+      halign: 'center',
+    },
+    bodyStyles: { fontSize: 9 },
+    columnStyles: {
+      0: { cellWidth: 35, halign: 'center' },
+      1: { cellWidth: 120 },
+      2: { cellWidth: 30, halign: 'center' },
+    },
+  });
+  
+  y = (doc as any).lastAutoTable.finalY + 10;
+  
+  // Total row
+  const totalQtd = procedures.reduce((sum, p) => sum + p.quantidade, 0);
+  doc.setFillColor(230, 240, 230);
+  doc.rect(10, y, pageWidth - 20, 10, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('TOTAL GERAL DE PROCEDIMENTOS:', 15, y + 7);
+  doc.text(String(totalQtd), pageWidth - 35, y + 7);
+  
+  y += 20;
+  
+  // Signature area
+  doc.setFillColor(240, 240, 240);
+  doc.rect(10, y, pageWidth - 20, 8, 'F');
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text('AUTENTICAÇÃO', 15, y + 5.5);
+  y += 12;
+  
+  doc.rect(10, y, (pageWidth - 20) / 2, 30);
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.text('ASSINATURA E CARIMBO DO RESPONSÁVEL', 15, y + 4);
+  
+  doc.rect(10 + (pageWidth - 20) / 2, y, (pageWidth - 20) / 2, 30);
+  doc.text('DATA', 15 + (pageWidth - 20) / 2, y + 4);
+  doc.setFontSize(10);
+  doc.text(new Date().toLocaleDateString('pt-BR'), 15 + (pageWidth - 20) / 2, y + 15);
+  
+  // Footer
+  doc.setFillColor(0, 102, 51);
+  doc.rect(0, pageHeight - 8, pageWidth, 8, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(7);
+  doc.text('MuniSaúde Integrado - BPA-C TFD', 15, pageHeight - 3);
+  doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')}`, pageWidth - 50, pageHeight - 3);
+  
+  return Buffer.from(doc.output('arraybuffer'));
+}

@@ -1181,6 +1181,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // BPA-C (Consolidated) PDF export
+  app.post("/api/tfd/exports/bpa-c/pdf", enforceUnitScope(), async (req, res) => {
+    try {
+      const { competencia, startDate, endDate } = req.body;
+      const effectiveUnitId = getEffectiveUnitId(req);
+      
+      const requests = await storage.getTfdRequests({
+        unitId: effectiveUnitId || undefined,
+        status: 'completed',
+      });
+      
+      const filteredRequests = requests.filter(r => {
+        const date = new Date(r.travelDate || r.createdAt);
+        if (startDate && date < new Date(startDate)) return false;
+        if (endDate && date > new Date(endDate)) return false;
+        return true;
+      });
+
+      if (filteredRequests.length === 0) {
+        return res.status(404).json({ error: 'Nenhuma solicitação concluída encontrada para o período' });
+      }
+
+      // Get unit info for the header
+      const unit = await storage.getHealthUnitById(effectiveUnitId || filteredRequests[0].unitId);
+      if (!unit) {
+        return res.status(404).json({ error: 'Unidade de saúde não encontrada' });
+      }
+
+      // Consolidate procedures by code
+      const procedureMap: Record<string, { codigo: string; nome: string; quantidade: number }> = {};
+      
+      for (const request of filteredRequests) {
+        const procCode = request.sigtapCode || request.procedureCode || '0803010125';
+        if (!procedureMap[procCode]) {
+          const { getProcedureByCodigo } = await import('./services/sigtap-tfd');
+          const proc = getProcedureByCodigo(procCode);
+          procedureMap[procCode] = {
+            codigo: procCode,
+            nome: proc?.nome || 'DESLOCAMENTO DE PACIENTE',
+            quantidade: 0,
+          };
+        }
+        procedureMap[procCode].quantidade += 1;
+        
+        // Add companion procedure if applicable
+        if (request.companion && request.sigtapCompanionCode) {
+          const compCode = request.sigtapCompanionCode;
+          if (!procedureMap[compCode]) {
+            const { getProcedureByCodigo } = await import('./services/sigtap-tfd');
+            const proc = getProcedureByCodigo(compCode);
+            procedureMap[compCode] = {
+              codigo: compCode,
+              nome: proc?.nome || 'DESLOCAMENTO DE ACOMPANHANTE',
+              quantidade: 0,
+            };
+          }
+          procedureMap[compCode].quantidade += 1;
+        }
+      }
+
+      const procedures = Object.values(procedureMap);
+      const competenciaDate = competencia ? new Date(competencia) : new Date();
+
+      // Generate BPA-C PDF
+      const { generateBpaCPDF } = await import('./services/tfd-pdf-generator');
+      const pdfBuffer = generateBpaCPDF({
+        unit,
+        competencia: competenciaDate,
+        procedures,
+        totalRequests: filteredRequests.length,
+      });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=BPA-C_${new Date().toISOString().split('T')[0]}.pdf`);
+      res.send(pdfBuffer);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post("/api/tfd/exports/apac/pdf", enforceUnitScope(), async (req, res) => {
     try {
       const { competencia, startDate, endDate } = req.body;

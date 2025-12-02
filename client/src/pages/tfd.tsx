@@ -223,7 +223,7 @@ interface TfdCalculation {
 
 function SusExportsTab() {
   const { toast } = useToast();
-  const [exportType, setExportType] = useState<'bpa' | 'apac'>('bpa');
+  const [exportType, setExportType] = useState<'bpa-i' | 'bpa-c' | 'apac'>('bpa-i');
   const [competencia, setCompetencia] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -269,7 +269,10 @@ function SusExportsTab() {
       const [year, month] = competencia.split('-');
       const competenciaDate = new Date(parseInt(year), parseInt(month) - 1, 1);
       
-      const endpoint = `/api/tfd/exports/${exportType}/pdf`;
+      // Map export type to endpoint path
+      const endpointPath = exportType === 'bpa-i' ? 'bpa' : exportType === 'bpa-c' ? 'bpa-c' : 'apac';
+      const endpoint = `/api/tfd/exports/${endpointPath}/pdf`;
+      
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -290,7 +293,7 @@ function SusExportsTab() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      const formType = exportType === 'bpa' ? 'BPA-I' : 'APAC';
+      const formType = exportType === 'bpa-i' ? 'BPA-I' : exportType === 'bpa-c' ? 'BPA-C' : 'APAC';
       a.download = `Formulario_${formType}_${competencia.replace('-', '')}.pdf`;
       document.body.appendChild(a);
       a.click();
@@ -423,12 +426,13 @@ function SusExportsTab() {
           <div className="grid md:grid-cols-4 gap-4 mb-4">
             <div className="space-y-2">
               <Label>Tipo de Formulário</Label>
-              <Select value={exportType} onValueChange={(v) => setExportType(v as 'bpa' | 'apac')}>
+              <Select value={exportType} onValueChange={(v) => setExportType(v as 'bpa-i' | 'bpa-c' | 'apac')}>
                 <SelectTrigger data-testid="select-export-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="bpa">BPA-I (Individualizado)</SelectItem>
+                  <SelectItem value="bpa-i">BPA-I (Individualizado)</SelectItem>
+                  <SelectItem value="bpa-c">BPA-C (Consolidado)</SelectItem>
                   <SelectItem value="apac">APAC Laudo</SelectItem>
                 </SelectContent>
               </Select>
@@ -485,8 +489,9 @@ function SusExportsTab() {
                 <ul className="list-disc list-inside mt-1 space-y-1">
                   <li>Este sistema gera formulários <strong>preenchidos</strong> em PDF para impressão</li>
                   <li>Imprima os formulários e insira os dados manualmente no sistema BPA do DATASUS</li>
-                  <li>BPA-I: Formulário de produção ambulatorial individualizada</li>
-                  <li>APAC: Laudo de solicitação/autorização para procedimentos de alta complexidade</li>
+                  <li><strong>BPA-I:</strong> Produção ambulatorial individualizada (por paciente)</li>
+                  <li><strong>BPA-C:</strong> Produção ambulatorial consolidada (totais por procedimento)</li>
+                  <li><strong>APAC:</strong> Laudo de solicitação/autorização para alta complexidade</li>
                   <li>Distância mínima TFD: 50km (Portaria SAS/MS nº 55/1999)</li>
                 </ul>
               </div>
