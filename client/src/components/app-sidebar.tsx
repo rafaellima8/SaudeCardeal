@@ -1,13 +1,11 @@
 import {
   Home,
   Users,
-  Calendar,
   Pill,
   Truck,
   FileText,
   Building2,
   UserCog,
-  BarChart3,
   ChevronDown,
   LogOut,
   FileCheck,
@@ -37,7 +35,6 @@ import { useLocation } from "wouter";
 const allMenuItems = [
   { title: "Dashboard", icon: Home, url: "/" },
   { title: "Pacientes", icon: Users, url: "/pacientes" },
-  { title: "Agendamentos", icon: Calendar, url: "/agendamentos" },
   { title: "Prescrições", icon: FileCheck, url: "/prescricoes" },
   { title: "Farmácia", icon: Pill, url: "/farmacia" },
   { title: "Dispensação", icon: Pill, url: "/farmacia/dispensacao" },
@@ -49,8 +46,6 @@ const allMenuItems = [
 const allConfigItems = [
   { title: "Unidades", icon: Building2, url: "/unidades" },
   { title: "Profissionais", icon: UserCog, url: "/profissionais" },
-  { title: "Indicadores", icon: BarChart3, url: "/indicadores" },
-  { title: "Configuração de Agenda", icon: Calendar, url: "/admin/agenda-config" },
 ];
 
 const roleLabels: Record<string, string> = {

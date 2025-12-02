@@ -14,7 +14,6 @@ import { Badge } from "@/components/ui/badge";
 import Dashboard from "@/pages/dashboard";
 import Patients from "@/pages/patients";
 import PatientDetail from "@/pages/patient-detail";
-import Appointments from "@/pages/appointments";
 import Prescriptions from "@/pages/prescriptions";
 import Pharmacy from "@/pages/pharmacy";
 import PharmacyDispensation from "@/pages/pharmacy-dispensation";
@@ -23,9 +22,6 @@ import TFD from "@/pages/tfd";
 import Reports from "@/pages/reports";
 import Units from "@/pages/units";
 import Professionals from "@/pages/professionals";
-import Indicators from "@/pages/indicators";
-import DynamicFormsAdmin from "@/pages/admin/dynamic-forms-admin";
-import ScheduleConfig from "@/pages/schedule-config";
 import LoginPage from "@/pages/login";
 import Profile from "@/pages/profile";
 import Settings from "@/pages/settings";
@@ -38,7 +34,6 @@ function ProtectedRoutes() {
       <Route path="/" component={Dashboard} />
       <Route path="/pacientes" component={Patients} />
       <Route path="/pacientes/:id" component={PatientDetail} />
-      <Route path="/agendamentos" component={Appointments} />
       <Route path="/prescricoes" component={Prescriptions} />
       <Route path="/farmacia" component={Pharmacy} />
       <Route path="/farmacia/dispensacao" component={PharmacyDispensation} />
@@ -47,9 +42,6 @@ function ProtectedRoutes() {
       <Route path="/relatorios" component={Reports} />
       <Route path="/unidades" component={Units} />
       <Route path="/profissionais" component={Professionals} />
-      <Route path="/indicadores" component={Indicators} />
-      <Route path="/admin/formularios-dinamicos" component={DynamicFormsAdmin} />
-      <Route path="/admin/agenda-config" component={ScheduleConfig} />
       <Route path="/perfil" component={Profile} />
       <Route path="/configuracoes" component={Settings} />
       <Route component={NotFound} />
@@ -131,7 +123,7 @@ function AppContent() {
   return <AuthenticatedApp />;
 }
 
-function App() {
+export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -141,5 +133,3 @@ function App() {
     </QueryClientProvider>
   );
 }
-
-export default App;
