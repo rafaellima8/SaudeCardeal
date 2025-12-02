@@ -1,10 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import type { Consultation, Citizen, Professional, HealthUnit, Prescription } from '@shared/schema';
+import type { Citizen, Professional, HealthUnit, Prescription } from '@shared/schema';
 
-/**
- * Gera logo SVG como string para uso em PDFs
- */
 function generateLogoSvg(options: { width: number; height: number; variant?: 'color' | 'inverse' } = { width: 32, height: 32 }): string {
   const { width, height, variant = 'color' } = options;
   
@@ -31,23 +28,17 @@ function generateLogoSvg(options: { width: number; height: number; variant?: 'co
   return svg;
 }
 
-/**
- * Adiciona cabeçalho institucional padrão ao PDF
- */
 function addInstitutionalHeader(doc: jsPDF, unit: HealthUnit): number {
   const pageWidth = doc.internal.pageSize.getWidth();
   let yPosition = 15;
 
-  // Faixa verde institucional
-  doc.setFillColor(16, 185, 129); // Verde saúde #10B981
+  doc.setFillColor(16, 185, 129);
   doc.rect(0, 0, pageWidth, 45, 'F');
 
-  // Logo SVG
   const logoSvg = generateLogoSvg({ width: 32, height: 32, variant: 'inverse' });
   const logoDataUri = `data:image/svg+xml;base64,${Buffer.from(logoSvg).toString('base64')}`;
   doc.addImage(logoDataUri, 'SVG', 15, 12, 20, 20);
 
-  // Texto do cabeçalho
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
@@ -66,12 +57,9 @@ function addInstitutionalHeader(doc: jsPDF, unit: HealthUnit): number {
   doc.setFontSize(9);
   doc.text(unit.address, pageWidth / 2, yPosition, { align: 'center' });
 
-  return 55; // Retorna a posição Y após o cabeçalho
+  return 55;
 }
 
-/**
- * Adiciona rodapé ao PDF
- */
 function addFooter(doc: jsPDF) {
   const pageHeight = doc.internal.pageSize.getHeight();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -95,9 +83,6 @@ function addFooter(doc: jsPDF) {
   );
 }
 
-/**
- * Calcula idade a partir da data de nascimento
- */
 function calculateAge(birthDate: Date): number {
   const today = new Date();
   let age = today.getFullYear() - birthDate.getFullYear();
@@ -110,29 +95,30 @@ function calculateAge(birthDate: Date): number {
   return age;
 }
 
-/**
- * Interface para dados de prescrição médica
- */
-export interface PrescriptionPDFData {
-  consultation: Consultation;
-  citizen: Citizen;
-  professional: Professional;
-  unit: HealthUnit;
-  prescriptions: Prescription[];
-}
+const administrationRouteLabels: Record<string, string> = {
+  oral: 'Via oral',
+  topical: 'Uso tópico',
+  injectable: 'Injetável',
+  inhalation: 'Inalatório',
+  sublingual: 'Sublingual',
+  rectal: 'Retal',
+  ophthalmic: 'Oftálmico',
+  nasal: 'Nasal',
+  auricular: 'Auricular',
+};
 
-/**
- * Gera PDF de Receita Médica
- */
-export function generatePrescriptionPDF(data: PrescriptionPDFData): Buffer {
+export function generatePrescriptionPDF(
+  prescription: Prescription,
+  citizen: Citizen,
+  professional: Professional,
+  unit: HealthUnit
+): Buffer {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   
-  // Cabeçalho institucional
-  let yPosition = addInstitutionalHeader(doc, data.unit);
+  let yPosition = addInstitutionalHeader(doc, unit);
   yPosition += 5;
 
-  // Título do documento
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
@@ -144,115 +130,133 @@ export function generatePrescriptionPDF(data: PrescriptionPDFData): Buffer {
   doc.line(15, yPosition, pageWidth - 15, yPosition);
   yPosition += 8;
 
-  // Dados do Profissional
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.text('Médico(a):', 15, yPosition);
   doc.setFont('helvetica', 'normal');
-  doc.text(data.professional.name, 40, yPosition);
+  doc.text(professional.name, 45, yPosition);
   
   yPosition += 6;
   doc.setFont('helvetica', 'bold');
-  doc.text(`${data.professional.councilType}:`, 15, yPosition);
+  doc.text(`${professional.councilType}:`, 15, yPosition);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${data.professional.councilNumber} - ${data.professional.councilState}`, 40, yPosition);
+  doc.text(`${professional.councilNumber} - ${professional.councilState}`, 45, yPosition);
   
   yPosition += 6;
   doc.setFont('helvetica', 'bold');
   doc.text('Especialidade:', 15, yPosition);
   doc.setFont('helvetica', 'normal');
-  doc.text(data.professional.specialty, 40, yPosition);
+  doc.text(professional.specialty, 55, yPosition);
   
   yPosition += 10;
 
-  // Dados do Paciente
   doc.setFont('helvetica', 'bold');
   doc.text('Paciente:', 15, yPosition);
   doc.setFont('helvetica', 'normal');
-  doc.text(data.citizen.name, 40, yPosition);
+  doc.text(citizen.name, 45, yPosition);
   
   yPosition += 6;
-  const age = calculateAge(data.citizen.birthDate);
+  const age = calculateAge(citizen.birthDate);
   doc.setFont('helvetica', 'bold');
   doc.text('Idade:', 15, yPosition);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${age} anos`, 40, yPosition);
+  doc.text(`${age} anos`, 35, yPosition);
   
-  if (data.citizen.cns) {
+  if (citizen.cns) {
     doc.setFont('helvetica', 'bold');
-    doc.text('CNS:', 100, yPosition);
+    doc.text('CNS:', 80, yPosition);
     doc.setFont('helvetica', 'normal');
-    doc.text(data.citizen.cns, 115, yPosition);
+    doc.text(citizen.cns, 95, yPosition);
   }
   
+  yPosition += 6;
+  doc.setFont('helvetica', 'bold');
+  doc.text('CPF:', 15, yPosition);
+  doc.setFont('helvetica', 'normal');
+  doc.text(citizen.cpf, 30, yPosition);
+
   yPosition += 6;
   doc.setFont('helvetica', 'bold');
   doc.text('Data:', 15, yPosition);
   doc.setFont('helvetica', 'normal');
-  doc.text(new Date(data.consultation.consultationDate).toLocaleDateString('pt-BR'), 40, yPosition);
+  doc.text(new Date(prescription.createdAt).toLocaleDateString('pt-BR'), 35, yPosition);
   
   yPosition += 12;
   doc.setDrawColor(200, 200, 200);
   doc.line(15, yPosition, pageWidth - 15, yPosition);
-  yPosition += 8;
+  yPosition += 10;
 
-  // Prescrições
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
   doc.text('PRESCRIÇÃO:', 15, yPosition);
-  yPosition += 8;
+  yPosition += 10;
 
-  if (data.prescriptions.length === 0) {
-    doc.setFontSize(10);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(0, 0, 0);
+  doc.text(`1. ${prescription.medication}`, 15, yPosition);
+  yPosition += 6;
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  
+  const details: string[] = [];
+  if (prescription.dosage) details.push(`Dosagem: ${prescription.dosage}${prescription.dosageUnit || ''}`);
+  if (prescription.administrationRoute) {
+    details.push(`Via: ${administrationRouteLabels[prescription.administrationRoute] || prescription.administrationRoute}`);
+  }
+  if (prescription.frequency) details.push(`Frequência: ${prescription.frequency}`);
+  if (prescription.duration) details.push(`Duração: ${prescription.duration}`);
+  if (prescription.quantity) details.push(`Quantidade: ${prescription.quantity}`);
+  
+  if (details.length > 0) {
+    doc.text(details.join(' | '), 20, yPosition);
+    yPosition += 6;
+  }
+  
+  if (prescription.instructions) {
+    yPosition += 2;
     doc.setFont('helvetica', 'italic');
-    doc.setTextColor(100, 100, 100);
-    doc.text('Nenhum medicamento prescrito', 15, yPosition);
-  } else {
-    data.prescriptions.forEach((prescription, index) => {
-      // Verificar se precisa de nova página
-      if (yPosition > 240) {
-        doc.addPage();
-        yPosition = 20;
-      }
-
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 0, 0);
-      doc.text(`${index + 1}. ${prescription.medication}`, 15, yPosition);
-      yPosition += 6;
-
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      
-      const details: string[] = [];
-      if (prescription.dosage) details.push(`Dosagem: ${prescription.dosage}`);
-      if (prescription.route) details.push(`Via: ${prescription.route}`);
-      if (prescription.frequency) details.push(`Frequência: ${prescription.frequency}`);
-      if (prescription.duration) details.push(`Duração: ${prescription.duration}`);
-      
-      if (details.length > 0) {
-        doc.text(details.join(' | '), 20, yPosition);
-        yPosition += 6;
-      }
-      
-      if (prescription.instructions) {
-        doc.setFont('helvetica', 'italic');
-        doc.setTextColor(60, 60, 60);
-        const splitInstructions = doc.splitTextToSize(prescription.instructions, pageWidth - 40);
-        doc.text(splitInstructions, 20, yPosition);
-        yPosition += (splitInstructions.length * 5) + 2;
-        doc.setTextColor(0, 0, 0);
-      }
-      
-      yPosition += 4;
-    });
+    doc.setTextColor(60, 60, 60);
+    const splitInstructions = doc.splitTextToSize(`Orientações: ${prescription.instructions}`, pageWidth - 40);
+    doc.text(splitInstructions, 20, yPosition);
+    yPosition += (splitInstructions.length * 5) + 2;
+    doc.setTextColor(0, 0, 0);
   }
 
-  // Assinatura
-  yPosition += 15;
+  if (prescription.specialInstructions) {
+    yPosition += 2;
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(180, 0, 0);
+    const splitSpecial = doc.splitTextToSize(`ATENÇÃO: ${prescription.specialInstructions}`, pageWidth - 40);
+    doc.text(splitSpecial, 20, yPosition);
+    yPosition += (splitSpecial.length * 5) + 2;
+    doc.setTextColor(0, 0, 0);
+  }
+
+  if (prescription.useContinuous) {
+    yPosition += 4;
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 100, 0);
+    doc.text('USO CONTÍNUO', 20, yPosition);
+    doc.setTextColor(0, 0, 0);
+  }
+
+  if (prescription.isControlled) {
+    yPosition += 8;
+    doc.setFillColor(255, 240, 240);
+    doc.rect(15, yPosition - 4, pageWidth - 30, 12, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(180, 0, 0);
+    doc.text(`MEDICAMENTO CONTROLADO - ${prescription.controlType || 'Portaria 344/98'}`, pageWidth / 2, yPosition + 2, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
+    yPosition += 12;
+  }
+
+  yPosition += 20;
   if (yPosition > 250) {
     doc.addPage();
-    yPosition = 20;
+    yPosition = 30;
   }
   
   doc.setDrawColor(0, 0, 0);
@@ -262,160 +266,11 @@ export function generatePrescriptionPDF(data: PrescriptionPDFData): Buffer {
   
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text(data.professional.name, pageWidth / 2, yPosition, { align: 'center' });
+  doc.text(professional.name, pageWidth / 2, yPosition, { align: 'center' });
   yPosition += 4;
-  doc.text(`${data.professional.councilType}: ${data.professional.councilNumber} - ${data.professional.councilState}`, pageWidth / 2, yPosition, { align: 'center' });
+  doc.text(`${professional.councilType}: ${professional.councilNumber} - ${professional.councilState}`, pageWidth / 2, yPosition, { align: 'center' });
 
-  // Rodapé
   addFooter(doc);
 
   return Buffer.from(doc.output('arraybuffer'));
-}
-
-/**
- * Interface para dados de atestado médico
- */
-export interface MedicalCertificateData {
-  consultation: Consultation;
-  citizen: Citizen;
-  professional: Professional;
-  unit: HealthUnit;
-  certificateType: string;
-  startDate: Date;
-  endDate: Date;
-  reason?: string;
-}
-
-/**
- * Gera PDF de Atestado Médico
- */
-export function generateMedicalCertificatePDF(data: MedicalCertificateData): Buffer {
-  const doc = new jsPDF();
-  const pageWidth = doc.internal.pageSize.getWidth();
-  
-  // Cabeçalho institucional
-  let yPosition = addInstitutionalHeader(doc, data.unit);
-  yPosition += 5;
-
-  // Título do documento
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  doc.text('ATESTADO MÉDICO', pageWidth / 2, yPosition, { align: 'center' });
-  
-  yPosition += 10;
-  doc.setDrawColor(16, 185, 129);
-  doc.setLineWidth(0.5);
-  doc.line(15, yPosition, pageWidth - 15, yPosition);
-  yPosition += 15;
-
-  // Corpo do atestado
-  const age = calculateAge(data.citizen.birthDate);
-  const daysDiff = Math.ceil((data.endDate.getTime() - data.startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  
-  const certificateTypeText = data.certificateType === 'trabalho' ? 'laborais' : 
-                              data.certificateType === 'escola' ? 'escolares' : 'habituais';
-
-  doc.setFontSize(12);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(0, 0, 0);
-  
-  const text1 = `Atesto, para os devidos fins, que o(a) Sr(a). `;
-  const text2Bold = data.citizen.name;
-  const text3 = `, ${age} anos, portador(a) do CPF ${data.citizen.cpf}`;
-  if (data.citizen.cns) {
-    doc.text(text1 + text2Bold + text3 + ` e CNS ${data.citizen.cns}, esteve sob meus cuidados`, 15, yPosition, { maxWidth: pageWidth - 30 });
-  } else {
-    doc.text(text1 + text2Bold + text3 + `, esteve sob meus cuidados`, 15, yPosition, { maxWidth: pageWidth - 30 });
-  }
-  yPosition += 7;
-  
-  const consultationDateStr = new Date(data.consultation.consultationDate).toLocaleDateString('pt-BR', { 
-    day: '2-digit', 
-    month: 'long', 
-    year: 'numeric' 
-  });
-  
-  doc.text(`profissionais nesta unidade de saúde na data de ${consultationDateStr}`, 15, yPosition, { maxWidth: pageWidth - 30 });
-  yPosition += 7;
-  
-  if (daysDiff === 1) {
-    doc.text(`e necessita de 1 (um) dia de afastamento das suas atividades ${certificateTypeText},`, 15, yPosition, { maxWidth: pageWidth - 30 });
-  } else {
-    doc.text(`e necessita de ${daysDiff} (${numberToWords(daysDiff)}) dias de afastamento das suas atividades ${certificateTypeText},`, 15, yPosition, { maxWidth: pageWidth - 30 });
-  }
-  yPosition += 7;
-  
-  const startDateStr = data.startDate.toLocaleDateString('pt-BR');
-  const endDateStr = data.endDate.toLocaleDateString('pt-BR');
-  
-  doc.text(`no período de ${startDateStr} a ${endDateStr}.`, 15, yPosition, { maxWidth: pageWidth - 30 });
-  yPosition += 10;
-
-  // Motivo (se fornecido)
-  if (data.reason && data.reason.trim().length > 0) {
-    doc.setFont('helvetica', 'bold');
-    doc.text('Motivo:', 15, yPosition);
-    yPosition += 6;
-    doc.setFont('helvetica', 'normal');
-    const splitReason = doc.splitTextToSize(data.reason, pageWidth - 30);
-    doc.text(splitReason, 15, yPosition);
-    yPosition += (splitReason.length * 6) + 5;
-  }
-
-  // CID (opcional - pode ser expandido futuramente)
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100, 100, 100);
-  doc.text('Código CID: _________________________', 15, yPosition);
-  yPosition += 15;
-
-  // Local e Data
-  yPosition += 10;
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(0, 0, 0);
-  
-  const locationDate = `Cardeal da Silva/BA, ${new Date().toLocaleDateString('pt-BR', { 
-    day: '2-digit', 
-    month: 'long', 
-    year: 'numeric' 
-  })}`;
-  doc.text(locationDate, pageWidth / 2, yPosition, { align: 'center' });
-  
-  // Assinatura
-  yPosition += 25;
-  doc.setDrawColor(0, 0, 0);
-  doc.setLineWidth(0.3);
-  doc.line(pageWidth / 2 - 40, yPosition, pageWidth / 2 + 40, yPosition);
-  yPosition += 5;
-  
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.text(data.professional.name, pageWidth / 2, yPosition, { align: 'center' });
-  yPosition += 5;
-  doc.setFont('helvetica', 'normal');
-  doc.text(`${data.professional.councilType}: ${data.professional.councilNumber} - ${data.professional.councilState}`, pageWidth / 2, yPosition, { align: 'center' });
-  yPosition += 4;
-  doc.setFontSize(9);
-  doc.text(data.professional.specialty, pageWidth / 2, yPosition, { align: 'center' });
-
-  // Rodapé
-  addFooter(doc);
-
-  return Buffer.from(doc.output('arraybuffer'));
-}
-
-/**
- * Converte número para extenso (simplificado, até 31 dias)
- */
-function numberToWords(num: number): string {
-  const words = [
-    '', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove', 'dez',
-    'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove', 'vinte',
-    'vinte e um', 'vinte e dois', 'vinte e três', 'vinte e quatro', 'vinte e cinco', 
-    'vinte e seis', 'vinte e sete', 'vinte e oito', 'vinte e nove', 'trinta', 'trinta e um'
-  ];
-  
-  return words[num] || num.toString();
 }

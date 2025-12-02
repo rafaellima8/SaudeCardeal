@@ -3,14 +3,12 @@ import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Helper for UUID generation in SQLite
 const generateId = () => crypto.randomUUID();
 
 // ============================================================================
 // CORE TABLES
 // ============================================================================
 
-// Health Units (Unidades Básicas de Saúde)
 export const healthUnits = sqliteTable("health_units", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   name: text("name").notNull(),
@@ -21,7 +19,6 @@ export const healthUnits = sqliteTable("health_units", {
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
-// Users and Authentication
 export const users = sqliteTable("users", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   email: text("email").notNull().unique(),
@@ -36,7 +33,6 @@ export const users = sqliteTable("users", {
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
-// Professionals (Profissionais de Saúde)
 export const professionals = sqliteTable("professionals", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   name: text("name").notNull(),
@@ -46,16 +42,15 @@ export const professionals = sqliteTable("professionals", {
   councilType: text("council_type").notNull(),
   councilNumber: text("council_number").notNull(),
   councilState: text("council_state").notNull(),
-  cboCode: text("cbo_code"), // CBO (Código Brasileiro de Ocupação) - OBRIGATÓRIO e-SUS SISAB
+  cboCode: text("cbo_code"),
   phone: text("phone"),
   email: text("email"),
   unitId: text("unit_id").notNull().references(() => healthUnits.id),
-  teamINE: text("team_ine"), // Identificador Nacional de Equipes (10 dígitos CNES)
+  teamINE: text("team_ine"),
   active: integer("active", { mode: "boolean" }).default(true).notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
-// Citizens/Patients (Cidadãos/Pacientes) - Conforme e-SUS PEC v5.3
 export const citizens = sqliteTable("citizens", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   name: text("name").notNull(),
@@ -86,7 +81,6 @@ export const citizens = sqliteTable("citizens", {
   observations: text("observations"),
   photoUrl: text("photo_url"),
   microarea: text("microarea"),
-  familyId: text("family_id").references(() => families.id),
   unitId: text("unit_id").notNull().references(() => healthUnits.id),
   cadsusSync: integer("cadsus_sync", { mode: "boolean" }).default(false),
   cadsusSyncAt: integer("cadsus_sync_at", { mode: "timestamp" }),
@@ -95,223 +89,52 @@ export const citizens = sqliteTable("citizens", {
 });
 
 // ============================================================================
-// ATTENDANCE TABLES
-// ============================================================================
-
-// Appointments (Agendamentos)
-export const appointments = sqliteTable("appointments", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  citizenId: text("citizen_id").notNull().references(() => citizens.id),
-  professionalId: text("professional_id").notNull().references(() => professionals.id),
-  unitId: text("unit_id").notNull().references(() => healthUnits.id),
-  appointmentDate: integer("appointment_date", { mode: "timestamp" }).notNull(),
-  type: text("type").notNull(),
-  status: text("status", { 
-    enum: ["scheduled", "confirmed", "in_progress", "completed", "cancelled", "no_show"] 
-  }).notNull().default("scheduled"),
-  notes: text("notes"),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Attendance Queue (Fila de Atendimento) - COM LINHA DE CUIDADO ✅
-export const attendanceQueue = sqliteTable("attendance_queue", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  citizenId: text("citizen_id").notNull().references(() => citizens.id),
-  unitId: text("unit_id").notNull().references(() => healthUnits.id),
-  ticket: text("ticket").notNull(),
-  priority: text("priority", { enum: ["normal", "urgent", "emergency"] }).notNull().default("normal"),
-  type: text("type").notNull(),
-  status: text("status", { enum: ["waiting", "in_progress", "completed", "cancelled"] }).notNull().default("waiting"),
-  arrivedAt: integer("arrived_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-  calledAt: integer("called_at", { mode: "timestamp" }),
-  completedAt: integer("completed_at", { mode: "timestamp" }),
-  consultationId: text("consultation_id").references(() => consultations.id), // Vincula fila ao atendimento médico
-  professionalId: text("professional_id").references(() => professionals.id), // Profissional que chamou o paciente
-  careLineId: text("care_line_id").references(() => careLines.id), // Linha de cuidado para encaninhamento inteligente
-  referralReason: text("referral_reason"), // Motivo do encaminhamento (para triagem especializada)
-  clinicalRisk: text("clinical_risk", { enum: ["baixo", "medio", "alto"] }), // Classificação de risco clínico
-});
-
-// Nursing Triage (Triagem de Enfermagem) - Etapa obrigatória antes da consulta médica
-export const nursingTriage = sqliteTable("nursing_triage", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  queueEntryId: text("queue_entry_id").notNull().references(() => attendanceQueue.id),
-  citizenId: text("citizen_id").notNull().references(() => citizens.id),
-  nurseId: text("nurse_id").notNull().references(() => professionals.id),
-  unitId: text("unit_id").notNull().references(() => healthUnits.id),
-  triageDate: integer("triage_date", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-  
-  // Manchester Triage Classification (Protocolo de Manchester)
-  riskClassification: text("risk_classification", { 
-    enum: ["emergencia", "muito_urgente", "urgente", "pouco_urgente", "nao_urgente"] 
-  }).notNull(),
-  riskColor: text("risk_color", { 
-    enum: ["vermelho", "laranja", "amarelo", "verde", "azul"] 
-  }).notNull(),
-  
-  // Chief Complaint
-  chiefComplaint: text("chief_complaint").notNull(),
-  symptomDuration: text("symptom_duration"),
-  painScale: integer("pain_scale"),
-  
-  // Vital Signs
-  bloodPressureSystolic: integer("blood_pressure_systolic"),
-  bloodPressureDiastolic: integer("blood_pressure_diastolic"),
-  heartRate: integer("heart_rate"),
-  respiratoryRate: integer("respiratory_rate"),
-  temperature: real("temperature"),
-  oxygenSaturation: integer("oxygen_saturation"),
-  bloodGlucose: integer("blood_glucose"),
-  weight: real("weight"),
-  height: real("height"),
-  
-  // Anthropometric (calculated)
-  bmi: real("bmi"),
-  
-  // Glasgow Scale (for emergency cases)
-  glasgowScore: integer("glasgow_score"),
-  
-  // Nursing Notes
-  observations: text("observations"),
-  nursingDiagnosis: text("nursing_diagnosis"),
-  
-  // Allergies/Alerts confirmed at triage
-  allergiesConfirmed: text("allergies_confirmed"),
-  
-  // Status
-  status: text("status", { enum: ["completed", "pending_medical", "cancelled"] }).notNull().default("completed"),
-  
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Consultations (Consultas Médicas) - COM CAMPOS SOAP COMPLETOS ✅
-export const consultations = sqliteTable("consultations", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  citizenId: text("citizen_id").notNull().references(() => citizens.id),
-  professionalId: text("professional_id").notNull().references(() => professionals.id),
-  unitId: text("unit_id").notNull().references(() => healthUnits.id),
-  appointmentId: text("appointment_id").references(() => appointments.id),
-  consultationDate: integer("consultation_date", { mode: "timestamp" }).notNull(),
-  
-  // Dynamic Forms - Care Line Assignment
-  careLineId: text("care_line_id").references(() => careLines.id),
-  
-  // e-SUS PEC Attendance Type (replaces legacy 'type') ✅
-  attendanceType: text("attendance_type", { 
-    enum: ["consulta", "procedimento", "vacina", "visita_domiciliar", "grupo", "atendimento_odonto"] 
-  }).notNull().default("consulta"), // Tipo de atendimento
-  
-  type: text("type"), // DEPRECATED - Mantido para compatibilidade, usar attendanceType
-  
-  // SOAP Fields (e-SUS PEC v5.3 compliant) ✅
-  subjective: text("subjective"), // S - Subjetivo (queixa, história)
-  objective: text("objective"), // O - Objetivo (exame físico)
-  assessment: text("assessment"), // A - Avaliação (diagnóstico)
-  plan: text("plan"), // P - Plano (conduta)
-  
-  // Vital Signs (JSON as TEXT in SQLite) ✅
-  vitalSigns: text("vital_signs", { mode: "json" }).$type<{
-    bloodPressure?: string; // PA
-    heartRate?: number; // FC
-    temperature?: number; // Temperatura
-    respiratoryRate?: number; // FR
-    oxygenSaturation?: number; // SpO2
-    weight?: number; // Peso
-    height?: number; // Altura
-    bmi?: number; // IMC
-    abdominalCircumference?: number; // Circunferência abdominal
-  }>(),
-  
-  // Diagnosis Codes (JSON Arrays as TEXT in SQLite) ✅
-  ciap2Codes: text("ciap2_codes", { mode: "json" }).$type<string[]>(), // Códigos CIAP-2
-  cid10Codes: text("cid10_codes", { mode: "json" }).$type<string[]>(), // Códigos CID-10
-  
-  // e-SUS PEC Additional Fields (Atendimento Individual) ✅
-  allergies: text("allergies", { mode: "json" }).$type<string[]>(), // Lista de alergias
-  chronicConditions: text("chronic_conditions", { mode: "json" }).$type<string[]>(), // Problemas crônicos
-  
-  familyHistory: text("family_history"), // História familiar
-  socialHistory: text("social_history"), // História social (tabagismo, etilismo, etc)
-  
-  prescriptionRationale: text("prescription_rationale"), // Racionalização de medicamento (e-SUS PEC)
-  
-  // Legacy fields (mantidos para compatibilidade)
-  chiefComplaint: text("chief_complaint"),
-  historyOfPresentIllness: text("history_of_present_illness"),
-  physicalExam: text("physical_exam"),
-  diagnosis: text("diagnosis"),
-  treatmentPlan: text("treatment_plan"),
-  notes: text("notes"),
-  
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Citizen Problems/Conditions (Problemas/Condições do Cidadão - CIAP-2) ✅
-export const citizenProblems = sqliteTable("citizen_problems", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  citizenId: text("citizen_id").notNull().references(() => citizens.id, { onDelete: "cascade" }),
-  unitId: text("unit_id").notNull().references(() => healthUnits.id), // Multi-tenant safety ✅
-  ciap2Code: text("ciap2_code").notNull(), // Código CIAP-2
-  description: text("description").notNull(), // Descrição do problema
-  status: text("status", { 
-    enum: ["active", "resolved", "controlled"] 
-  }).notNull().default("active"), // Ativo, Resolvido, Controlado
-  diagnosedAt: integer("diagnosed_at", { mode: "timestamp" }).notNull(), // Data do diagnóstico
-  notes: text("notes"), // Observações
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// ============================================================================
 // PHARMACY TABLES
 // ============================================================================
 
-// RENAME Catalog - Relação Nacional de Medicamentos Essenciais
 export const renameCatalog = sqliteTable("rename_catalog", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
-  code: text("code").notNull().unique(), // Código RENAME
-  commercialName: text("commercial_name").notNull(), // Nome comercial
-  activeIngredient: text("active_ingredient").notNull(), // Princípio ativo
-  therapeuticClass: text("therapeutic_class"), // Classe terapêutica
-  presentation: text("presentation").notNull(), // Apresentação (ex: "500mg comprimido")
-  concentration: text("concentration"), // Concentração
-  unit: text("unit"), // Unidade (mg, ml, UI)
+  code: text("code").notNull().unique(),
+  commercialName: text("commercial_name").notNull(),
+  activeIngredient: text("active_ingredient").notNull(),
+  therapeuticClass: text("therapeutic_class"),
+  presentation: text("presentation").notNull(),
+  concentration: text("concentration"),
+  unit: text("unit"),
   administrationRoute: text("administration_route", { 
     enum: ["oral", "topical", "injectable", "inhalation", "sublingual", "rectal", "ophthalmic", "nasal", "auricular"] 
   }).notNull().default("oral"),
-  isControlled: integer("is_controlled", { mode: "boolean" }).default(false), // Portaria 344/98
+  isControlled: integer("is_controlled", { mode: "boolean" }).default(false),
   controlType: text("control_type", { 
     enum: ["A1", "A2", "A3", "B1", "B2", "C1", "C2", "C3", "C4", "C5", "D1", "D2"] 
-  }), // Tipo de controle ANVISA
-  maxPrescriptionDays: integer("max_prescription_days").default(30), // Dias máximos prescrição
-  requiresSpecialForm: integer("requires_special_form", { mode: "boolean" }).default(false), // Receituário especial
-  pediatricDosePerKg: text("pediatric_dose_per_kg"), // Dose pediátrica por kg
-  contraindications: text("contraindications", { mode: "json" }).$type<string[]>(), // Contraindicações
-  interactions: text("interactions", { mode: "json" }).$type<string[]>(), // Interações conhecidas
+  }),
+  maxPrescriptionDays: integer("max_prescription_days").default(30),
+  requiresSpecialForm: integer("requires_special_form", { mode: "boolean" }).default(false),
+  pediatricDosePerKg: text("pediatric_dose_per_kg"),
+  contraindications: text("contraindications", { mode: "json" }).$type<string[]>(),
+  interactions: text("interactions", { mode: "json" }).$type<string[]>(),
   active: integer("active", { mode: "boolean" }).default(true),
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
-// Citizen Allergies (Alergias do Cidadão)
 export const citizenAllergies = sqliteTable("citizen_allergies", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   citizenId: text("citizen_id").notNull().references(() => citizens.id, { onDelete: "cascade" }),
   allergyType: text("allergy_type", { 
     enum: ["medication", "food", "environmental", "other"] 
   }).notNull(),
-  allergen: text("allergen").notNull(), // Substância alergênica
+  allergen: text("allergen").notNull(),
   severity: text("severity", { enum: ["mild", "moderate", "severe", "anaphylactic"] }).notNull(),
-  reaction: text("reaction"), // Tipo de reação
+  reaction: text("reaction"),
   diagnosedDate: integer("diagnosed_date", { mode: "timestamp" }),
   notes: text("notes"),
   active: integer("active", { mode: "boolean" }).default(true),
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
-// Medications (Medicamentos) - Estoque local da unidade
 export const medications = sqliteTable("medications", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
-  renameId: text("rename_id").references(() => renameCatalog.id), // Referência ao catálogo RENAME
+  renameId: text("rename_id").references(() => renameCatalog.id),
   name: text("name").notNull(),
   genericName: text("generic_name"),
   manufacturer: text("manufacturer"),
@@ -321,82 +144,66 @@ export const medications = sqliteTable("medications", {
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
-// Prescriptions (Receitas Médicas) - Estrutura Completa e-SUS
 export const prescriptions = sqliteTable("prescriptions", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
-  consultationId: text("consultation_id").references(() => consultations.id),
   citizenId: text("citizen_id").notNull().references(() => citizens.id),
   professionalId: text("professional_id").notNull().references(() => professionals.id),
   unitId: text("unit_id").notNull().references(() => healthUnits.id),
-  renameId: text("rename_id").references(() => renameCatalog.id), // Referência catálogo RENAME
+  renameId: text("rename_id").references(() => renameCatalog.id),
   
-  // Dados do medicamento
   medication: text("medication").notNull(),
-  genericName: text("generic_name"), // Princípio ativo
-  dosage: text("dosage").notNull(), // Ex: "500mg"
+  genericName: text("generic_name"),
+  dosage: text("dosage").notNull(),
   dosageUnit: text("dosage_unit", { enum: ["mg", "ml", "g", "UI", "mcg", "comprimido", "gota"] }),
   
-  // Posologia estruturada
-  frequency: text("frequency").notNull(), // Ex: "8/8h" ou "3x ao dia"
+  frequency: text("frequency").notNull(),
   frequencyUnit: text("frequency_unit", { enum: ["hours", "daily", "weekly", "monthly", "asNeeded"] }),
-  duration: text("duration").notNull(), // Ex: "7 dias"
-  durationDays: integer("duration_days"), // Número de dias
-  quantity: integer("quantity").notNull(), // Quantidade total
+  duration: text("duration").notNull(),
+  durationDays: integer("duration_days"),
+  quantity: integer("quantity").notNull(),
   
-  // Via de administração
   administrationRoute: text("administration_route", { 
     enum: ["oral", "topical", "injectable", "inhalation", "sublingual", "rectal", "ophthalmic", "nasal", "auricular"] 
   }).default("oral"),
   
-  // Orientações e observações
-  instructions: text("instructions"), // Orientações especiais
-  specialInstructions: text("special_instructions"), // Ex: "Tomar em jejum"
-  useContinuous: integer("use_continuous", { mode: "boolean" }).default(false), // Uso contínuo
+  instructions: text("instructions"),
+  specialInstructions: text("special_instructions"),
+  useContinuous: integer("use_continuous", { mode: "boolean" }).default(false),
   
-  // Controle Portaria 344/98
   isControlled: integer("is_controlled", { mode: "boolean" }).default(false),
   controlType: text("control_type", { enum: ["A1", "A2", "A3", "B1", "B2", "C1", "C2", "C3", "C4", "C5", "D1", "D2"] }),
-  specialFormNumber: text("special_form_number"), // Número notificação especial
+  specialFormNumber: text("special_form_number"),
   
-  // Validações realizadas
   allergyChecked: integer("allergy_checked", { mode: "boolean" }).default(false),
   interactionChecked: integer("interaction_checked", { mode: "boolean" }).default(false),
   dosageValidated: integer("dosage_validated", { mode: "boolean" }).default(false),
   pediatricDoseCalculated: integer("pediatric_dose_calculated", { mode: "boolean" }).default(false),
-  patientWeight: integer("patient_weight"), // Peso usado para cálculo pediátrico
+  patientWeight: integer("patient_weight"),
   
-  // Assinatura digital
   signatureHash: text("signature_hash"),
   signedAt: integer("signed_at", { mode: "timestamp" }),
-  qrCodeData: text("qr_code_data"), // Dados para QR Code de validação
+  qrCodeData: text("qr_code_data"),
   
-  // Status e timestamps
   status: text("status", { enum: ["draft", "pending", "dispensed", "partial", "cancelled", "expired"] }).notNull().default("pending"),
-  validUntil: integer("valid_until", { mode: "timestamp" }), // Validade da receita
+  validUntil: integer("valid_until", { mode: "timestamp" }),
   dispensedAt: integer("dispensed_at", { mode: "timestamp" }),
   dispensedBy: text("dispensed_by").references(() => professionals.id),
   
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
-// Medication Dispensations (Dispensações de Medicamentos) ✅
 export const dispensations = sqliteTable("dispensations", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   prescriptionId: text("prescription_id").notNull().references(() => prescriptions.id),
   citizenId: text("citizen_id").notNull().references(() => citizens.id),
-  professionalId: text("professional_id").notNull().references(() => professionals.id), // Profissional que dispensou
-  unitId: text("unit_id").notNull().references(() => healthUnits.id), // Multi-tenant safety ✅
+  professionalId: text("professional_id").notNull().references(() => professionals.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
   medication: text("medication").notNull(),
   quantity: integer("quantity").notNull(),
   dispensedAt: integer("dispensed_at", { mode: "timestamp" }).notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
-export type Dispensation = typeof dispensations.$inferSelect;
-export const insertDispensationSchema = createInsertSchema(dispensations).omit({ id: true, createdAt: true });
-export type InsertDispensation = z.infer<typeof insertDispensationSchema>;
-
-// Medication Stock (Estoque de Medicamentos) - Controle por Lote ✅
 export const medicationStock = sqliteTable("medication_stock", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   unitId: text("unit_id").notNull().references(() => healthUnits.id),
@@ -439,11 +246,6 @@ export const medicationStock = sqliteTable("medication_stock", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
-export type MedicationStock = typeof medicationStock.$inferSelect;
-export const insertMedicationStockSchema = createInsertSchema(medicationStock).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertMedicationStock = z.infer<typeof insertMedicationStockSchema>;
-
-// Stock Movements (Movimentações de Estoque) ✅
 export const stockMovements = sqliteTable("stock_movements", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   stockId: text("stock_id").notNull().references(() => medicationStock.id),
@@ -469,213 +271,74 @@ export const stockMovements = sqliteTable("stock_movements", {
   professionalId: text("professional_id").notNull().references(() => professionals.id),
   authorizedBy: text("authorized_by").references(() => professionals.id),
   
-  observations: text("observations"),
-  
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
-export type StockMovement = typeof stockMovements.$inferSelect;
-export const insertStockMovementSchema = createInsertSchema(stockMovements).omit({ id: true, createdAt: true });
-export type InsertStockMovement = z.infer<typeof insertStockMovementSchema>;
-
 // ============================================================================
-// EXAMS AND TFD TABLES
+// TFD TABLES (Tratamento Fora de Domicílio)
 // ============================================================================
 
-// Exams (Exames) - Workflow Completo e-SUS
-export const exams = sqliteTable("exams", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  citizenId: text("citizen_id").notNull().references(() => citizens.id),
-  professionalId: text("professional_id").notNull().references(() => professionals.id),
-  unitId: text("unit_id").notNull().references(() => healthUnits.id),
-  consultationId: text("consultation_id").references(() => consultations.id),
-  
-  // Dados do exame
-  examType: text("exam_type").notNull(), // Nome do exame
-  sigtapCode: text("sigtap_code"), // Código SIGTAP
-  examCategory: text("exam_category", { 
-    enum: ["laboratory", "imaging", "procedure", "pathology", "other"] 
-  }).default("laboratory"),
-  
-  // Solicitação estruturada
-  priority: text("priority", { enum: ["routine", "urgent", "emergency"] }).notNull().default("routine"),
-  clinicalJustification: text("clinical_justification").notNull(), // Justificativa clínica obrigatória
-  hypothesisDiagnosis: text("hypothesis_diagnosis"), // Hipótese diagnóstica
-  cid10Code: text("cid10_code"), // CID-10 relacionado
-  desiredDate: integer("desired_date", { mode: "timestamp" }), // Data desejada de realização
-  
-  // Timestamps do workflow
-  requestDate: integer("request_date", { mode: "timestamp" }).notNull(),
-  scheduledDate: integer("scheduled_date", { mode: "timestamp" }), // Data agendada
-  collectedDate: integer("collected_date", { mode: "timestamp" }), // Data da coleta
-  resultDate: integer("result_date", { mode: "timestamp" }), // Data resultado disponível
-  
-  // Status workflow: solicitado → agendado → coletado → resultado disponível
-  status: text("status", { 
-    enum: ["requested", "scheduled", "collected", "result_available", "completed", "cancelled"] 
-  }).notNull().default("requested"),
-  
-  // Resultado e anexos
-  result: text("result"), // Resultado textual
-  resultValue: text("result_value"), // Valor numérico se aplicável
-  resultUnit: text("result_unit"), // Unidade do resultado
-  referenceRange: text("reference_range"), // Valores de referência
-  isAbnormal: integer("is_abnormal", { mode: "boolean" }), // Resultado anormal
-  attachmentUrl: text("attachment_url"), // URL do anexo digitalizado
-  attachmentFileName: text("attachment_file_name"), // Nome do arquivo
-  
-  // Profissionais envolvidos
-  collectedBy: text("collected_by").references(() => professionals.id), // Quem coletou
-  analyzedBy: text("analyzed_by").references(() => professionals.id), // Quem analisou
-  
-  // Observações e notificações
-  observations: text("observations"),
-  patientNotified: integer("patient_notified", { mode: "boolean" }).default(false),
-  notificationSentAt: integer("notification_sent_at", { mode: "timestamp" }),
-  
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Medical Referrals (Encaminhamentos Médicos) - COM SUGESTÃO INTELIGENTE ✅
-export const medicalReferrals = sqliteTable("medical_referrals", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  consultationId: text("consultation_id").references(() => consultations.id),
-  citizenId: text("citizen_id").notNull().references(() => citizens.id),
-  professionalId: text("professional_id").notNull().references(() => professionals.id),
-  unitId: text("unit_id").notNull().references(() => healthUnits.id),
-  destination: text("destination").notNull(),
-  specialty: text("specialty"), // LEGACY: Texto livre, mantido para compatibilidade
-  
-  // Encaminhamento Inteligente - Sugestão de Especialidade ✅
-  suggestedSpecialtyId: text("suggested_specialty_id").references(() => specialties.id), // Especialidade sugerida pelo motor
-  chosenSpecialtyId: text("chosen_specialty_id").references(() => specialties.id), // Especialidade escolhida pelo médico
-  suggestionScore: integer("suggestion_score"), // Score da sugestão (0-100)
-  suggestionJustification: text("suggestion_justification"), // Justificativa textual da sugestão
-  hypothesisDiagnosis: text("hypothesis_diagnosis"), // Hipótese diagnóstica (texto ou CID)
-  cidCode: text("cid_code"), // Código CID-10 da hipótese diagnóstica
-  complementaryData: text("complementary_data", { mode: "json" }).$type<{
-    alarmSigns?: {
-      fever?: boolean;
-      weightLoss?: boolean;
-      bleeding?: boolean;
-      recentTrauma?: boolean;
-      severeHeadache?: boolean;
-      dyspnea?: boolean;
-    };
-    attendanceType?: "acute" | "chronic" | "followup" | "emergency";
-    patientAge?: number;
-    patientGender?: string;
-  }>(), // Dados complementares para refinamento da sugestão
-  
-  reason: text("reason").notNull(),
-  priority: text("priority", { enum: ["normal", "urgent", "emergency"] }).notNull().default("normal"),
-  status: text("status", { 
-    enum: ["pending", "scheduled", "in_progress", "completed", "cancelled"] 
-  }).notNull().default("pending"),
-  clinicalRisk: text("clinical_risk", { enum: ["baixo", "medio", "alto"] }).default("medio"),
-  referralDate: integer("referral_date", { mode: "timestamp" }).notNull(),
-  scheduledDate: integer("scheduled_date", { mode: "timestamp" }),
-  completedDate: integer("completed_date", { mode: "timestamp" }),
-  observations: text("observations"),
-  
-  // Fila de Linha de Cuidado
-  careLineId: text("care_line_id").references(() => careLines.id),
-  queuePosition: integer("queue_position"),
-  queueEnteredAt: integer("queue_entered_at", { mode: "timestamp" }),
-  
-  // Contra-Referência (resposta do especialista)
-  counterReferralDate: integer("counter_referral_date", { mode: "timestamp" }),
-  counterReferralProfessionalId: text("counter_referral_professional_id").references(() => professionals.id),
-  counterReferralReport: text("counter_referral_report"),
-  counterReferralDiagnosis: text("counter_referral_diagnosis"),
-  counterReferralConducts: text("counter_referral_conducts"),
-  counterReferralFollowUp: text("counter_referral_follow_up"),
-  counterReferralAttachments: text("counter_referral_attachments", { mode: "json" }).$type<string[]>(),
-  
-  // Auditoria
-  statusHistory: text("status_history", { mode: "json" }).$type<{
-    status: string;
-    changedAt: string;
-    changedBy: string;
-    reason?: string;
-  }[]>(),
-  
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// ============================================================================
-// TFD MODULE (Tratamento Fora do Domicílio) - Complete Implementation
-// ============================================================================
-
-// TFD Vehicles (Frota de Veículos)
 export const tfdVehicles = sqliteTable("tfd_vehicles", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   unitId: text("unit_id").notNull().references(() => healthUnits.id),
   plate: text("plate").notNull().unique(),
   model: text("model").notNull(),
   brand: text("brand").notNull(),
-  year: integer("year").notNull(),
-  capacity: integer("capacity").notNull().default(4),
-  vehicleType: text("vehicle_type", {
-    enum: ["ambulancia", "van", "onibus", "carro", "micro_onibus"]
-  }).notNull().default("van"),
-  fuelType: text("fuel_type", {
-    enum: ["gasolina", "etanol", "diesel", "flex", "eletrico"]
-  }).notNull().default("flex"),
-  currentKm: integer("current_km").notNull().default(0),
+  year: integer("year"),
+  vehicleType: text("vehicle_type", { 
+    enum: ["ambulancia", "van", "micro_onibus", "onibus", "carro"] 
+  }).notNull(),
+  capacity: integer("capacity").notNull(),
+  currentKm: integer("current_km").default(0),
   lastMaintenanceKm: integer("last_maintenance_km"),
   nextMaintenanceKm: integer("next_maintenance_km"),
   insuranceExpiry: integer("insurance_expiry", { mode: "timestamp" }),
   inspectionExpiry: integer("inspection_expiry", { mode: "timestamp" }),
-  status: text("status", {
-    enum: ["disponivel", "em_viagem", "manutencao", "inativo"]
+  status: text("status", { 
+    enum: ["disponivel", "em_viagem", "manutencao", "inativo"] 
   }).notNull().default("disponivel"),
   observations: text("observations"),
-  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  active: integer("active", { mode: "boolean" }).default(true).notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
-// TFD Drivers (Motoristas)
 export const tfdDrivers = sqliteTable("tfd_drivers", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   unitId: text("unit_id").notNull().references(() => healthUnits.id),
   name: text("name").notNull(),
   cpf: text("cpf").notNull().unique(),
   cnh: text("cnh").notNull(),
-  cnhCategory: text("cnh_category", {
-    enum: ["A", "B", "C", "D", "E", "AB", "AC", "AD", "AE"]
+  cnhCategory: text("cnh_category", { 
+    enum: ["A", "B", "C", "D", "E", "AB", "AC", "AD", "AE"] 
   }).notNull(),
   cnhExpiry: integer("cnh_expiry", { mode: "timestamp" }).notNull(),
-  phone: text("phone").notNull(),
+  phone: text("phone"),
   email: text("email"),
   address: text("address"),
   emergencyContact: text("emergency_contact"),
   emergencyPhone: text("emergency_phone"),
-  hireDate: integer("hire_date", { mode: "timestamp" }),
-  status: text("status", {
-    enum: ["disponivel", "em_viagem", "ferias", "afastado", "inativo"]
+  status: text("status", { 
+    enum: ["disponivel", "em_viagem", "ferias", "afastado", "inativo"] 
   }).notNull().default("disponivel"),
   observations: text("observations"),
-  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  active: integer("active", { mode: "boolean" }).default(true).notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
-// TFD Trips (Viagens com controle de km/combustível)
 export const tfdTrips = sqliteTable("tfd_trips", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   unitId: text("unit_id").notNull().references(() => healthUnits.id),
   vehicleId: text("vehicle_id").notNull().references(() => tfdVehicles.id),
   driverId: text("driver_id").notNull().references(() => tfdDrivers.id),
+  destination: text("destination").notNull(),
+  destinationMunicipality: text("destination_municipality"),
+  destinationState: text("destination_state"),
   scheduledDeparture: integer("scheduled_departure", { mode: "timestamp" }).notNull(),
   scheduledReturn: integer("scheduled_return", { mode: "timestamp" }),
   actualDeparture: integer("actual_departure", { mode: "timestamp" }),
   actualReturn: integer("actual_return", { mode: "timestamp" }),
-  origin: text("origin").notNull(),
-  destination: text("destination").notNull(),
   route: text("route"),
   initialKm: integer("initial_km"),
   finalKm: integer("final_km"),
@@ -685,340 +348,122 @@ export const tfdTrips = sqliteTable("tfd_trips", {
   tollCost: real("toll_cost"),
   otherCosts: real("other_costs"),
   totalCost: real("total_cost"),
-  passengersCount: integer("passengers_count").notNull().default(1),
-  status: text("status", {
-    enum: ["agendada", "em_andamento", "concluida", "cancelada"]
+  passengersCount: integer("passengers_count").notNull(),
+  status: text("status", { 
+    enum: ["agendada", "em_andamento", "concluida", "cancelada"] 
   }).notNull().default("agendada"),
   tripReport: text("trip_report"),
   incidents: text("incidents"),
   observations: text("observations"),
-  createdBy: text("created_by").references(() => users.id),
-  completedBy: text("completed_by").references(() => users.id),
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
-// TFD Requests (Solicitações de Transporte Intermunicipal) - Enhanced
 export const tfdRequests = sqliteTable("tfd_requests", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   citizenId: text("citizen_id").notNull().references(() => citizens.id),
-  professionalId: text("professional_id").notNull().references(() => professionals.id),
-  unitId: text("unit_id").notNull().references(() => healthUnits.id),
-  originUnitId: text("origin_unit_id").references(() => healthUnits.id),
-  tripId: text("trip_id").references(() => tfdTrips.id),
-  requestDate: integer("request_date", { mode: "timestamp" }).notNull(),
+  originUnitId: text("origin_unit_id").notNull().references(() => healthUnits.id),
+  requestedById: text("requested_by_id").notNull().references(() => professionals.id),
+  
   desiredDate: integer("desired_date", { mode: "timestamp" }),
   travelDate: integer("travel_date", { mode: "timestamp" }),
   returnDate: integer("return_date", { mode: "timestamp" }),
   destination: text("destination").notNull(),
   destinationMunicipality: text("destination_municipality"),
-  destinationState: text("destination_state").default("BA"),
+  destinationState: text("destination_state"),
   destinationFacility: text("destination_facility"),
-  reason: text("reason", {
-    enum: ["consulta", "exame", "internacao", "quimioterapia", "radioterapia", "hemodialise", "cirurgia", "outro"]
+  
+  reason: text("reason", { 
+    enum: ["consulta", "exame", "internacao", "quimioterapia", "radioterapia", "hemodialise", "cirurgia", "outro"] 
   }).notNull(),
   reasonDetail: text("reason_detail"),
   procedure: text("procedure"),
   procedureCode: text("procedure_code"),
+  
   accompaniedBy: text("accompanied_by"),
   companion: integer("companion", { mode: "boolean" }).default(false),
   companionJustification: text("companion_justification"),
-  transportType: text("transport_type", {
-    enum: ["ambulancia", "van", "onibus", "carro", "micro_onibus"]
+  
+  transportType: text("transport_type", { 
+    enum: ["ambulancia", "van", "onibus", "carro", "micro_onibus"] 
   }),
-  urgencyLevel: text("urgency_level", {
-    enum: ["eletivo", "urgente", "emergencia"]
+  urgencyLevel: text("urgency_level", { 
+    enum: ["eletivo", "urgente", "emergencia"] 
   }).notNull().default("eletivo"),
+  
   medicalDocument: text("medical_document"),
-  medicalDocumentType: text("medical_document_type", {
-    enum: ["laudo", "encaminhamento", "prescricao", "exame", "outro"]
+  medicalDocumentType: text("medical_document_type", { 
+    enum: ["laudo", "encaminhamento", "prescricao", "exame", "outro"] 
   }),
   justification: text("justification"),
+  
+  budgetVerified: integer("budget_verified", { mode: "boolean" }).default(false),
+  budgetNotes: text("budget_notes"),
+  observations: text("observations"),
+  
   status: text("status", { 
     enum: ["pending", "approved", "rejected", "scheduled", "in_transit", "completed", "cancelled", "no_show"] 
   }).notNull().default("pending"),
-  budgetVerified: integer("budget_verified", { mode: "boolean" }).default(false),
-  budgetNotes: text("budget_notes"),
-  approvedBy: text("approved_by").references(() => users.id),
-  approvedAt: integer("approved_at", { mode: "timestamp" }),
-  approvalJustification: text("approval_justification"),
-  rejectedBy: text("rejected_by").references(() => users.id),
-  rejectedAt: integer("rejected_at", { mode: "timestamp" }),
-  rejectionReason: text("rejection_reason"),
-  scheduledBy: text("scheduled_by").references(() => users.id),
-  scheduledAt: integer("scheduled_at", { mode: "timestamp" }),
-  observations: text("observations"),
-  statusHistory: text("status_history", { mode: "json" }).$type<{
+  statusHistory: text("status_history", { mode: "json" }).$type<Array<{
     status: string;
     changedAt: string;
     changedBy: string;
     reason?: string;
-  }[]>(),
+  }>>(),
+  
+  tripId: text("trip_id").references(() => tfdTrips.id),
+  
+  approvedBy: text("approved_by").references(() => professionals.id),
+  approvedAt: integer("approved_at", { mode: "timestamp" }),
+  approvalJustification: text("approval_justification"),
+  
+  rejectedBy: text("rejected_by").references(() => professionals.id),
+  rejectedAt: integer("rejected_at", { mode: "timestamp" }),
+  rejectionReason: text("rejection_reason"),
+  
+  scheduledBy: text("scheduled_by").references(() => professionals.id),
+  scheduledAt: integer("scheduled_at", { mode: "timestamp" }),
+  
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
-// TFD Trip Passengers (Passageiros por viagem - relaciona solicitações à viagem)
 export const tfdTripPassengers = sqliteTable("tfd_trip_passengers", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
-  tripId: text("trip_id").notNull().references(() => tfdTrips.id),
+  tripId: text("trip_id").notNull().references(() => tfdTrips.id, { onDelete: "cascade" }),
   tfdRequestId: text("tfd_request_id").notNull().references(() => tfdRequests.id),
   citizenId: text("citizen_id").notNull().references(() => citizens.id),
-  isCompanion: integer("is_companion", { mode: "boolean" }).notNull().default(false),
-  boardingConfirmed: integer("boarding_confirmed", { mode: "boolean" }).default(false),
-  boardingTime: integer("boarding_time", { mode: "timestamp" }),
-  disembarkingConfirmed: integer("disembarking_confirmed", { mode: "boolean" }).default(false),
-  disembarkingTime: integer("disembarking_time", { mode: "timestamp" }),
-  noShow: integer("no_show", { mode: "boolean" }).default(false),
-  noShowReason: text("no_show_reason"),
+  isCompanion: integer("is_companion", { mode: "boolean" }).default(false),
+  companionOf: text("companion_of").references(() => citizens.id),
+  seatNumber: integer("seat_number"),
+  boarded: integer("boarded", { mode: "boolean" }).default(false),
+  boardedAt: integer("boarded_at", { mode: "timestamp" }),
+  disembarked: integer("disembarked", { mode: "boolean" }).default(false),
+  disembarkedAt: integer("disembarked_at", { mode: "timestamp" }),
+  status: text("status", { 
+    enum: ["confirmado", "embarcado", "desembarcado", "nao_compareceu", "cancelado"] 
+  }).notNull().default("confirmado"),
   observations: text("observations"),
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
 // ============================================================================
-// TERRITORIAL MANAGEMENT TABLES (e-SUS Território)
+// SYSTEM TABLES
 // ============================================================================
 
-// Dwellings (Domicílios)
-export const dwellings = sqliteTable("dwellings", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  unitId: text("unit_id").notNull().references(() => healthUnits.id),
-  microarea: text("microarea").notNull(),
-  address: text("address").notNull(),
-  number: text("number"),
-  complement: text("complement"),
-  neighborhood: text("neighborhood").notNull(),
-  zipCode: text("zip_code"),
-  latitude: real("latitude"),
-  longitude: real("longitude"),
-  dwellingType: text("dwelling_type", { 
-    enum: ["casa", "apartamento", "comodo", "outro"] 
-  }).notNull().default("casa"),
-  sanitation: text("sanitation", { 
-    enum: ["rede_esgoto", "fossa_septica", "ceu_aberto", "outro"] 
-  }),
-  waterSupply: text("water_supply", { 
-    enum: ["rede_publica", "poco", "cisterna", "outro"] 
-  }),
-  hasElectricity: integer("has_electricity", { mode: "boolean" }).default(true),
-  hasAnimals: integer("has_animals", { mode: "boolean" }).default(false),
-  familiesCount: integer("families_count").default(1),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Families (Famílias)
-export const families = sqliteTable("families", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  dwellingId: text("dwelling_id").notNull().references(() => dwellings.id),
-  unitId: text("unit_id").notNull().references(() => healthUnits.id),
-  familyCode: text("family_code").notNull(),
-  headOfFamilyId: text("head_of_family_id").references(() => citizens.id),
-  monthlyIncome: real("monthly_income"),
-  benefitsReceived: text("benefits_received"),
-  membersCount: integer("members_count").default(1),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Family Members (Membros da Família) - Relationship tracking
-export const familyMembers = sqliteTable("family_members", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  familyId: text("family_id").notNull().references(() => families.id, { onDelete: "cascade" }),
-  citizenId: text("citizen_id").notNull().references(() => citizens.id, { onDelete: "cascade" }),
-  relationshipType: text("relationship_type", {
-    enum: ["responsavel_familiar", "conjuge", "filho", "neto", "pai_mae", "avo", "irmao", "outro"]
-  }).notNull().default("outro"),
-  isHeadOfFamily: integer("is_head_of_family", { mode: "boolean" }).default(false).notNull(),
-  joinedAt: integer("joined_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-  leftAt: integer("left_at", { mode: "timestamp" }),
-  notes: text("notes"),
-});
-
-// Home Visits (Visitas Domiciliares)
-export const homeVisits = sqliteTable("home_visits", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  dwellingId: text("dwelling_id").notNull().references(() => dwellings.id),
-  familyId: text("family_id").references(() => families.id),
-  professionalId: text("professional_id").notNull().references(() => professionals.id),
-  visitDate: integer("visit_date", { mode: "timestamp" }).notNull(),
-  visitType: text("visit_type", { 
-    enum: ["rotina", "busca_ativa", "acompanhamento", "urgencia"] 
-  }).notNull(),
-  visitMotive: text("visit_motive", { 
-    enum: ["gestante", "crianca", "idoso", "doenca_cronica", "controle_ambiental", "outro"] 
-  }),
-  findings: text("findings"),
-  actions: text("actions"),
-  referrals: text("referrals"),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// ============================================================================
-// e-SUS EXPORT TABLES
-// ============================================================================
-
-// e-SUS Exports (Exportações e-SUS)
-export const esusExports = sqliteTable("esus_exports", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  batchId: text("batch_id"),
-  cnes: text("cnes").notNull(),
-  ine: text("ine"),
-  periodStart: integer("period_start", { mode: "timestamp" }).notNull(),
-  periodEnd: integer("period_end", { mode: "timestamp" }).notNull(),
-  recordsCount: integer("records_count").notNull(),
-  fileSize: integer("file_size").notNull(),
-  jsonPath: text("json_path"),
-  xmlPath: text("xml_path"),
-  status: text("status", { enum: ["processing", "completed", "failed"] }).notNull().default("processing"),
-  errorMessage: text("error_message"),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-  completedAt: integer("completed_at", { mode: "timestamp" }),
-});
-
-// SIGTAP Code Mappings (Mapeamento de Códigos SIGTAP)
-// Mapeia tipos de procedimentos/exames internos para códigos SIGTAP oficiais
-export const sigtapMappings = sqliteTable("sigtap_mappings", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  internalCode: text("internal_code").notNull().unique(), // Código interno do sistema (ex: "consulta_medica_demanda_espontanea")
-  sigtapCode: text("sigtap_code").notNull(), // Código SIGTAP (ex: "0301010039")
-  description: text("description").notNull(), // Descrição do procedimento
-  category: text("category", { 
-    enum: ["consultation", "procedure", "exam", "vaccine", "other"] 
-  }).notNull(),
-  active: integer("active", { mode: "boolean" }).default(true).notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// ============================================================================
-// ENDEMIC CONTROL TABLES (Controle de Endemias)
-// ============================================================================
-
-// Endemic Cycles (Ciclos de Trabalho - LIRAa, PVE)
-export const endemicCycles = sqliteTable("endemic_cycles", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  unitId: text("unit_id").notNull().references(() => healthUnits.id),
-  name: text("name").notNull(), // Ex: "LIRAa Outubro 2025"
-  cycleType: text("cycle_type", {
-    enum: ["liraa", "pve", "rotina", "bloqueio"]
-  }).notNull(),
-  startDate: integer("start_date", { mode: "timestamp" }).notNull(),
-  endDate: integer("end_date", { mode: "timestamp" }).notNull(),
-  targetMicroareas: text("target_microareas").notNull(), // JSON array of microarea codes
-  status: text("status", {
-    enum: ["planned", "in_progress", "completed", "cancelled"]
-  }).notNull().default("planned"),
-  totalDwellings: integer("total_dwellings").default(0),
-  visitedDwellings: integer("visited_dwellings").default(0),
-  fociFound: integer("foci_found").default(0),
-  description: text("description"),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// FAD - Ficha de Avaliação de Densidade
-export const fadEvaluations = sqliteTable("fad_evaluations", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  cycleId: text("cycle_id").notNull().references(() => endemicCycles.id),
-  dwellingId: text("dwelling_id").notNull().references(() => dwellings.id),
-  professionalId: text("professional_id").notNull().references(() => professionals.id),
-  visitDate: integer("visit_date", { mode: "timestamp" }).notNull(),
-  dwellingInspected: integer("dwelling_inspected", { mode: "boolean" }).notNull().default(true),
-  dwellingClosed: integer("dwelling_closed", { mode: "boolean" }).default(false),
-  dwellingRefused: integer("dwelling_refused", { mode: "boolean" }).default(false),
-  residentsCount: integer("residents_count"),
-  containersInspected: integer("containers_inspected").default(0),
-  containersWithLarvae: integer("containers_with_larvae").default(0),
-  containersEliminated: integer("containers_eliminated").default(0),
-  larvicideApplied: integer("larvicide_applied", { mode: "boolean" }).default(false),
-  larvicideType: text("larvicide_type"), // Ex: "Bti", "Pyriproxyfen"
-  observations: text("observations"),
-  latitude: real("latitude"),
-  longitude: real("longitude"),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Foci / Criadouros (Breeding Sites)
-export const foci = sqliteTable("foci", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  fadId: text("fad_id").notNull().references(() => fadEvaluations.id),
-  dwellingId: text("dwelling_id").notNull().references(() => dwellings.id),
-  depositType: text("deposit_type", {
-    enum: ["A1", "A2", "B", "C", "D1", "D2", "E"]
-  }).notNull(),
-  depositDescription: text("deposit_description").notNull(), // Ex: "Caixa d'água", "Pneu"
-  larvaeFound: integer("larvae_found", { mode: "boolean" }).notNull().default(true),
-  pupaeFound: integer("pupae_found", { mode: "boolean" }).default(false),
-  actionTaken: text("action_taken", {
-    enum: ["elimination", "treatment", "protection", "education"]
-  }).notNull(),
-  larvicideApplied: text("larvicide_applied"), // Tipo de larvicida
-  quantity: integer("quantity").default(1), // Quantidade de depósitos
-  latitude: real("latitude"),
-  longitude: real("longitude"),
-  photoUrl: text("photo_url"), // URL da foto do foco
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Focal Treatments (Tratamentos Focais)
-export const focalTreatments = sqliteTable("focal_treatments", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  cycleId: text("cycle_id").references(() => endemicCycles.id),
-  dwellingId: text("dwelling_id").notNull().references(() => dwellings.id),
-  professionalId: text("professional_id").notNull().references(() => professionals.id),
-  treatmentDate: integer("treatment_date", { mode: "timestamp" }).notNull(),
-  treatmentType: text("treatment_type", {
-    enum: ["perifocal", "focal", "nebulizacao", "bloqueio"]
-  }).notNull(),
-  productUsed: text("product_used").notNull(), // Ex: "Malathion", "Deltametrina"
-  dosage: text("dosage"), // Ex: "50ml/m²"
-  targetArea: real("target_area"), // Área tratada em m²
-  containersCount: integer("containers_count").default(0),
-  reinspectionDate: integer("reinspection_date", { mode: "timestamp" }),
-  reinspected: integer("reinspected", { mode: "boolean" }).default(false),
-  effectiveness: text("effectiveness", {
-    enum: ["effective", "partially_effective", "ineffective", "pending"]
-  }).default("pending"),
-  observations: text("observations"),
-  latitude: real("latitude"),
-  longitude: real("longitude"),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// AI Audit Logs (Registros de Auditoria de IA para Compliance Médico)
-export const aiAuditLogs = sqliteTable("ai_audit_logs", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  userId: text("user_id").notNull().references(() => users.id),
-  userName: text("user_name").notNull(),
-  userRole: text("user_role").notNull(),
-  operation: text("operation", {
-    enum: ["diagnose", "drug_interactions", "validate_prescription", "generate_care_plan"]
-  }).notNull(),
-  inputData: text("input_data", { mode: "json" }), // Dados de entrada (JSON)
-  success: integer("success", { mode: "boolean" }).notNull(),
-  errorCode: text("error_code"), // ID de correlação de erro
-  errorMessage: text("error_message"), // Mensagem de erro (se houver)
-  completionTokens: integer("completion_tokens"), // Tokens usados pela IA
-  latencyMs: integer("latency_ms"), // Latência em milissegundos
-  citizenId: text("citizen_id"), // ID do cidadão (se aplicável)
-  consultationId: text("consultation_id"), // ID da consulta (se aplicável)
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Notifications (Sistema de Notificações)
 export const notifications = sqliteTable("notifications", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
-  userId: text("user_id").references(() => users.id), // null = notificação para toda unidade
+  userId: text("user_id").references(() => users.id),
   unitId: text("unit_id").notNull().references(() => healthUnits.id),
   type: text("type", {
-    enum: ["clinical_alert", "prescription_ready", "stock_low", "exam_result", "referral_update", "appointment_reminder", "system", "tfd_update"]
+    enum: ["prescription_ready", "stock_low", "system", "tfd_update"]
   }).notNull(),
   priority: text("priority", {
     enum: ["low", "medium", "high", "critical"]
   }).notNull().default("medium"),
   title: text("title").notNull(),
   message: text("message").notNull(),
-  entityType: text("entity_type"), // Ex: "consultation", "prescription"
+  entityType: text("entity_type"),
   entityId: text("entity_id"),
   actionUrl: text("action_url"),
   metadata: text("metadata", { mode: "json" }),
@@ -1028,16 +473,15 @@ export const notifications = sqliteTable("notifications", {
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
-// Document Signatures (Assinaturas Digitais)
 export const documentSignatures = sqliteTable("document_signatures", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   documentType: text("document_type", {
-    enum: ["prescription", "certificate", "referral", "exam_request", "consultation"]
+    enum: ["prescription"]
   }).notNull(),
   documentId: text("document_id").notNull(),
   signerId: text("signer_id").notNull().references(() => professionals.id),
   signerName: text("signer_name").notNull(),
-  signerCredentials: text("signer_credentials"), // CRM, CNS, etc
+  signerCredentials: text("signer_credentials"),
   unitId: text("unit_id").notNull().references(() => healthUnits.id),
   hash: text("hash").notNull(),
   signature: text("signature").notNull(),
@@ -1050,32 +494,8 @@ export const documentSignatures = sqliteTable("document_signatures", {
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
 
-// Medical Certificates (Atestados Médicos)
-export const medicalCertificates = sqliteTable("medical_certificates", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  consultationId: text("consultation_id").notNull().references(() => consultations.id),
-  citizenId: text("citizen_id").notNull().references(() => citizens.id),
-  professionalId: text("professional_id").notNull().references(() => professionals.id),
-  unitId: text("unit_id").notNull().references(() => healthUnits.id),
-  certificateType: text("certificate_type", {
-    enum: ["trabalho", "escola", "acompanhante", "comparecimento", "aptidao", "outros"]
-  }).notNull(),
-  startDate: integer("start_date", { mode: "timestamp" }).notNull(),
-  endDate: integer("end_date", { mode: "timestamp" }).notNull(),
-  daysCount: integer("days_count").notNull(),
-  reason: text("reason"),
-  cid10Code: text("cid10_code"),
-  observations: text("observations"),
-  signatureId: text("signature_id").references(() => documentSignatures.id),
-  printedAt: integer("printed_at", { mode: "timestamp" }),
-  status: text("status", {
-    enum: ["draft", "signed", "printed", "cancelled"]
-  }).notNull().default("draft"),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
 // ============================================================================
-// INSERT SCHEMAS (Zod Validation)
+// INSERT SCHEMAS
 // ============================================================================
 
 export const insertHealthUnitSchema = createInsertSchema(healthUnits).omit({
@@ -1099,31 +519,6 @@ export const insertCitizenSchema = createInsertSchema(citizens).omit({
   updatedAt: true,
 });
 
-export const insertAppointmentSchema = createInsertSchema(appointments).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertAttendanceQueueSchema = createInsertSchema(attendanceQueue).omit({
-  id: true,
-});
-
-export const insertNursingTriageSchema = createInsertSchema(nursingTriage).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertConsultationSchema = createInsertSchema(consultations).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertCitizenProblemSchema = createInsertSchema(citizenProblems).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
 export const insertMedicationSchema = createInsertSchema(medications).omit({
   id: true,
   createdAt: true,
@@ -1134,18 +529,17 @@ export const insertPrescriptionSchema = createInsertSchema(prescriptions).omit({
   createdAt: true,
 });
 
-export const insertExamSchema = createInsertSchema(exams).omit({
-  id: true,
-  createdAt: true,
+export const insertDispensationSchema = createInsertSchema(dispensations).omit({ 
+  id: true, 
+  createdAt: true 
 });
 
-export const insertMedicalReferralSchema = createInsertSchema(medicalReferrals).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
+export const insertMedicationStockSchema = createInsertSchema(medicationStock).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
 });
 
-// TFD Module Insert Schemas
 export const insertTfdVehicleSchema = createInsertSchema(tfdVehicles).omit({
   id: true,
   createdAt: true,
@@ -1176,7 +570,15 @@ export const insertTfdTripPassengerSchema = createInsertSchema(tfdTripPassengers
   createdAt: true,
 });
 
-// TFD Module Update Schemas (security - only mutable fields)
+export const loginSchema = z.object({
+  email: z.string().email("Email inválido"),
+  password: z.string().min(6, "Senha deve ter no mínimo 6 caracteres"),
+});
+
+// ============================================================================
+// UPDATE SCHEMAS
+// ============================================================================
+
 export const updateTfdVehicleSchema = z.object({
   model: z.string().optional(),
   brand: z.string().optional(),
@@ -1268,863 +670,54 @@ export const updateTfdRequestSchema = z.object({
   })).optional(),
 }).refine(data => Object.keys(data).length > 0, { message: "Nenhum campo para atualizar" });
 
-export const insertDwellingSchema = createInsertSchema(dwellings).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertFamilySchema = createInsertSchema(families).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertHomeVisitSchema = createInsertSchema(homeVisits).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertFamilyMemberSchema = createInsertSchema(familyMembers).omit({
-  id: true,
-  joinedAt: true,
-});
-
-// e-SUS Export Insert Schema
-export const insertEsusExportSchema = createInsertSchema(esusExports).omit({
-  id: true,
-  createdAt: true,
-  completedAt: true,
-});
-
-// SIGTAP Mapping Insert Schema
-export const insertSigtapMappingSchema = createInsertSchema(sigtapMappings).omit({
-  id: true,
-  createdAt: true,
-});
-
-// Endemic Control Insert Schemas
-export const insertEndemicCycleSchema = createInsertSchema(endemicCycles).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertFadEvaluationSchema = createInsertSchema(fadEvaluations).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertFocusSchema = createInsertSchema(foci).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertFocalTreatmentSchema = createInsertSchema(focalTreatments).omit({
-  id: true,
-  createdAt: true,
-});
-
-// ============================================================================
-// ACE MODULE TABLES (Agente de Combate a Endemias)
-// ============================================================================
-
-// ACE Dwellings (Imóveis ACE)
-export const aceDwellings = sqliteTable("ace_dwellings", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  externalId: text("external_id").unique(),
-  unitId: text("unit_id").notNull().references(() => healthUnits.id),
-  microarea: text("microarea"),
-  street: text("street").notNull(),
-  number: text("number"),
-  complement: text("complement"),
-  neighborhood: text("neighborhood"),
-  zipCode: text("zip_code"),
-  latitude: text("latitude"),
-  longitude: text("longitude"),
-  dwellingType: text("dwelling_type"),
-  sanitation: text("sanitation"),
-  waterSupply: text("water_supply"),
-  hasElectricity: integer("has_electricity", { mode: "boolean" }).default(true).notNull(),
-  hasAnimals: integer("has_animals", { mode: "boolean" }).default(false).notNull(),
-  animalTypes: text("animal_types", { mode: "json" }).$type<string[]>().default(sql`'[]'`).notNull(),
-  householdMembers: integer("household_members").default(0).notNull(),
-  notes: text("notes"),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// ACE Visits (Visitas ACE)
-export const aceVisits = sqliteTable("ace_visits", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  externalId: text("external_id").unique(),
-  dwellingId: text("dwelling_id").notNull().references(() => aceDwellings.id, { onDelete: "cascade" }),
-  professionalId: text("professional_id").notNull().references(() => professionals.id),
-  unitId: text("unit_id").notNull().references(() => healthUnits.id),
-  visitDate: integer("visit_date", { mode: "timestamp" }).notNull(),
-  visitType: text("visit_type"),
-  visitMotive: text("visit_motive"),
-  latitude: text("latitude"),
-  longitude: text("longitude"),
-  temperature: real("temperature"),
-  bloodPressureSystolic: integer("blood_pressure_systolic"),
-  bloodPressureDiastolic: integer("blood_pressure_diastolic"),
-  heartRate: integer("heart_rate"),
-  respiratoryRate: integer("respiratory_rate"),
-  bloodGlucose: integer("blood_glucose"),
-  weight: real("weight"),
-  height: real("height"),
-  observations: text("observations"),
-  findings: text("findings", { mode: "json" }).$type<Record<string, any>>().default(sql`'{}'`).notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// ACE Foci (Focos Vetoriais)
-export const aceFoci = sqliteTable("ace_foci", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  visitId: text("visit_id").notNull().references(() => aceVisits.id, { onDelete: "cascade" }),
-  dwellingId: text("dwelling_id").notNull().references(() => aceDwellings.id, { onDelete: "cascade" }),
-  fociType: text("foci_type").notNull(),
-  locationDescription: text("location_description"),
-  latitude: text("latitude"),
-  longitude: text("longitude"),
-  quantity: integer("quantity").default(1).notNull(),
-  actionTaken: text("action_taken"),
-  status: text("status", { enum: ["active", "resolved", "monitoring"] }).default("active").notNull(),
-  notes: text("notes"),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-  resolvedAt: integer("resolved_at", { mode: "timestamp" }),
-});
-
-// ACE Audit Logs (Logs de Auditoria ACE)
-export const aceAuditLogs = sqliteTable("ace_audit_logs", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  entityType: text("entity_type").notNull(),
-  entityId: text("entity_id").notNull(),
-  action: text("action").notNull(),
-  userId: text("user_id").references(() => users.id),
-  changes: text("changes", { mode: "json" }).$type<Record<string, any>>().default(sql`'{}'`).notNull(),
-  metadata: text("metadata", { mode: "json" }).$type<Record<string, any>>().default(sql`'{}'`).notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Medical Records Audit Logs (Auditoria de Acesso a Prontuários - LGPD Compliance)
-export const medicalRecordsAuditLogs = sqliteTable("medical_records_audit_logs", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  citizenId: text("citizen_id").notNull().references(() => citizens.id),
-  userId: text("user_id").notNull().references(() => users.id),
-  professionalId: text("professional_id").references(() => professionals.id),
-  unitId: text("unit_id").notNull().references(() => healthUnits.id),
-  action: text("action", { 
-    enum: ["view", "create", "update", "delete", "print", "export", "share"] 
-  }).notNull(),
-  entityType: text("entity_type", { 
-    enum: ["consultation", "prescription", "exam", "referral", "certificate", "triage", "history", "full_record"] 
-  }).notNull(),
-  entityId: text("entity_id"),
-  accessReason: text("access_reason"),
-  ipAddress: text("ip_address"),
-  userAgent: text("user_agent"),
-  sessionId: text("session_id"),
-  sensitiveDataAccessed: integer("sensitive_data_accessed", { mode: "boolean" }).default(false).notNull(),
-  metadata: text("metadata", { mode: "json" }).$type<Record<string, any>>().default(sql`'{}'`).notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// ACE Insert Schemas
-export const insertAceDwellingSchema = createInsertSchema(aceDwellings).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertAceVisitSchema = createInsertSchema(aceVisits).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertAceFocusSchema = createInsertSchema(aceFoci).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertAceAuditLogSchema = createInsertSchema(aceAuditLogs).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertMedicalRecordsAuditLogSchema = createInsertSchema(medicalRecordsAuditLogs).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const loginSchema = z.object({
-  email: z.string().email("Email inválido"),
-  password: z.string().min(6, "Senha deve ter no mínimo 6 caracteres"),
-});
-
-// ============================================================================
-// SPECIALTY & CARE LINES MANAGEMENT (Dynamic Forms System)
-// ============================================================================
-
-// Specialties (Especialidades Médicas)
-export const specialties = sqliteTable("specialties", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  name: text("name").notNull().unique(), // "Endocrinologia", "Pediatria", etc
-  code: text("code").notNull().unique(), // "ENDO", "PEDI", etc
-  slug: text("slug").notNull().unique(), // "endocrino", "pediatria", etc (para matching)
-  description: text("description"),
-  active: integer("active", { mode: "boolean" }).default(true).notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Referral Rules (Regras de Encaminhamento Inteligente)
-// Motor rule-based para sugestão automática de especialidades
-export const referralRules = sqliteTable("referral_rules", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  specialtyId: text("specialty_id").notNull().references(() => specialties.id, { onDelete: "cascade" }),
-  keywords: text("keywords", { mode: "json" }).$type<string[]>().notNull(), // ["diabetes", "hipotireoidismo", "tireoide"]
-  cidCodes: text("cid_codes", { mode: "json" }).$type<string[]>(), // ["E11", "E03"] - códigos CID relacionados
-  ciapCodes: text("ciap_codes", { mode: "json" }).$type<string[]>(), // Códigos CIAP-2 relacionados
-  baseWeight: integer("base_weight").notNull().default(10), // Peso base para cálculo de score
-  cidWeight: integer("cid_weight").notNull().default(20), // Peso adicional para match de CID
-  observations: text("observations"), // Notas sobre a regra
-  active: integer("active", { mode: "boolean" }).default(true).notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Care Lines (Linhas de Cuidado - transversais a especialidades)
-export const careLines = sqliteTable("care_lines", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  name: text("name").notNull(), // "Diabetes", "Pré-natal", "Hipertensão"
-  code: text("code").notNull(), // REMOVED .unique() - allowing per-unit duplicates
-  description: text("description"),
-  specialtyId: text("specialty_id").references(() => specialties.id), // Opcional
-  unitId: text("unit_id").notNull().references(() => healthUnits.id), // SECURITY: Multi-tenant isolation
-  priority: integer("priority").default(0), // For specialty fallback ordering
-  riskStratification: integer("risk_stratification", { mode: "boolean" }).default(false),
-  active: integer("active", { mode: "boolean" }).default(true).notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Consultation Templates (Modelos de Formulário)
-export const consultationTemplates = sqliteTable("consultation_templates", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  name: text("name").notNull(), // "Consulta Pré-natal", "Puericultura"
-  specialtyId: text("specialty_id").references(() => specialties.id),
-  careLineId: text("care_line_id").references(() => careLines.id),
-  description: text("description"),
-  active: integer("active", { mode: "boolean" }).default(true).notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Template Fields (Campos Dinâmicos do Formulário)
-export const templateFields = sqliteTable("template_fields", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  templateId: text("template_id").notNull().references(() => consultationTemplates.id, { onDelete: "cascade" }),
-  fieldName: text("field_name").notNull(), // "peso", "ig_semanas", "hba1c"
-  fieldLabel: text("field_label").notNull(), // "Peso (kg)", "Idade Gestacional"
-  fieldType: text("field_type", { 
-    enum: ["text", "number", "date", "select", "checkbox", "textarea", "range"] 
-  }).notNull(),
-  fieldOptions: text("field_options", { mode: "json" }).$type<string[]>(), // Para select/checkbox
-  required: integer("required", { mode: "boolean" }).default(false).notNull(),
-  order: integer("order").notNull(), // Ordem de exibição
-  validationRules: text("validation_rules", { mode: "json" }).$type<{
-    min?: number;
-    max?: number;
-    pattern?: string;
-    customMessage?: string;
-  }>(),
-  helperText: text("helper_text"), // Texto de ajuda
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Consultation Field Data (Dados Preenchidos do Formulário Dinâmico)
-export const consultationFieldData = sqliteTable("consultation_field_data", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  consultationId: text("consultation_id").notNull().references(() => consultations.id, { onDelete: "cascade" }),
-  fieldId: text("field_id").notNull().references(() => templateFields.id),
-  fieldValue: text("field_value"), // Armazena qualquer tipo como string/JSON
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Clinical Protocols (Protocolos Clínicos - Alertas Automáticos)
-export const clinicalProtocols = sqliteTable("clinical_protocols", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  name: text("name").notNull(), // "HbA1c descompensada", "VDRL pendente"
-  description: text("description"), // Descrição detalhada do protocolo
-  category: text("category", { 
-    enum: ["vital_signs", "diagnosis", "medication", "age_gender", "exam", "pregnancy", "chronic"] 
-  }).notNull().default("diagnosis"),
-  careLineId: text("care_line_id").references(() => careLines.id),
-  specialtyId: text("specialty_id").references(() => specialties.id),
-  unitId: text("unit_id").references(() => healthUnits.id), // Multi-tenant, null = global
-  triggerConditions: text("trigger_conditions", { mode: "json" }).$type<{
-    vitalSigns?: Array<{ field: string; operator: string; value: number }>;
-    age?: { min?: number; max?: number };
-    gender?: "M" | "F";
-    diagnoses?: string[]; // CIAP-2/CID-10 codes
-    medications?: string[]; // Medication names or codes
-    exams?: Array<{ code: string; operator?: string; value?: number }>;
-  }>(),
-  alertMessage: text("alert_message").notNull(),
-  alertLevel: text("alert_level", { enum: ["info", "warning", "critical"] }).notNull().default("info"),
-  recommendation: text("recommendation"), // Ação recomendada
-  protocolReference: text("protocol_reference"), // Referência (ex: "MS 2019", "CFM 2020")
-  action: text("action", { mode: "json" }).$type<{
-    type: "notify" | "auto_referral" | "schedule_followup" | "require_justification";
-    target?: string;
-    days?: number;
-  }>(),
-  active: integer("active", { mode: "boolean" }).default(true).notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Protocol Alerts (Alertas Disparados por Protocolos)
-export const protocolAlerts = sqliteTable("protocol_alerts", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  consultationId: text("consultation_id").notNull().references(() => consultations.id, { onDelete: "cascade" }),
-  protocolId: text("protocol_id").notNull().references(() => clinicalProtocols.id),
-  citizenId: text("citizen_id").notNull().references(() => citizens.id),
-  unitId: text("unit_id").notNull().references(() => healthUnits.id),
-  alertLevel: text("alert_level", { enum: ["info", "warning", "critical"] }).notNull(),
-  message: text("message").notNull(),
-  recommendation: text("recommendation"),
-  triggeredData: text("triggered_data", { mode: "json" }).$type<{
-    vitalSigns?: Array<{ field: string; value: number; expected: number }>;
-    age?: number;
-    diagnoses?: string[];
-    medications?: string[];
-  }>(),
-  status: text("status", { 
-    enum: ["active", "acknowledged", "dismissed", "resolved"] 
-  }).notNull().default("active"),
-  acknowledgedBy: text("acknowledged_by").references(() => professionals.id),
-  acknowledgedAt: integer("acknowledged_at", { mode: "timestamp" }),
-  dismissReason: text("dismiss_reason"), // Justificativa se ignorado
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Therapeutic Plans (Planos Terapêuticos Compartilhados)
-export const therapeuticPlans = sqliteTable("therapeutic_plans", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  citizenId: text("citizen_id").notNull().references(() => citizens.id, { onDelete: "cascade" }),
-  careLineId: text("care_line_id").references(() => careLines.id),
-  title: text("title").notNull(), // "Plano de cuidado - Diabetes tipo 2"
-  objective: text("objective"), // Objetivo terapêutico
-  status: text("status", { enum: ["active", "completed", "suspended"] }).notNull().default("active"),
-  startDate: integer("start_date", { mode: "timestamp" }).notNull(),
-  endDate: integer("end_date", { mode: "timestamp" }),
-  createdBy: text("created_by").notNull().references(() => professionals.id),
-  unitId: text("unit_id").notNull().references(() => healthUnits.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Therapeutic Plan Items (Itens/Tarefas do Plano Terapêutico)
-export const therapeuticPlanItems = sqliteTable("therapeutic_plan_items", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  planId: text("plan_id").notNull().references(() => therapeuticPlans.id, { onDelete: "cascade" }),
-  description: text("description").notNull(), // "Acompanhamento nutricional mensal"
-  responsibleProfessionalId: text("responsible_professional_id").references(() => professionals.id),
-  responsibleSpecialty: text("responsible_specialty"), // "Nutricionista", "Psicólogo"
-  status: text("status", { enum: ["pending", "in_progress", "completed", "cancelled"] }).notNull().default("pending"),
-  dueDate: integer("due_date", { mode: "timestamp" }),
-  completedDate: integer("completed_date", { mode: "timestamp" }),
-  notes: text("notes"),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Care Line Diagnoses Mapping - Automatic care line detection via diagnosis codes
-export const careLineDiagnoses = sqliteTable("care_line_diagnoses", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  careLineId: text("care_line_id").notNull().references(() => careLines.id, { onDelete: "cascade" }),
-  diagnosisType: text("diagnosis_type", { enum: ["ciap2" as const, "cid10" as const] }).notNull(),
-  diagnosisCode: text("diagnosis_code").notNull(), // "W78", "O11", "E10", etc
-  priority: integer("priority").default(0), // Higher priority = preferred match
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Care Line Triggers - Events that auto-assign care lines
-export const careLineTriggers = sqliteTable("care_line_triggers", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  careLineId: text("care_line_id").notNull().references(() => careLines.id, { onDelete: "cascade" }),
-  triggerType: text("trigger_type", { 
-    enum: ["problem", "procedure", "medication", "exam", "age_range", "gender", "appointment_specialty"] 
-  }).notNull(),
-  triggerValue: text("trigger_value").notNull(), // JSON with trigger criteria
-  priority: integer("priority").default(0),
-  active: integer("active", { mode: "boolean" }).default(true).notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Insert Schemas for new tables
-export const insertSpecialtySchema = createInsertSchema(specialties).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertReferralRuleSchema = createInsertSchema(referralRules).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertCareLineSchema = createInsertSchema(careLines).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertConsultationTemplateSchema = createInsertSchema(consultationTemplates).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertTemplateFieldSchema = createInsertSchema(templateFields).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertConsultationFieldDataSchema = createInsertSchema(consultationFieldData).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertClinicalProtocolSchema = createInsertSchema(clinicalProtocols).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertProtocolAlertSchema = createInsertSchema(protocolAlerts).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const updateProtocolAlertSchema = z.object({
-  status: z.enum(["active", "acknowledged", "dismissed", "resolved"]).optional(),
-  acknowledgedBy: z.string().uuid().optional(),
-  acknowledgedAt: z.date().optional(),
-  dismissReason: z.string().optional(),
-});
-
-export const insertTherapeuticPlanSchema = createInsertSchema(therapeuticPlans).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertTherapeuticPlanItemSchema = createInsertSchema(therapeuticPlanItems).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertCareLineDiagnosisSchema = createInsertSchema(careLineDiagnoses).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertCareLineTriggerSchema = createInsertSchema(careLineTriggers).omit({
-  id: true,
-  createdAt: true,
-});
-
 // ============================================================================
 // TYPES
 // ============================================================================
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
-
-export type InsertHealthUnit = z.infer<typeof insertHealthUnitSchema>;
 export type HealthUnit = typeof healthUnits.$inferSelect;
+export type InsertHealthUnit = z.infer<typeof insertHealthUnitSchema>;
 
-export type InsertProfessional = z.infer<typeof insertProfessionalSchema>;
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+
 export type Professional = typeof professionals.$inferSelect;
+export type InsertProfessional = z.infer<typeof insertProfessionalSchema>;
 
-export type InsertCitizen = z.infer<typeof insertCitizenSchema>;
 export type Citizen = typeof citizens.$inferSelect;
+export type InsertCitizen = z.infer<typeof insertCitizenSchema>;
 
-export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
-export type Appointment = typeof appointments.$inferSelect;
-
-export type InsertAttendanceQueue = z.infer<typeof insertAttendanceQueueSchema>;
-export type AttendanceQueue = typeof attendanceQueue.$inferSelect;
-
-export type InsertNursingTriage = z.infer<typeof insertNursingTriageSchema>;
-export type NursingTriage = typeof nursingTriage.$inferSelect;
-
-export type InsertConsultation = z.infer<typeof insertConsultationSchema>;
-export type Consultation = typeof consultations.$inferSelect;
-
-export type InsertCitizenProblem = z.infer<typeof insertCitizenProblemSchema>;
-export type CitizenProblem = typeof citizenProblems.$inferSelect;
-
-export type InsertMedication = z.infer<typeof insertMedicationSchema>;
 export type Medication = typeof medications.$inferSelect;
+export type InsertMedication = z.infer<typeof insertMedicationSchema>;
 
-export type InsertPrescription = z.infer<typeof insertPrescriptionSchema>;
 export type Prescription = typeof prescriptions.$inferSelect;
+export type InsertPrescription = z.infer<typeof insertPrescriptionSchema>;
 
-export type InsertExam = z.infer<typeof insertExamSchema>;
-export type Exam = typeof exams.$inferSelect;
+export type Dispensation = typeof dispensations.$inferSelect;
+export type InsertDispensation = z.infer<typeof insertDispensationSchema>;
 
-export type InsertMedicalReferral = z.infer<typeof insertMedicalReferralSchema>;
-export type MedicalReferral = typeof medicalReferrals.$inferSelect;
+export type MedicationStock = typeof medicationStock.$inferSelect;
+export type InsertMedicationStock = z.infer<typeof insertMedicationStockSchema>;
 
-// TFD Module Types
-export type InsertTfdVehicle = z.infer<typeof insertTfdVehicleSchema>;
+export type StockMovement = typeof stockMovements.$inferSelect;
+
 export type TfdVehicle = typeof tfdVehicles.$inferSelect;
-export type UpdateTfdVehicle = z.infer<typeof updateTfdVehicleSchema>;
+export type InsertTfdVehicle = z.infer<typeof insertTfdVehicleSchema>;
 
-export type InsertTfdDriver = z.infer<typeof insertTfdDriverSchema>;
 export type TfdDriver = typeof tfdDrivers.$inferSelect;
-export type UpdateTfdDriver = z.infer<typeof updateTfdDriverSchema>;
+export type InsertTfdDriver = z.infer<typeof insertTfdDriverSchema>;
 
-export type InsertTfdTrip = z.infer<typeof insertTfdTripSchema>;
 export type TfdTrip = typeof tfdTrips.$inferSelect;
-export type UpdateTfdTrip = z.infer<typeof updateTfdTripSchema>;
+export type InsertTfdTrip = z.infer<typeof insertTfdTripSchema>;
 
-export type InsertTfdRequest = z.infer<typeof insertTfdRequestSchema>;
 export type TfdRequest = typeof tfdRequests.$inferSelect;
+export type InsertTfdRequest = z.infer<typeof insertTfdRequestSchema>;
 export type UpdateTfdRequest = z.infer<typeof updateTfdRequestSchema>;
 
-export type InsertTfdTripPassenger = z.infer<typeof insertTfdTripPassengerSchema>;
 export type TfdTripPassenger = typeof tfdTripPassengers.$inferSelect;
+export type InsertTfdTripPassenger = z.infer<typeof insertTfdTripPassengerSchema>;
 
-export type InsertDwelling = z.infer<typeof insertDwellingSchema>;
-export type Dwelling = typeof dwellings.$inferSelect;
+export type Notification = typeof notifications.$inferSelect;
+export type DocumentSignature = typeof documentSignatures.$inferSelect;
 
-export type InsertFamily = z.infer<typeof insertFamilySchema>;
-export type Family = typeof families.$inferSelect;
-
-export type InsertFamilyMember = z.infer<typeof insertFamilyMemberSchema>;
-export type FamilyMember = typeof familyMembers.$inferSelect;
-
-export type InsertHomeVisit = z.infer<typeof insertHomeVisitSchema>;
-export type HomeVisit = typeof homeVisits.$inferSelect;
-
-export type InsertEsusExport = z.infer<typeof insertEsusExportSchema>;
-export type EsusExport = typeof esusExports.$inferSelect;
-
-export type InsertSigtapMapping = z.infer<typeof insertSigtapMappingSchema>;
-export type SigtapMapping = typeof sigtapMappings.$inferSelect;
-
-export type InsertEndemicCycle = z.infer<typeof insertEndemicCycleSchema>;
-export type EndemicCycle = typeof endemicCycles.$inferSelect;
-
-export type InsertFadEvaluation = z.infer<typeof insertFadEvaluationSchema>;
-export type FadEvaluation = typeof fadEvaluations.$inferSelect;
-
-export type InsertFocus = z.infer<typeof insertFocusSchema>;
-export type Focus = typeof foci.$inferSelect;
-
-export type InsertFocalTreatment = z.infer<typeof insertFocalTreatmentSchema>;
-export type FocalTreatment = typeof focalTreatments.$inferSelect;
-
-export const insertAiAuditLogSchema = createInsertSchema(aiAuditLogs).omit({
-  id: true,
-  createdAt: true,
-});
-export type InsertAiAuditLog = z.infer<typeof insertAiAuditLogSchema>;
-export type AiAuditLog = typeof aiAuditLogs.$inferSelect;
-
-// ACE Module Types
-export type InsertAceDwelling = z.infer<typeof insertAceDwellingSchema>;
-export type AceDwelling = typeof aceDwellings.$inferSelect;
-
-export type InsertAceVisit = z.infer<typeof insertAceVisitSchema>;
-export type AceVisit = typeof aceVisits.$inferSelect;
-
-export type InsertAceFocus = z.infer<typeof insertAceFocusSchema>;
-export type AceFocus = typeof aceFoci.$inferSelect;
-
-export type InsertAceAuditLog = z.infer<typeof insertAceAuditLogSchema>;
-export type AceAuditLog = typeof aceAuditLogs.$inferSelect;
-
-export type InsertMedicalRecordsAuditLog = z.infer<typeof insertMedicalRecordsAuditLogSchema>;
-export type MedicalRecordsAuditLog = typeof medicalRecordsAuditLogs.$inferSelect;
-
-// Dynamic Forms System Types
-export type InsertSpecialty = z.infer<typeof insertSpecialtySchema>;
-export type Specialty = typeof specialties.$inferSelect;
-
-export type InsertReferralRule = z.infer<typeof insertReferralRuleSchema>;
-export type ReferralRule = typeof referralRules.$inferSelect;
-
-export type InsertCareLine = z.infer<typeof insertCareLineSchema>;
-export type CareLine = typeof careLines.$inferSelect;
-
-export type InsertConsultationTemplate = z.infer<typeof insertConsultationTemplateSchema>;
-export type ConsultationTemplate = typeof consultationTemplates.$inferSelect;
-
-export type InsertTemplateField = z.infer<typeof insertTemplateFieldSchema>;
-export type TemplateField = typeof templateFields.$inferSelect;
-
-export type InsertConsultationFieldData = z.infer<typeof insertConsultationFieldDataSchema>;
-export type ConsultationFieldData = typeof consultationFieldData.$inferSelect;
-
-export type InsertClinicalProtocol = z.infer<typeof insertClinicalProtocolSchema>;
-export type ClinicalProtocol = typeof clinicalProtocols.$inferSelect;
-
-export type InsertProtocolAlert = z.infer<typeof insertProtocolAlertSchema>;
-export type UpdateProtocolAlert = z.infer<typeof updateProtocolAlertSchema>;
-export type ProtocolAlert = typeof protocolAlerts.$inferSelect;
-
-export type InsertTherapeuticPlan = z.infer<typeof insertTherapeuticPlanSchema>;
-export type TherapeuticPlan = typeof therapeuticPlans.$inferSelect;
-
-export type InsertTherapeuticPlanItem = z.infer<typeof insertTherapeuticPlanItemSchema>;
-export type TherapeuticPlanItem = typeof therapeuticPlanItems.$inferSelect;
-
-export type CareLineDiagnosis = typeof careLineDiagnoses.$inferSelect;
-export type InsertCareLineDiagnosis = z.infer<typeof insertCareLineDiagnosisSchema>;
-
-export type CareLineTrigger = typeof careLineTriggers.$inferSelect;
-export type InsertCareLineTrigger = z.infer<typeof insertCareLineTriggerSchema>;
-
-// Stock Movement Validation Schemas (for API validation)
-export const stockMovementSchema = z.object({
-  medicationId: z.string().uuid(),
-  unitId: z.string().uuid(),
-  movementType: z.enum(["entrada", "saida", "ajuste"]),
-  quantity: z.number().int().positive(), // Always positive in schema, route handles negation for saida
-  batchNumber: z.string().min(1).optional(), // Optional for adjustments/outputs
-  expirationDate: z.coerce.date().optional(), // Optional for adjustments/outputs
-  reason: z.string().min(1), // Required for audit purposes
-});
-
-export type StockMovementInput = z.infer<typeof stockMovementSchema>;
-
-// ============================================================================
-// SPECIALTY SUGGESTION ENGINE SCHEMAS
-// ============================================================================
-
-// Input schema para sugestão de especialidade
-export const specialtySuggestionInputSchema = z.object({
-  motivoEncaminhamento: z.string().min(1, "Motivo do encaminhamento é obrigatório"),
-  hipoteseDiagnostica: z.string().optional(),
-  cid: z.string().optional(),
-  dadosComplementares: z.object({
-    sinaisAlarme: z.object({
-      perdaPeso: z.boolean().optional(),
-      febre: z.boolean().optional(),
-      traumaRecente: z.boolean().optional(),
-      sangramento: z.boolean().optional(),
-      cefaleiaSevera: z.boolean().optional(),
-      dispneia: z.boolean().optional(),
-    }).optional(),
-    tipoAtendimento: z.enum(["agudo", "cronico", "acompanhamento", "emergencia"]).optional(),
-    idadePaciente: z.number().optional(),
-    generoPaciente: z.string().optional(),
-  }).optional(),
-});
-
-export type SpecialtySuggestionInput = z.infer<typeof specialtySuggestionInputSchema>;
-
-// Output schema para sugestão de especialidade
-export const specialtySuggestionOutputSchema = z.object({
-  especialidadeId: z.string(),
-  nome: z.string(),
-  slug: z.string(),
-  score: z.number(),
-  justificativa: z.string(),
-});
-
-export type SpecialtySuggestion = z.infer<typeof specialtySuggestionOutputSchema>;
-
-// Complementary data type for referral
-export type ReferralComplementaryData = {
-  alarmSigns?: {
-    fever?: boolean;
-    weightLoss?: boolean;
-    bleeding?: boolean;
-    recentTrauma?: boolean;
-    severeHeadache?: boolean;
-    dyspnea?: boolean;
-  };
-  attendanceType?: "acute" | "chronic" | "followup" | "emergency";
-  patientAge?: number;
-  patientGender?: string;
-};
-
-// ============================================================================
-// PROFESSIONAL SCHEDULE MANAGEMENT (Agenda Profissional)
-// ============================================================================
-
-// Professional Schedule Slots - Configuração de horários de atendimento
-export const professionalSchedules = sqliteTable("professional_schedules", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  professionalId: text("professional_id").notNull().references(() => professionals.id),
-  unitId: text("unit_id").notNull().references(() => healthUnits.id),
-  dayOfWeek: integer("day_of_week").notNull(), // 0=domingo, 1=segunda... 6=sábado
-  startTime: text("start_time").notNull(), // "08:00"
-  endTime: text("end_time").notNull(), // "12:00"
-  slotDuration: integer("slot_duration").notNull().default(30), // Minutos por consulta
-  maxAppointments: integer("max_appointments").notNull().default(12), // Vagas por turno
-  appointmentType: text("appointment_type", { 
-    enum: ["consulta", "retorno", "procedimento", "triagem", "urgencia"] 
-  }).notNull().default("consulta"),
-  careLineId: text("care_line_id").references(() => careLines.id), // Opcional: agenda por linha de cuidado
-  active: integer("active", { mode: "boolean" }).default(true).notNull(),
-  observations: text("observations"),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Schedule Exceptions - Exceções (férias, feriados, plantões extras)
-export const scheduleExceptions = sqliteTable("schedule_exceptions", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  professionalId: text("professional_id").notNull().references(() => professionals.id),
-  unitId: text("unit_id").notNull().references(() => healthUnits.id),
-  exceptionDate: integer("exception_date", { mode: "timestamp" }).notNull(),
-  exceptionType: text("exception_type", { 
-    enum: ["block", "extra", "holiday", "vacation", "sick_leave"] 
-  }).notNull(),
-  startTime: text("start_time"), // Para exceções parciais
-  endTime: text("end_time"),
-  reason: text("reason"),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Waiting List - Lista de Espera Automatizada
-export const waitingList = sqliteTable("waiting_list", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  citizenId: text("citizen_id").notNull().references(() => citizens.id),
-  unitId: text("unit_id").notNull().references(() => healthUnits.id),
-  professionalId: text("professional_id").references(() => professionals.id), // Profissional específico
-  specialtyId: text("specialty_id").references(() => specialties.id), // Ou especialidade
-  careLineId: text("care_line_id").references(() => careLines.id), // Ou linha de cuidado
-  priority: text("priority", { 
-    enum: ["normal", "priority", "urgent", "emergency"] 
-  }).notNull().default("normal"),
-  requestDate: integer("request_date", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-  preferredDays: text("preferred_days", { mode: "json" }).$type<number[]>(), // [1,3,5] = seg, qua, sex
-  preferredPeriod: text("preferred_period", { enum: ["manha", "tarde", "noite", "qualquer"] }).default("qualquer"),
-  reason: text("reason"),
-  status: text("status", { 
-    enum: ["waiting", "scheduled", "cancelled", "expired", "no_show"] 
-  }).notNull().default("waiting"),
-  scheduledAppointmentId: text("scheduled_appointment_id").references(() => appointments.id),
-  notifiedAt: integer("notified_at", { mode: "timestamp" }),
-  expiresAt: integer("expires_at", { mode: "timestamp" }),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Queue Routing Rules - Regras de Roteamento Automático de Fila
-export const queueRoutingRules = sqliteTable("queue_routing_rules", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  unitId: text("unit_id").notNull().references(() => healthUnits.id),
-  name: text("name").notNull(),
-  description: text("description"),
-  priority: integer("priority").default(0).notNull(), // Ordem de avaliação
-  conditions: text("conditions", { mode: "json" }).$type<{
-    ageMin?: number;
-    ageMax?: number;
-    gender?: string;
-    careLineId?: string;
-    appointmentType?: string;
-    priority?: string;
-    diagnosisCodes?: string[];
-  }>(),
-  targetProfessionalId: text("target_professional_id").references(() => professionals.id),
-  targetCareLineId: text("target_care_line_id").references(() => careLines.id),
-  targetRoom: text("target_room"),
-  active: integer("active", { mode: "boolean" }).default(true).notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// Insert Schemas
-export const insertProfessionalScheduleSchema = createInsertSchema(professionalSchedules).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertScheduleExceptionSchema = createInsertSchema(scheduleExceptions).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertWaitingListSchema = createInsertSchema(waitingList).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertQueueRoutingRuleSchema = createInsertSchema(queueRoutingRules).omit({
-  id: true,
-  createdAt: true,
-});
-
-// Update Schemas (only mutable fields, preserving multi-tenant security)
-export const updateProfessionalScheduleSchema = z.object({
-  startTime: z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:mm inválido").optional(),
-  endTime: z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:mm inválido").optional(),
-  slotDuration: z.number().min(5, "Duração mínima: 5 min").max(120, "Duração máxima: 120 min").optional(),
-  maxAppointments: z.number().min(1, "Mínimo 1 vaga").max(50, "Máximo 50 vagas").optional(),
-  appointmentType: z.string().optional(),
-  careLineId: z.string().uuid().nullable().optional(),
-  observations: z.string().nullable().optional(),
-  active: z.boolean().optional(),
-}).refine(
-  (data) => Object.keys(data).length > 0,
-  { message: "Nenhum campo para atualizar" }
-).refine(
-  (data) => {
-    if (data.startTime && data.endTime) {
-      return data.startTime < data.endTime;
-    }
-    return true;
-  },
-  { message: "Hora de início deve ser anterior à hora de fim" }
-);
-
-export const updateWaitingListSchema = z.object({
-  status: z.enum(["waiting", "scheduled", "cancelled", "no_show"]).optional(),
-  priority: z.enum(["normal", "priority", "urgent", "emergency"]).optional(),
-  professionalId: z.string().uuid().nullable().optional(),
-  specialtyId: z.string().uuid().nullable().optional(),
-  preferredDays: z.array(z.number().min(0).max(6)).nullable().optional(),
-  observations: z.string().nullable().optional(),
-  notifiedAt: z.date().nullable().optional(),
-  scheduledAppointmentId: z.string().uuid().nullable().optional(),
-}).refine(
-  (data) => Object.keys(data).length > 0,
-  { message: "Nenhum campo para atualizar" }
-);
-
-export const updateQueueRoutingRuleSchema = z.object({
-  name: z.string().min(1).optional(),
-  description: z.string().nullable().optional(),
-  priority: z.number().min(0).max(100).optional(),
-  conditions: z.record(z.any()).nullable().optional(),
-  targetCareLineId: z.string().uuid().nullable().optional(),
-  targetProfessionalId: z.string().uuid().nullable().optional(),
-  targetRoom: z.string().nullable().optional(),
-  active: z.boolean().optional(),
-}).refine(
-  (data) => Object.keys(data).length > 0,
-  { message: "Nenhum campo para atualizar" }
-);
-
-// Types
-export type ProfessionalSchedule = typeof professionalSchedules.$inferSelect;
-export type InsertProfessionalSchedule = z.infer<typeof insertProfessionalScheduleSchema>;
-export type UpdateProfessionalSchedule = z.infer<typeof updateProfessionalScheduleSchema>;
-
-export type ScheduleException = typeof scheduleExceptions.$inferSelect;
-export type InsertScheduleException = z.infer<typeof insertScheduleExceptionSchema>;
-
-export type WaitingListEntry = typeof waitingList.$inferSelect;
-export type InsertWaitingListEntry = z.infer<typeof insertWaitingListSchema>;
-export type UpdateWaitingListEntry = z.infer<typeof updateWaitingListSchema>;
-
-export type QueueRoutingRule = typeof queueRoutingRules.$inferSelect;
-export type InsertQueueRoutingRule = z.infer<typeof insertQueueRoutingRuleSchema>;
-export type UpdateQueueRoutingRule = z.infer<typeof updateQueueRoutingRuleSchema>;
-
+export type RenameCatalog = typeof renameCatalog.$inferSelect;
+export type CitizenAllergy = typeof citizenAllergies.$inferSelect;

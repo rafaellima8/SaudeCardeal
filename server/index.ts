@@ -3,16 +3,10 @@ import session from "express-session";
 import { db } from "./db";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import seedSIGTAPMappings from "./seed-sigtap";
-import seedRENAMECatalog from "./seed-rename";
 import { seed as seedMinimal } from "./seed-minimal";
-import { seedSpecialtiesAndRules } from "./seed-specialties";
-import { seedProtocols } from "./seeds/seed-protocols";
 
 const app = express();
 
-// Session configuration with secure settings
-// Using MemoryStore temporarily (SQLite compatibility)
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "dev-secret-change-in-production",
@@ -22,7 +16,7 @@ app.use(
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     },
   })
 );
@@ -70,41 +64,12 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Seed usuários de teste (apenas em desenvolvimento)
   if (process.env.NODE_ENV === "development") {
     try {
       await seedMinimal();
     } catch (error) {
-      console.warn("[STARTUP] Aviso: Seed usuários falhou (pode já estar populado):", error);
+      console.warn("[STARTUP] Aviso: Seed mínimo falhou (pode já estar populado):", error);
     }
-  }
-
-  // Garantir seed SIGTAP no startup (SISAB compliance)
-  try {
-    await seedSIGTAPMappings();
-  } catch (error) {
-    console.warn("[STARTUP] Aviso: Seed SIGTAP falhou (pode já estar populado):", error);
-  }
-  
-  // Seed de especialidades e regras de encaminhamento inteligente
-  try {
-    await seedSpecialtiesAndRules();
-  } catch (error) {
-    console.warn("[STARTUP] Aviso: Seed especialidades falhou (pode já estar populado):", error);
-  }
-  
-  // Seed catálogo RENAME (medicamentos essenciais)
-  try {
-    await seedRENAMECatalog();
-  } catch (error) {
-    console.warn("[STARTUP] Aviso: Seed RENAME falhou (pode já estar populado):", error);
-  }
-  
-  // Seed protocolos clínicos padrão (hipertensão, diabetes, TB, gestação)
-  try {
-    await seedProtocols();
-  } catch (error) {
-    console.warn("[STARTUP] Aviso: Seed protocolos clínicos falhou:", error);
   }
   
   const server = await registerRoutes(app);
@@ -117,20 +82,13 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
+  const port = 5000;
   server.listen({
     port,
     host: "0.0.0.0",

@@ -9,13 +9,7 @@ import {
   UserCog,
   BarChart3,
   ChevronDown,
-  ClipboardList,
-  MapPin,
-  Activity,
   LogOut,
-  Bug,
-  Stethoscope,
-  ListChecks,
   FileCheck,
 } from "lucide-react";
 import {
@@ -42,18 +36,9 @@ import { useLocation } from "wouter";
 
 const allMenuItems = [
   { title: "Dashboard", icon: Home, url: "/" },
-  { title: "Recepção", icon: ClipboardList, url: "/recepcao" },
   { title: "Pacientes", icon: Users, url: "/pacientes" },
   { title: "Agendamentos", icon: Calendar, url: "/agendamentos" },
-  { title: "Fila de Atendimento", icon: ListChecks, url: "/fila-atendimento" },
-  { title: "Atendimentos", icon: Stethoscope, url: "/atendimentos" },
   { title: "Prescrições", icon: FileCheck, url: "/prescricoes" },
-  { title: "Território", icon: MapPin, url: "/territorio" },
-  { title: "ACE Dashboard", icon: Activity, url: "/ace" },
-  { title: "ACE Imóveis", icon: Home, url: "/ace/imoveis" },
-  { title: "ACE Visitas", icon: ClipboardList, url: "/ace/visitas" },
-  { title: "ACE Focos", icon: Bug, url: "/ace/focos" },
-  { title: "Endemias", icon: Bug, url: "/endemias" },
   { title: "Farmácia", icon: Pill, url: "/farmacia" },
   { title: "Dispensação", icon: Pill, url: "/farmacia/dispensacao" },
   { title: "Estoque", icon: Pill, url: "/farmacia/estoque" },
@@ -66,9 +51,6 @@ const allConfigItems = [
   { title: "Profissionais", icon: UserCog, url: "/profissionais" },
   { title: "Indicadores", icon: BarChart3, url: "/indicadores" },
   { title: "Configuração de Agenda", icon: Calendar, url: "/admin/agenda-config" },
-  { title: "Protocolos Clínicos", icon: FileCheck, url: "/admin/protocolos-clinicos" },
-  { title: "Formulários Dinâmicos", icon: ClipboardList, url: "/admin/formularios-dinamicos" },
-  { title: "Exportação e-SUS", icon: FileText, url: "/admin/esus-exports" },
 ];
 
 const roleLabels: Record<string, string> = {
