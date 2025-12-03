@@ -26,15 +26,15 @@ test.describe('Alerts Page', () => {
     await page.goto('/alertas');
     
     await expect(page.getByTestId('tabs-alerts')).toBeVisible();
-    await expect(page.getByText('Alertas Ativos')).toBeVisible();
-    await expect(page.getByText('Histórico')).toBeVisible();
-    await expect(page.getByText('Regras de Alerta')).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Alertas Ativos' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Histórico' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Regras de Alerta' })).toBeVisible();
   });
 
   test('should show severity filter in history tab', async ({ page }) => {
     await page.goto('/alertas');
     
-    await page.getByText('Histórico').click();
+    await page.getByRole('tab', { name: 'Histórico' }).click();
     
     await expect(page.getByTestId('select-severity-filter')).toBeVisible();
   });
@@ -42,7 +42,7 @@ test.describe('Alerts Page', () => {
   test('should show category filter in history tab', async ({ page }) => {
     await page.goto('/alertas');
     
-    await page.getByText('Histórico').click();
+    await page.getByRole('tab', { name: 'Histórico' }).click();
     
     await expect(page.getByTestId('select-category-filter')).toBeVisible();
   });
@@ -50,7 +50,7 @@ test.describe('Alerts Page', () => {
   test('should display alert rules in rules tab', async ({ page }) => {
     await page.goto('/alertas');
     
-    await page.getByText('Regras de Alerta').click();
+    await page.getByRole('tab', { name: 'Regras de Alerta' }).click();
     
     const ruleCards = page.locator('[data-testid^="card-rule-"]');
     const count = await ruleCards.count();
@@ -72,14 +72,14 @@ test.describe('Alerts Page', () => {
   test('should filter by severity in history', async ({ page }) => {
     await page.goto('/alertas');
     
-    await page.getByText('Histórico').click();
+    await page.getByRole('tab', { name: 'Histórico' }).click();
     
     const severityFilter = page.getByTestId('select-severity-filter');
     await severityFilter.click();
     
-    await expect(page.getByText('Crítico')).toBeVisible();
-    await expect(page.getByText('Alto')).toBeVisible();
-    await expect(page.getByText('Médio')).toBeVisible();
-    await expect(page.getByText('Baixo')).toBeVisible();
+    await expect(page.getByRole('option', { name: 'Crítico' })).toBeVisible();
+    await expect(page.getByRole('option', { name: 'Alto' })).toBeVisible();
+    await expect(page.getByRole('option', { name: 'Médio' })).toBeVisible();
+    await expect(page.getByRole('option', { name: 'Baixo' })).toBeVisible();
   });
 });

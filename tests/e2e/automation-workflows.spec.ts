@@ -67,7 +67,7 @@ test.describe('Workflows Page', () => {
     await page.goto('/workflows');
     
     await expect(page.getByTestId('tabs-workflow')).toBeVisible();
-    await expect(page.getByText('Definições de Fluxo')).toBeVisible();
-    await expect(page.getByText('Instâncias Ativas')).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Definições de Fluxo' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Instâncias Ativas' })).toBeVisible();
   });
 });
