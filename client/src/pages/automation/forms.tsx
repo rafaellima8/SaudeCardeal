@@ -28,12 +28,17 @@ import {
 interface FormTemplate {
   id: string;
   slug: string;
+  codigo?: string;
   name: string;
   category: string;
+  subcategory?: string;
   isBuiltIn: boolean;
   description?: string;
+  prazoNotificacao?: string;
+  fichaInvestigacao?: boolean;
+  totalCampos?: number;
   fields?: any[];
-  pageSize?: string;
+  pageSize?: { width: number; height: number } | string;
 }
 
 interface FormCategory {
@@ -340,7 +345,11 @@ export default function FormsPage() {
                     {selectedTemplate.isBuiltIn ? "Built-in" : "Customizado"}
                   </Badge>
                   {selectedTemplate.pageSize && (
-                    <Badge variant="secondary">Página: {selectedTemplate.pageSize}</Badge>
+                    <Badge variant="secondary">
+                      Página: {typeof selectedTemplate.pageSize === 'object' 
+                        ? `${selectedTemplate.pageSize.width}x${selectedTemplate.pageSize.height}` 
+                        : selectedTemplate.pageSize}
+                    </Badge>
                   )}
                 </div>
 

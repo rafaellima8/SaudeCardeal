@@ -93,8 +93,16 @@ Isolated modular architecture in `/modules/` directory:
 - Created `/modules/reports/` with strategic-reports.ts and routes.ts for KPI dashboards
 - Integrated all module routes into server/routes.ts with namespace isolation
 
+### SINAN Templates Expansion (Dec 2025)
+- **68+ Official SINAN Forms**: Comprehensive coverage of compulsory disease notification forms
+- **New Diseases Added**: Mpox, SRAG (Síndrome Respiratória Aguda Grave), HIV/AIDS em Criança, Esquistossomose, Botulismo, Difteria, Febre Tifoide, Febre do Nilo Ocidental, Febre Maculosa, Hantavirose
+- **13 Disease Categories**: arboviroses, respiratorias, ist, hepatites, meningites, zoonoses, endemicas, cronicas, intoxicacoes, violencias, trabalho, virais (emergentes), alimentares
+- **Template Structure**: Each form includes CAMPOS_NOTIFICACAO_BASE, CAMPOS_PACIENTE_BASE, CAMPOS_RESIDENCIA_BASE + disease-specific clinical fields
+- **Field Metadata**: Complete field definitions with coordinates (x,y), validation rules, masks, CID-10 mapping
+- **Helper Functions**: getAgravoByCode, getAgravosByCat, getAllAgravos, getAgravosImediatos, buildSinanTemplate
+
 ### Frontend Automation Pages (Dec 2025)
-- **Forms Page** (`/formularios`): Lists 38 form templates (36 SINAN + BPA-I + APAC), with field preview and validation
+- **Forms Page** (`/formularios`): Lists 68+ form templates (SINAN forms + BPA-I + APAC), with field preview and validation
 - **Workflow Page** (`/workflows`): Shows 4 built-in workflows (SINAN, TFD, Prescription, Diaper), status management
 - **Alerts Page** (`/alertas`): Displays 10 alert rules across 4 categories with severity filtering and acknowledge/resolve actions
 - **Strategic Reports Page** (`/relatorios-estrategicos`): Catalog of 8 reports across 4 categories with export formats

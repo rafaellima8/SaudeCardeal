@@ -121,45 +121,19 @@ export class FormEngine {
   }
 }
 
-export const SINAN_TEMPLATES: Record<string, Partial<TemplateDefinition>> = {
-  dengue: {
-    pageSize: { width: 2100, height: 2970 },
-    fields: [
-      { id: "notificacao_tipo", label: "Tipo de Notificação", type: "select", required: true, x: 100, y: 100, width: 200, height: 30, fontSize: 12, options: ["1-Individual", "2-Surto"] },
-      { id: "agravo", label: "Agravo/Doença", type: "text", required: true, x: 100, y: 140, width: 400, height: 30, fontSize: 12 },
-      { id: "cid", label: "CID-10", type: "text", required: true, x: 520, y: 140, width: 100, height: 30, fontSize: 12, validation: { pattern: "^[A-Z]\\d{2}(\\.\\d)?$" } },
-      { id: "data_notificacao", label: "Data da Notificação", type: "date", required: true, x: 100, y: 180, width: 150, height: 30, fontSize: 12 },
-      { id: "uf_notificacao", label: "UF", type: "text", required: true, x: 260, y: 180, width: 50, height: 30, fontSize: 12 },
-      { id: "municipio_notificacao", label: "Município de Notificação", type: "text", required: true, x: 320, y: 180, width: 300, height: 30, fontSize: 12 },
-      { id: "unidade_saude", label: "Unidade de Saúde", type: "text", required: true, x: 100, y: 220, width: 400, height: 30, fontSize: 12 },
-      { id: "cnes", label: "CNES", type: "text", required: false, x: 520, y: 220, width: 100, height: 30, fontSize: 12, validation: { pattern: "^\\d{7}$" } },
-      { id: "paciente_nome", label: "Nome do Paciente", type: "text", required: true, x: 100, y: 280, width: 500, height: 30, fontSize: 12, validation: { minLength: 3 } },
-      { id: "paciente_data_nascimento", label: "Data de Nascimento", type: "date", required: false, x: 100, y: 320, width: 150, height: 30, fontSize: 12 },
-      { id: "paciente_idade", label: "Idade", type: "number", required: true, x: 260, y: 320, width: 80, height: 30, fontSize: 12 },
-      { id: "paciente_sexo", label: "Sexo", type: "select", required: true, x: 350, y: 320, width: 100, height: 30, fontSize: 12, options: ["M-Masculino", "F-Feminino", "I-Ignorado"] },
-      { id: "paciente_gestante", label: "Gestante", type: "select", required: false, x: 460, y: 320, width: 150, height: 30, fontSize: 12, options: ["1-1º Trimestre", "2-2º Trimestre", "3-3º Trimestre", "4-Idade gestacional ignorada", "5-Não", "6-Não se aplica", "9-Ignorado"] },
-      { id: "paciente_raca", label: "Raça/Cor", type: "select", required: false, x: 100, y: 360, width: 150, height: 30, fontSize: 12, options: ["1-Branca", "2-Preta", "3-Amarela", "4-Parda", "5-Indígena", "9-Ignorado"] },
-      { id: "paciente_escolaridade", label: "Escolaridade", type: "select", required: false, x: 260, y: 360, width: 200, height: 30, fontSize: 12, options: ["0-Analfabeto", "1-1ª a 4ª série incompleta", "2-4ª série completa", "3-5ª a 8ª série incompleta", "4-Ensino fundamental completo", "5-Ensino médio incompleto", "6-Ensino médio completo", "7-Educação superior incompleta", "8-Educação superior completa", "9-Ignorado", "10-Não se aplica"] },
-      { id: "paciente_cns", label: "CNS", type: "text", required: false, x: 100, y: 400, width: 200, height: 30, fontSize: 12, mask: "999999999999999", validation: { pattern: "^\\d{15}$" } },
-      { id: "paciente_nome_mae", label: "Nome da Mãe", type: "text", required: false, x: 310, y: 400, width: 400, height: 30, fontSize: 12 },
-    ],
-  },
-  tuberculose: {
-    pageSize: { width: 2100, height: 2970 },
-    fields: [
-      { id: "notificacao_tipo", label: "Tipo de Notificação", type: "select", required: true, x: 100, y: 100, width: 200, height: 30, fontSize: 12, options: ["1-Individual"] },
-      { id: "agravo", label: "Agravo/Doença", type: "text", required: true, x: 100, y: 140, width: 400, height: 30, fontSize: 12 },
-      { id: "cid", label: "CID-10", type: "text", required: true, x: 520, y: 140, width: 100, height: 30, fontSize: 12 },
-      { id: "data_notificacao", label: "Data da Notificação", type: "date", required: true, x: 100, y: 180, width: 150, height: 30, fontSize: 12 },
-      { id: "paciente_nome", label: "Nome do Paciente", type: "text", required: true, x: 100, y: 280, width: 500, height: 30, fontSize: 12, validation: { minLength: 3 } },
-      { id: "paciente_sexo", label: "Sexo", type: "select", required: true, x: 350, y: 320, width: 100, height: 30, fontSize: 12, options: ["M-Masculino", "F-Feminino", "I-Ignorado"] },
-      { id: "forma_clinica", label: "Forma Clínica", type: "select", required: true, x: 100, y: 440, width: 200, height: 30, fontSize: 12, options: ["1-Pulmonar", "2-Extrapulmonar", "3-Pulmonar+Extrapulmonar"] },
-      { id: "baciloscopia", label: "Baciloscopia de Escarro", type: "select", required: false, x: 310, y: 440, width: 150, height: 30, fontSize: 12, options: ["1-Positivo", "2-Negativo", "3-Não realizado", "4-Não se aplica"] },
-      { id: "cultura", label: "Cultura de Escarro", type: "select", required: false, x: 470, y: 440, width: 150, height: 30, fontSize: 12, options: ["1-Positivo", "2-Negativo", "3-Em andamento", "4-Não realizado"] },
-      { id: "hiv", label: "Teste HIV", type: "select", required: false, x: 100, y: 480, width: 150, height: 30, fontSize: 12, options: ["1-Positivo", "2-Negativo", "3-Em andamento", "4-Não realizado"] },
-    ],
-  },
-};
+import { SINAN_AGRAVOS, CATEGORIAS_SINAN, getAllAgravos, getAgravoByCode, getAgravosByCat, getAgravosImediatos, buildSinanTemplate } from "./sinan-templates";
+
+export { SINAN_AGRAVOS, CATEGORIAS_SINAN, getAllAgravos, getAgravoByCode, getAgravosByCat, getAgravosImediatos, buildSinanTemplate };
+
+export const SINAN_TEMPLATES: Record<string, Partial<TemplateDefinition>> = SINAN_AGRAVOS.reduce((acc, agravo) => {
+  const slug = agravo.nome.toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  acc[slug] = buildSinanTemplate(agravo);
+  return acc;
+}, {} as Record<string, Partial<TemplateDefinition>>);
 
 export const BPA_TEMPLATE: Partial<TemplateDefinition> = {
   pageSize: { width: 2100, height: 2970 },
