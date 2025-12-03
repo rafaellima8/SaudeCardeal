@@ -92,3 +92,23 @@ Isolated modular architecture in `/modules/` directory:
 - Created `/modules/alerts/` with alert-scheduler.ts and routes.ts for intelligent notifications
 - Created `/modules/reports/` with strategic-reports.ts and routes.ts for KPI dashboards
 - Integrated all module routes into server/routes.ts with namespace isolation
+
+### Frontend Automation Pages (Dec 2025)
+- **Forms Page** (`/formularios`): Lists 38 form templates (36 SINAN + BPA-I + APAC), with field preview and validation
+- **Workflow Page** (`/workflows`): Shows 4 built-in workflows (SINAN, TFD, Prescription, Diaper), status management
+- **Alerts Page** (`/alertas`): Displays 10 alert rules across 4 categories with severity filtering and acknowledge/resolve actions
+- **Strategic Reports Page** (`/relatorios-estrategicos`): Catalog of 8 reports across 4 categories with export formats
+
+### Backend Module Architecture (Dec 2025)
+- Modules use class inheritance pattern: `Extended*Engine extends *Engine` to preserve prototype methods
+- Built-in data arrays: `SINAN_TEMPLATES`, `WORKFLOW_DEFINITIONS`, `DEFAULT_ALERTS`, `STRATEGIC_REPORTS`
+- Helper methods added: `getTemplateBySlug`, `getWorkflowBySlug`, `getAlertBySlug`, `getReportsByCategory`, `getAllCategories`
+
+### Test Infrastructure (Dec 2025)
+- **Vitest Configuration**: `vitest.config.ts` with jsdom environment for frontend tests
+- **Unit Tests** (64 passing): 
+  - `tests/unit/form-engine.test.ts`: SINAN templates, BPA/APAC structure, field validation
+  - `tests/unit/workflow-engine.test.ts`: Workflow definitions, steps, transitions, role-based actions
+  - `tests/unit/alert-scheduler.test.ts`: Alert rules, categories, severities, notification channels
+  - `tests/unit/strategic-reports.test.ts`: Report definitions, KPIs, export formats, categories
+- **API Integration Tests**: `tests/api/automation.test.ts` with endpoint coverage for all automation modules
