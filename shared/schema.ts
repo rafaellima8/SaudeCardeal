@@ -951,6 +951,159 @@ export const documentSignatures = sqliteTable("document_signatures", {
 });
 
 // ============================================================================
+// SINAN - SISTEMA DE INFORMAÇÃO DE AGRAVOS DE NOTIFICAÇÃO
+// ============================================================================
+
+export const sinanNotifications = sqliteTable("sinan_notifications", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  
+  notificationNumber: text("notification_number").notNull().unique(),
+  notificationDate: integer("notification_date", { mode: "timestamp" }).notNull(),
+  notificationWeek: integer("notification_week").notNull(),
+  notificationYear: integer("notification_year").notNull(),
+  
+  agravo: text("agravo", {
+    enum: [
+      "dengue", "chikungunya", "zika", "leishmaniose_visceral", "leishmaniose_tegumentar",
+      "hanseniase", "tuberculose", "malaria", "covid19", "hepatite_a", "hepatite_b", 
+      "hepatite_c", "meningite", "tetano", "coqueluche", "difteria", "poliomielite",
+      "sarampo", "rubeola", "varicela", "febre_amarela", "raiva_humana", "leptospirose",
+      "esquistossomose", "doenca_chagas", "hantavirose", "febre_maculosa", "botulismo",
+      "colera", "febre_tifoide", "antraz", "peste", "tularemia", "acidentes_animais",
+      "intoxicacao_exogena", "violencia_domestica", "acidente_trabalho", "outros"
+    ]
+  }).notNull(),
+  
+  cidPrimary: text("cid_primary").notNull(),
+  cidSecondary: text("cid_secondary"),
+  
+  patientName: text("patient_name").notNull(),
+  patientBirthDate: integer("patient_birth_date", { mode: "timestamp" }),
+  patientAge: integer("patient_age"),
+  patientAgeUnit: text("patient_age_unit", { enum: ["anos", "meses", "dias"] }).default("anos"),
+  patientSex: text("patient_sex", { enum: ["M", "F", "I"] }).notNull(),
+  patientPregnant: text("patient_pregnant", { enum: ["sim", "nao", "nao_se_aplica", "ignorado"] }),
+  patientRace: text("patient_race", { 
+    enum: ["branca", "preta", "parda", "amarela", "indigena", "ignorado"] 
+  }),
+  patientSchooling: text("patient_schooling", {
+    enum: [
+      "analfabeto", "fundamental_incompleto", "fundamental_completo",
+      "medio_incompleto", "medio_completo", "superior_incompleto",
+      "superior_completo", "ignorado", "nao_se_aplica"
+    ]
+  }),
+  patientOccupation: text("patient_occupation"),
+  patientCpf: text("patient_cpf"),
+  patientCns: text("patient_cns"),
+  patientMotherName: text("patient_mother_name"),
+  
+  patientPhone: text("patient_phone"),
+  patientAddress: text("patient_address"),
+  patientAddressNumber: text("patient_address_number"),
+  patientComplement: text("patient_complement"),
+  patientNeighborhood: text("patient_neighborhood"),
+  patientMunicipalityIbge: text("patient_municipality_ibge"),
+  patientMunicipalityName: text("patient_municipality_name"),
+  patientState: text("patient_state"),
+  patientCep: text("patient_cep"),
+  patientZone: text("patient_zone", { enum: ["urbana", "rural", "periurbana", "ignorado"] }),
+  patientCountry: text("patient_country").default("Brasil"),
+  
+  symptomStartDate: integer("symptom_start_date", { mode: "timestamp" }),
+  hospitalization: integer("hospitalization", { mode: "boolean" }).default(false),
+  hospitalizationDate: integer("hospitalization_date", { mode: "timestamp" }),
+  hospitalizationUnit: text("hospitalization_unit"),
+  hospitalizationUnitCnes: text("hospitalization_unit_cnes"),
+  uti: integer("uti", { mode: "boolean" }).default(false),
+  
+  evolution: text("evolution", { 
+    enum: ["cura", "obito_agravo", "obito_outras_causas", "ignorado", "em_investigacao"] 
+  }),
+  evolutionDate: integer("evolution_date", { mode: "timestamp" }),
+  autopsyPerformed: integer("autopsy_performed", { mode: "boolean" }).default(false),
+  
+  classification: text("classification", {
+    enum: ["confirmado", "provavel", "descartado", "inconclusivo", "em_investigacao"]
+  }).default("em_investigacao"),
+  confirmationCriteria: text("confirmation_criteria", {
+    enum: ["laboratorial", "clinico_epidemiologico", "clinico", "ignorado"]
+  }),
+  
+  investigatorName: text("investigator_name"),
+  investigatorCns: text("investigator_cns"),
+  investigationDate: integer("investigation_date", { mode: "timestamp" }),
+  investigationStatus: text("investigation_status", {
+    enum: ["pendente", "em_andamento", "concluida", "encerrada"]
+  }).default("pendente"),
+  
+  status: text("status", {
+    enum: ["rascunho", "preenchida", "validada", "exportada", "cancelada"]
+  }).default("rascunho"),
+  
+  notifierId: text("notifier_id").references(() => professionals.id),
+  notifierName: text("notifier_name"),
+  
+  additionalData: text("additional_data", { mode: "json" }),
+  labResults: text("lab_results", { mode: "json" }),
+  observations: text("observations"),
+  
+  exportedAt: integer("exported_at", { mode: "timestamp" }),
+  exportBatch: text("export_batch"),
+  
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+export const sinanLabExams = sqliteTable("sinan_lab_exams", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  notificationId: text("notification_id").notNull().references(() => sinanNotifications.id),
+  
+  examType: text("exam_type").notNull(),
+  examName: text("exam_name").notNull(),
+  collectionDate: integer("collection_date", { mode: "timestamp" }),
+  resultDate: integer("result_date", { mode: "timestamp" }),
+  result: text("result", { enum: ["positivo", "negativo", "inconclusivo", "nao_realizado", "em_andamento"] }),
+  resultValue: text("result_value"),
+  resultUnit: text("result_unit"),
+  referenceValue: text("reference_value"),
+  laboratory: text("laboratory"),
+  laboratoryCnes: text("laboratory_cnes"),
+  method: text("method"),
+  observations: text("observations"),
+  
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+export const sinanExportBatches = sqliteTable("sinan_export_batches", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  
+  batchNumber: text("batch_number").notNull().unique(),
+  exportDate: integer("export_date", { mode: "timestamp" }).notNull(),
+  referenceMonth: integer("reference_month").notNull(),
+  referenceYear: integer("reference_year").notNull(),
+  
+  totalRecords: integer("total_records").notNull().default(0),
+  agravo: text("agravo"),
+  
+  exportedBy: text("exported_by").references(() => users.id),
+  exportedByName: text("exported_by_name"),
+  
+  fileFormat: text("file_format", { enum: ["dbf", "txt", "xml"] }).default("dbf"),
+  filePath: text("file_path"),
+  fileHash: text("file_hash"),
+  
+  status: text("status", { 
+    enum: ["gerado", "enviado", "aceito", "rejeitado", "processando"] 
+  }).default("gerado"),
+  responseMessage: text("response_message"),
+  
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// ============================================================================
 // INSERT SCHEMAS
 // ============================================================================
 
@@ -1022,6 +1175,42 @@ export const insertTfdRequestSchema = createInsertSchema(tfdRequests).omit({
 });
 
 export const insertTfdTripPassengerSchema = createInsertSchema(tfdTripPassengers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertSinanNotificationSchema = createInsertSchema(sinanNotifications).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateSinanNotificationSchema = z.object({
+  agravo: z.enum([
+    "dengue", "chikungunya", "zika", "leishmaniose_visceral", "leishmaniose_tegumentar",
+    "hanseniase", "tuberculose", "malaria", "covid19", "hepatite_a", "hepatite_b",
+    "hepatite_c", "meningite", "tetano", "coqueluche", "difteria", "poliomielite",
+    "sarampo", "rubeola", "varicela", "febre_amarela", "raiva_humana", "leptospirose",
+    "esquistossomose", "doenca_chagas", "hantavirose", "febre_maculosa", "botulismo",
+    "colera", "febre_tifoide", "antraz", "peste", "tularemia", "acidentes_animais",
+    "intoxicacao_exogena", "violencia_domestica", "acidente_trabalho", "outros"
+  ]).optional(),
+  cidPrimary: z.string().optional(),
+  cidSecondary: z.string().nullable().optional(),
+  patientName: z.string().optional(),
+  patientSex: z.enum(["M", "F", "I"]).optional(),
+  classification: z.enum(["confirmado", "provavel", "descartado", "inconclusivo", "em_investigacao"]).optional(),
+  investigationStatus: z.enum(["pendente", "em_andamento", "concluida", "encerrada"]).optional(),
+  status: z.enum(["rascunho", "preenchida", "validada", "exportada", "cancelada"]).optional(),
+  observations: z.string().nullable().optional(),
+});
+
+export const insertSinanLabExamSchema = createInsertSchema(sinanLabExams).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertSinanExportBatchSchema = createInsertSchema(sinanExportBatches).omit({
   id: true,
   createdAt: true,
 });
@@ -1367,3 +1556,14 @@ export type DiaperDemandForecast = typeof diaperDemandForecast.$inferSelect;
 export type InsertDiaperDemandForecast = z.infer<typeof insertDiaperDemandForecastSchema>;
 
 export type SaAuditLog = typeof saAuditLog.$inferSelect;
+
+// SINAN Types
+export type SinanNotification = typeof sinanNotifications.$inferSelect;
+export type InsertSinanNotification = z.infer<typeof insertSinanNotificationSchema>;
+export type UpdateSinanNotification = z.infer<typeof updateSinanNotificationSchema>;
+
+export type SinanLabExam = typeof sinanLabExams.$inferSelect;
+export type InsertSinanLabExam = z.infer<typeof insertSinanLabExamSchema>;
+
+export type SinanExportBatch = typeof sinanExportBatches.$inferSelect;
+export type InsertSinanExportBatch = z.infer<typeof insertSinanExportBatchSchema>;

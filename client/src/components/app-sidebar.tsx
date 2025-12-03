@@ -11,6 +11,7 @@ import {
   FileCheck,
   Baby,
   Heart,
+  AlertTriangle,
 } from "lucide-react";
 import {
   Sidebar,
@@ -44,6 +45,7 @@ const allMenuItems = [
   { title: "Fraldas", icon: Baby, url: "/farmacia/fraldas" },
   { title: "TFD", icon: Truck, url: "/tfd" },
   { title: "Assistência Social", icon: Heart, url: "/assistencia-social" },
+  { title: "SINAN", icon: AlertTriangle, url: "/sinan" },
   { title: "Relatórios", icon: FileText, url: "/relatorios" },
 ];
 

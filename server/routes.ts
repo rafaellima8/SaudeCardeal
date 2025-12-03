@@ -13,6 +13,7 @@ import {
   insertDiaperAuthorizationSchema,
   insertDiaperDeliverySchema,
   insertSaBeneficiarySchema,
+  updateSinanNotificationSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { 
@@ -2380,6 +2381,220 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       await storage.deleteProfessional(req.params.id);
       res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // SINAN API
+  // ============================================================================
+  app.get("/api/sinan/notifications", enforceUnitScope(), async (req, res) => {
+    try {
+      const effectiveUnitId = getEffectiveUnitId(req);
+      const { agravo, status, classification } = req.query;
+      
+      const notifications = await storage.getSinanNotifications({
+        unitId: effectiveUnitId || undefined,
+        agravo: agravo as string,
+        status: status as string,
+        classification: classification as string,
+      });
+      res.json(notifications);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/sinan/notifications/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const notification = await storage.getSinanNotificationById(req.params.id);
+      if (!notification) {
+        return res.status(404).json({ error: "Notificação não encontrada" });
+      }
+      
+      if (!validateEntityAccess(req, notification.unitId)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      
+      res.json(notification);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  const sinanCreateSchema = z.object({
+    agravo: z.enum([
+      "dengue", "chikungunya", "zika", "leishmaniose_visceral", "leishmaniose_tegumentar",
+      "hanseniase", "tuberculose", "malaria", "covid19", "hepatite_a", "hepatite_b",
+      "hepatite_c", "meningite", "tetano", "coqueluche", "difteria", "poliomielite",
+      "sarampo", "rubeola", "varicela", "febre_amarela", "raiva_humana", "leptospirose",
+      "esquistossomose", "doenca_chagas", "hantavirose", "febre_maculosa", "botulismo",
+      "colera", "febre_tifoide", "antraz", "peste", "tularemia", "acidentes_animais",
+      "intoxicacao_exogena", "violencia_domestica", "acidente_trabalho", "outros"
+    ]),
+    cidPrimary: z.string().min(3, "CID-10 obrigatório"),
+    cidSecondary: z.string().nullable().optional(),
+    patientName: z.string().min(2, "Nome do paciente obrigatório"),
+    patientSex: z.enum(["M", "F", "I"]),
+    patientBirthDate: z.string().nullable().optional(),
+    patientAge: z.number().nullable().optional(),
+    patientAgeUnit: z.enum(["anos", "meses", "dias"]).optional(),
+    patientCpf: z.string().nullable().optional(),
+    patientCns: z.string().nullable().optional(),
+    patientMotherName: z.string().nullable().optional(),
+    patientPhone: z.string().nullable().optional(),
+    patientAddress: z.string().nullable().optional(),
+    patientNeighborhood: z.string().nullable().optional(),
+    patientMunicipalityName: z.string().nullable().optional(),
+    patientState: z.string().nullable().optional(),
+    patientCep: z.string().nullable().optional(),
+    patientZone: z.enum(["urbana", "rural", "periurbana", "ignorado"]).nullable().optional(),
+    patientRace: z.enum(["branca", "preta", "parda", "amarela", "indigena", "ignorado"]).nullable().optional(),
+    patientSchooling: z.enum([
+      "analfabeto", "fundamental_incompleto", "fundamental_completo",
+      "medio_incompleto", "medio_completo", "superior_incompleto",
+      "superior_completo", "ignorado", "nao_se_aplica"
+    ]).nullable().optional(),
+    patientPregnant: z.enum(["sim", "nao", "nao_se_aplica", "ignorado"]).nullable().optional(),
+    symptomStartDate: z.string().nullable().optional(),
+    hospitalization: z.boolean().optional(),
+    hospitalizationDate: z.string().nullable().optional(),
+    hospitalizationUnit: z.string().nullable().optional(),
+    uti: z.boolean().optional(),
+    evolution: z.enum(["cura", "obito_agravo", "obito_outras_causas", "ignorado", "em_investigacao"]).nullable().optional(),
+    evolutionDate: z.string().nullable().optional(),
+    classification: z.enum(["confirmado", "provavel", "descartado", "inconclusivo", "em_investigacao"]).optional(),
+    confirmationCriteria: z.enum(["laboratorial", "clinico_epidemiologico", "clinico", "ignorado"]).nullable().optional(),
+    observations: z.string().nullable().optional(),
+  });
+
+  app.post("/api/sinan/notifications", enforceUnitScope(), async (req, res) => {
+    try {
+      const sessionUnitId = req.session?.user?.unitId;
+      if (!sessionUnitId) {
+        return res.status(400).json({ error: "Unidade não identificada" });
+      }
+
+      const validatedData = sinanCreateSchema.parse(req.body);
+
+      const year = new Date().getFullYear();
+      const existingCount = (await storage.getSinanNotifications({ unitId: sessionUnitId })).length;
+      const notificationNumber = `${year}${sessionUnitId.slice(0, 4).toUpperCase()}${String(existingCount + 1).padStart(6, '0')}`;
+
+      const now = new Date();
+      const startOfYear = new Date(year, 0, 1);
+      const weekNumber = Math.ceil((now.getTime() - startOfYear.getTime()) / (7 * 24 * 60 * 60 * 1000));
+
+      const data = {
+        ...validatedData,
+        unitId: sessionUnitId,
+        notificationNumber,
+        notificationDate: now,
+        notificationWeek: weekNumber,
+        notificationYear: year,
+        notifierId: req.session?.user?.id || null,
+        notifierName: req.session?.user?.name || null,
+        status: 'rascunho' as const,
+        classification: validatedData.classification || 'em_investigacao',
+        investigationStatus: 'pendente' as const,
+        patientBirthDate: validatedData.patientBirthDate ? new Date(validatedData.patientBirthDate) : null,
+        symptomStartDate: validatedData.symptomStartDate ? new Date(validatedData.symptomStartDate) : null,
+        hospitalizationDate: validatedData.hospitalizationDate ? new Date(validatedData.hospitalizationDate) : null,
+        evolutionDate: validatedData.evolutionDate ? new Date(validatedData.evolutionDate) : null,
+      };
+
+      const notification = await storage.createSinanNotification(data as any);
+      res.status(201).json(notification);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/sinan/notifications/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const existing = await storage.getSinanNotificationById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Notificação não encontrada" });
+      }
+      if (!validateEntityAccess(req, existing.unitId)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      const validatedData = updateSinanNotificationSchema.parse(req.body);
+      
+      const updateData: any = {
+        ...validatedData,
+        updatedAt: new Date(),
+      };
+
+      if (req.body.patientBirthDate) {
+        updateData.patientBirthDate = new Date(req.body.patientBirthDate);
+      }
+      if (req.body.symptomStartDate) {
+        updateData.symptomStartDate = new Date(req.body.symptomStartDate);
+      }
+      if (req.body.evolutionDate) {
+        updateData.evolutionDate = new Date(req.body.evolutionDate);
+      }
+
+      const notification = await storage.updateSinanNotification(req.params.id, updateData);
+      res.json(notification);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/sinan/notifications/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const existing = await storage.getSinanNotificationById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Notificação não encontrada" });
+      }
+      if (!validateEntityAccess(req, existing.unitId)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      await storage.deleteSinanNotification(req.params.id);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/sinan/stats", enforceUnitScope(), async (req, res) => {
+    try {
+      const effectiveUnitId = getEffectiveUnitId(req);
+      const notifications = await storage.getSinanNotifications({
+        unitId: effectiveUnitId || undefined,
+      });
+
+      const byStatus: Record<string, number> = {};
+      const byAgravo: Record<string, number> = {};
+      const byClassification: Record<string, number> = {};
+
+      for (const n of notifications) {
+        const status = n.status || 'rascunho';
+        const agravo = n.agravo;
+        const classification = n.classification || 'em_investigacao';
+        
+        byStatus[status] = (byStatus[status] || 0) + 1;
+        byAgravo[agravo] = (byAgravo[agravo] || 0) + 1;
+        byClassification[classification] = (byClassification[classification] || 0) + 1;
+      }
+
+      res.json({
+        total: notifications.length,
+        byStatus,
+        byAgravo,
+        byClassification,
+      });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

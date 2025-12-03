@@ -42,6 +42,8 @@ import type {
   InsertDiaperDelivery,
   DiaperMonthlyList,
   InsertDiaperMonthlyList,
+  SinanNotification,
+  InsertSinanNotification,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -230,6 +232,13 @@ export interface IStorage {
     trend: 'increasing' | 'stable' | 'decreasing';
     recommendation: string;
   }[]>;
+
+  // SINAN Notifications
+  getSinanNotifications(params: { unitId?: string; agravo?: string; status?: string; classification?: string }): Promise<SinanNotification[]>;
+  getSinanNotificationById(id: string): Promise<SinanNotification | undefined>;
+  createSinanNotification(notification: InsertSinanNotification): Promise<SinanNotification>;
+  updateSinanNotification(id: string, notification: Partial<InsertSinanNotification>): Promise<SinanNotification | undefined>;
+  deleteSinanNotification(id: string): Promise<boolean>;
 }
 
 export class DbStorage implements IStorage {
@@ -1444,6 +1453,65 @@ export class DbStorage implements IStorage {
     }
 
     return forecasts.filter(f => f.avgMonthlyDemand > 0 || f.currentStock > 0);
+  }
+
+  // SINAN Notifications
+  async getSinanNotifications(params: { unitId?: string; agravo?: string; status?: string; classification?: string }): Promise<SinanNotification[]> {
+    const conditions: any[] = [];
+
+    if (params.unitId) {
+      conditions.push(eq(schema.sinanNotifications.unitId, params.unitId));
+    }
+    if (params.agravo) {
+      conditions.push(eq(schema.sinanNotifications.agravo, params.agravo as any));
+    }
+    if (params.status) {
+      conditions.push(eq(schema.sinanNotifications.status, params.status as any));
+    }
+    if (params.classification) {
+      conditions.push(eq(schema.sinanNotifications.classification, params.classification as any));
+    }
+
+    let query = db.select().from(schema.sinanNotifications);
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    return query.orderBy(desc(schema.sinanNotifications.createdAt));
+  }
+
+  async getSinanNotificationById(id: string): Promise<SinanNotification | undefined> {
+    const results = await db
+      .select()
+      .from(schema.sinanNotifications)
+      .where(eq(schema.sinanNotifications.id, id))
+      .limit(1);
+    return results[0];
+  }
+
+  async createSinanNotification(notification: InsertSinanNotification): Promise<SinanNotification> {
+    const results = await db
+      .insert(schema.sinanNotifications)
+      .values(notification)
+      .returning();
+    return results[0];
+  }
+
+  async updateSinanNotification(id: string, notification: Partial<InsertSinanNotification>): Promise<SinanNotification | undefined> {
+    const results = await db
+      .update(schema.sinanNotifications)
+      .set(notification)
+      .where(eq(schema.sinanNotifications.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async deleteSinanNotification(id: string): Promise<boolean> {
+    const result = await db
+      .delete(schema.sinanNotifications)
+      .where(eq(schema.sinanNotifications.id, id));
+    return true;
   }
 }
 

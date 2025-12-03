@@ -21,6 +21,7 @@ import PharmacyStock from "@/pages/pharmacy-stock";
 import PharmacyDiaperStock from "@/pages/pharmacy-diaper-stock";
 import TFD from "@/pages/tfd";
 import SocialAssistance from "@/pages/social-assistance";
+import Sinan from "@/pages/sinan";
 import Reports from "@/pages/reports";
 import Units from "@/pages/units";
 import Professionals from "@/pages/professionals";
@@ -43,6 +44,7 @@ function ProtectedRoutes() {
       <Route path="/farmacia/fraldas" component={PharmacyDiaperStock} />
       <Route path="/tfd" component={TFD} />
       <Route path="/assistencia-social" component={SocialAssistance} />
+      <Route path="/sinan" component={Sinan} />
       <Route path="/relatorios" component={Reports} />
       <Route path="/unidades" component={Units} />
       <Route path="/profissionais" component={Professionals} />
