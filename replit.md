@@ -28,11 +28,53 @@ The system follows a client-server architecture with a clear separation of conce
     - **Social Assistance**: Beneficiary management, diaper request/authorization workflow, delivery management (FIFO stock allocation), monthly list CSV upload for batch processing, demand forecasting, integration with Pharmacy diaper stock, and full audit logging.
     - **SINAN (Sistema de Informação de Agravos de Notificação)**: Official notification forms for 36 compulsory diseases, epidemiological week calculation, patient demographic data (SUS fields), clinical evolution and hospitalization tracking, classification criteria, investigation workflow, lab exam results integration, and export batch management for SUS submission. All endpoints use Zod validation.
 
+### Automation Modules (NEW - Dec 2025)
+Isolated modular architecture in `/modules/` directory:
+- **Form Automation** (`/api/forms/*`): Dynamic form templates for SINAN, BPA-I, APAC with JSON schema, field validation, and mapping to SUS systems.
+- **Workflow Engine** (`/api/workflow/*`): State machine for approval flows (Unit → Vigilância → CPD chain), with auto-approval timers and role-based transitions.
+- **Alert Scheduler** (`/api/alerts/*`): Event-driven notification rules for deadlines (prazos), pendências, stock alerts, epidemic thresholds, and edital monitoring.
+- **Strategic Reports** (`/api/strategic-reports/*`): ETL engine for Previne Brasil indicators, MAC production, AIH checklist, vigilância epidemiológica, and financial KPIs.
+
 ### System Design Choices
 - **Database**: SQLite for simplicity and embedded use, managed by Drizzle ORM for type-safe and efficient data access.
-- **Modularity**: The system is organized into distinct modules (Patient, Prescriptions, Pharmacy, TFD, Social Assistance, SINAN), each with its own routes and services.
+- **Modularity**: The system is organized into distinct modules (Patient, Prescriptions, Pharmacy, TFD, Social Assistance, SINAN), each with its own routes and services. New automation modules are isolated in `/modules/` directory with dedicated route namespaces.
 - **Validation**: Extensive use of Zod for data validation on both frontend and backend to ensure data integrity and compliance.
 - **PDF Generation**: Dedicated services for generating compliant PDF documents for prescriptions, TFD reports (BPA-I, APAC), and Social Assistance documents (authorizations, donation terms, delivery receipts).
+
+## Database Schema (Key Tables)
+
+### Core Tables (31 existing)
+- healthUnits, users, professionals, citizens
+- medications, prescriptions, dispensations, medicationStock, stockMovements, renameCatalog, citizenAllergies
+- tfdVehicles, tfdDrivers, tfdTrips, tfdRequests, tfdTripPassengers, sigtapTfdCatalog
+- diaperStock, diaperStockMovements
+- saBeneficiaries, diaperRequests, diaperAuthorizations, diaperDeliveries, diaperMonthlyLists, diaperDemandForecast, saAuditLog
+- sinanNotifications, sinanLabExams, sinanExportBatches
+- notifications, documentSignatures
+
+### Automation Tables (13 new)
+- formTemplates, formSubmissions
+- workflowDefinitions, workflowInstances, workflowActions
+- alertRules, alertInstances, alertDeliveries
+- editais
+- reportDefinitions, reportExecutions
+- systemAuditLog
+
+## API Endpoints
+
+### Automation Module APIs
+- `GET /api/forms/templates` - List form templates (SINAN, BPA, APAC)
+- `GET /api/forms/templates/:slug` - Get template definition
+- `POST /api/forms/validate` - Validate form payload
+- `GET /api/workflow/definitions` - List workflow definitions
+- `GET /api/workflow/available-actions` - Get available actions for status/role
+- `POST /api/workflow/validate-transition` - Validate workflow transition
+- `GET /api/alerts/rules` - List alert rules
+- `GET /api/alerts/active` - Get active alerts
+- `POST /api/alerts/:id/acknowledge` - Acknowledge alert
+- `POST /api/alerts/:id/resolve` - Resolve alert
+- `GET /api/strategic-reports/definitions` - List report definitions
+- `POST /api/strategic-reports/execute/:slug` - Execute report
 
 ## External Dependencies
 
@@ -41,3 +83,12 @@ The system follows a client-server architecture with a clear separation of conce
 - **DATASUS BPA System**: For exporting BPA-I and APAC data in TXT format for submission, and for generating printable PDF forms to be manually entered into the system.
 - **IBGE (Brazilian Institute of Geography and Statistics)**: Used for municipality codes in TFD.
 - **CID-10 (International Classification of Diseases, 10th Revision)**: Used for diagnosis coding.
+
+## Recent Changes (Dec 2025)
+
+- Added 13 new database tables for automation modules in `shared/schema.ts`
+- Created `/modules/forms/` with form-engine.ts and routes.ts for dynamic form templates
+- Created `/modules/workflow/` with workflow-engine.ts and routes.ts for approval flows
+- Created `/modules/alerts/` with alert-scheduler.ts and routes.ts for intelligent notifications
+- Created `/modules/reports/` with strategic-reports.ts and routes.ts for KPI dashboards
+- Integrated all module routes into server/routes.ts with namespace isolation

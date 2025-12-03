@@ -31,6 +31,11 @@ import { validateTfdRequestForSUS, validateCNS, validateCPF, validateCID10, vali
 import { SIGTAP_TFD_CATALOG, searchSigtapProcedures, calculateTFDValue, getProcedureByCodigo, validateProcedureForPatient } from "./services/sigtap-tfd";
 import { parseCsvContent, processMonthlyList, generateAuthorizationPDF, generateDeliveryReceiptPDF, generateDonationTermPDF } from "./services/social-assistance-service";
 
+import formsRoutes from "../modules/forms/routes";
+import workflowRoutes from "../modules/workflow/routes";
+import alertsRoutes from "../modules/alerts/routes";
+import reportsRoutes from "../modules/reports/routes";
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
   // AUTHENTICATION API
@@ -2626,6 +2631,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: error.message });
     }
   });
+
+  // ============================================================================
+  // AUTOMATION MODULES API (Non-invasive)
+  // ============================================================================
+  app.use("/api/forms", enforceUnitScope(), formsRoutes);
+  app.use("/api/workflow", enforceUnitScope(), workflowRoutes);
+  app.use("/api/alerts", enforceUnitScope(), alertsRoutes);
+  app.use("/api/strategic-reports", enforceUnitScope(), reportsRoutes);
 
   const httpServer = createServer(app);
   return httpServer;

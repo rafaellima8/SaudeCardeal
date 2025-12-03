@@ -1,0 +1,92 @@
+{
+  "timestamp": "2025-12-03T04:30:00Z",
+  "summary": {
+    "total_tables": 44,
+    "core_tables": 31,
+    "automation_tables": 13,
+    "total_endpoints": 126,
+    "core_endpoints": 114,
+    "automation_endpoints": 12,
+    "total_pages": 18,
+    "total_services": 13
+  },
+  "existing_models": {
+    "core": ["healthUnits", "users", "professionals", "citizens"],
+    "pharmacy": ["medications", "prescriptions", "dispensations", "medicationStock", "stockMovements", "renameCatalog", "citizenAllergies"],
+    "tfd": ["tfdVehicles", "tfdDrivers", "tfdTrips", "tfdRequests", "tfdTripPassengers", "sigtapTfdCatalog"],
+    "diaper_stock": ["diaperStock", "diaperStockMovements"],
+    "social_assistance": ["saBeneficiaries", "diaperRequests", "diaperAuthorizations", "diaperDeliveries", "diaperMonthlyLists", "diaperDemandForecast", "saAuditLog"],
+    "sinan": ["sinanNotifications", "sinanLabExams", "sinanExportBatches"],
+    "system": ["notifications", "documentSignatures"]
+  },
+  "new_models": {
+    "form_automation": ["formTemplates", "formSubmissions"],
+    "workflow": ["workflowDefinitions", "workflowInstances", "workflowActions"],
+    "alerts": ["alertRules", "alertInstances", "alertDeliveries"],
+    "editais": ["editais"],
+    "reports": ["reportDefinitions", "reportExecutions"],
+    "audit": ["systemAuditLog"]
+  },
+  "new_api_endpoints": {
+    "forms": [
+      "GET /api/forms/templates",
+      "GET /api/forms/templates/:slug",
+      "POST /api/forms/validate",
+      "GET /api/forms/categories"
+    ],
+    "workflow": [
+      "GET /api/workflow/definitions",
+      "GET /api/workflow/definitions/:slug",
+      "GET /api/workflow/available-actions",
+      "POST /api/workflow/validate-transition",
+      "GET /api/workflow/queue",
+      "GET /api/workflow/stats"
+    ],
+    "alerts": [
+      "GET /api/alerts/rules",
+      "GET /api/alerts/rules/:slug",
+      "GET /api/alerts/active",
+      "POST /api/alerts/:id/acknowledge",
+      "POST /api/alerts/:id/resolve",
+      "POST /api/alerts/:id/dismiss",
+      "GET /api/alerts/stats",
+      "GET /api/alerts/categories"
+    ],
+    "strategic_reports": [
+      "GET /api/strategic-reports/definitions",
+      "GET /api/strategic-reports/definitions/:slug",
+      "GET /api/strategic-reports/categories",
+      "POST /api/strategic-reports/execute/:slug",
+      "GET /api/strategic-reports/executions"
+    ]
+  },
+  "new_services": {
+    "form_engine": {
+      "file": "modules/forms/form-engine.ts",
+      "features": ["template validation", "field mapping", "SINAN/BPA/APAC templates"]
+    },
+    "workflow_engine": {
+      "file": "modules/workflow/workflow-engine.ts",
+      "features": ["state machine", "role-based transitions", "auto-approval timers", "default workflows for SINAN/TFD/prescription/diaper"]
+    },
+    "alert_scheduler": {
+      "file": "modules/alerts/alert-scheduler.ts",
+      "features": ["event-driven alerts", "deadline monitoring", "threshold alerts", "10 default alert rules"]
+    },
+    "strategic_reports": {
+      "file": "modules/reports/strategic-reports.ts",
+      "features": ["8 strategic report definitions", "Previne Brasil KPIs", "MAC production", "vigilancia epidemiologica", "farmacia completo"]
+    }
+  },
+  "architecture_decisions": {
+    "isolation": "New modules are isolated in /modules/ directory with dedicated route namespaces to avoid breaking existing 114 endpoints",
+    "non_invasive": "All changes are additive - no existing code was modified except for route registration",
+    "schema_design": "13 new tables added to shared/schema.ts with proper foreign key relationships",
+    "route_pattern": "/api/forms/*, /api/workflow/*, /api/alerts/*, /api/strategic-reports/*"
+  },
+  "pending_work": {
+    "frontend": "React components for form builder, workflow approval UI, alert dashboard, strategic reports",
+    "database_migration": "Run npm run db:push to create new tables",
+    "tests": "Vitest unit tests for services, integration tests for APIs"
+  }
+}

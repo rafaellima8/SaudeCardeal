@@ -44,6 +44,17 @@ import type {
   InsertDiaperMonthlyList,
   SinanNotification,
   InsertSinanNotification,
+  FormTemplate,
+  FormSubmission,
+  WorkflowDefinition,
+  WorkflowInstance,
+  WorkflowAction,
+  AlertRule,
+  AlertInstance,
+  AlertDelivery,
+  ReportDefinition,
+  ReportExecution,
+  SystemAuditLog,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -1512,6 +1523,433 @@ export class DbStorage implements IStorage {
       .delete(schema.sinanNotifications)
       .where(eq(schema.sinanNotifications.id, id));
     return true;
+  }
+
+  // ============================================================================
+  // FORM TEMPLATES
+  // ============================================================================
+  async getFormTemplates(params: { category?: string; isActive?: boolean }): Promise<FormTemplate[]> {
+    const conditions: any[] = [];
+    
+    if (params.category) {
+      conditions.push(eq(schema.formTemplates.category, params.category as any));
+    }
+    if (params.isActive !== undefined) {
+      conditions.push(eq(schema.formTemplates.isActive, params.isActive));
+    }
+
+    let query = db.select().from(schema.formTemplates);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    return query.orderBy(asc(schema.formTemplates.name));
+  }
+
+  async getFormTemplateById(id: string): Promise<FormTemplate | undefined> {
+    const results = await db
+      .select()
+      .from(schema.formTemplates)
+      .where(eq(schema.formTemplates.id, id))
+      .limit(1);
+    return results[0];
+  }
+
+  async getFormTemplateBySlug(slug: string): Promise<FormTemplate | undefined> {
+    const results = await db
+      .select()
+      .from(schema.formTemplates)
+      .where(eq(schema.formTemplates.slug, slug))
+      .limit(1);
+    return results[0];
+  }
+
+  async createFormTemplate(template: Partial<FormTemplate>): Promise<FormTemplate> {
+    const results = await db
+      .insert(schema.formTemplates)
+      .values(template as any)
+      .returning();
+    return results[0];
+  }
+
+  async updateFormTemplate(id: string, template: Partial<FormTemplate>): Promise<FormTemplate | undefined> {
+    const results = await db
+      .update(schema.formTemplates)
+      .set({ ...template, updatedAt: new Date() })
+      .where(eq(schema.formTemplates.id, id))
+      .returning();
+    return results[0];
+  }
+
+  // ============================================================================
+  // FORM SUBMISSIONS
+  // ============================================================================
+  async getFormSubmissions(params: { templateId?: string; unitId?: string; status?: string }): Promise<FormSubmission[]> {
+    const conditions: any[] = [];
+    
+    if (params.templateId) {
+      conditions.push(eq(schema.formSubmissions.templateId, params.templateId));
+    }
+    if (params.unitId) {
+      conditions.push(eq(schema.formSubmissions.unitId, params.unitId));
+    }
+    if (params.status) {
+      conditions.push(eq(schema.formSubmissions.status, params.status as any));
+    }
+
+    let query = db.select().from(schema.formSubmissions);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    return query.orderBy(desc(schema.formSubmissions.createdAt));
+  }
+
+  async getFormSubmissionById(id: string): Promise<FormSubmission | undefined> {
+    const results = await db
+      .select()
+      .from(schema.formSubmissions)
+      .where(eq(schema.formSubmissions.id, id))
+      .limit(1);
+    return results[0];
+  }
+
+  async createFormSubmission(submission: Partial<FormSubmission>): Promise<FormSubmission> {
+    const results = await db
+      .insert(schema.formSubmissions)
+      .values(submission as any)
+      .returning();
+    return results[0];
+  }
+
+  async updateFormSubmission(id: string, submission: Partial<FormSubmission>): Promise<FormSubmission | undefined> {
+    const results = await db
+      .update(schema.formSubmissions)
+      .set({ ...submission, updatedAt: new Date() })
+      .where(eq(schema.formSubmissions.id, id))
+      .returning();
+    return results[0];
+  }
+
+  // ============================================================================
+  // WORKFLOW DEFINITIONS
+  // ============================================================================
+  async getWorkflowDefinitions(params: { entityType?: string; isActive?: boolean }): Promise<WorkflowDefinition[]> {
+    const conditions: any[] = [];
+    
+    if (params.entityType) {
+      conditions.push(eq(schema.workflowDefinitions.entityType, params.entityType as any));
+    }
+    if (params.isActive !== undefined) {
+      conditions.push(eq(schema.workflowDefinitions.isActive, params.isActive));
+    }
+
+    let query = db.select().from(schema.workflowDefinitions);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    return query.orderBy(asc(schema.workflowDefinitions.name));
+  }
+
+  async getWorkflowDefinitionById(id: string): Promise<WorkflowDefinition | undefined> {
+    const results = await db
+      .select()
+      .from(schema.workflowDefinitions)
+      .where(eq(schema.workflowDefinitions.id, id))
+      .limit(1);
+    return results[0];
+  }
+
+  async getWorkflowDefinitionBySlug(slug: string): Promise<WorkflowDefinition | undefined> {
+    const results = await db
+      .select()
+      .from(schema.workflowDefinitions)
+      .where(eq(schema.workflowDefinitions.slug, slug))
+      .limit(1);
+    return results[0];
+  }
+
+  async createWorkflowDefinition(definition: Partial<WorkflowDefinition>): Promise<WorkflowDefinition> {
+    const results = await db
+      .insert(schema.workflowDefinitions)
+      .values(definition as any)
+      .returning();
+    return results[0];
+  }
+
+  // ============================================================================
+  // WORKFLOW INSTANCES
+  // ============================================================================
+  async getWorkflowInstances(params: { entityType?: string; entityId?: string; unitId?: string; status?: string }): Promise<WorkflowInstance[]> {
+    const conditions: any[] = [];
+    
+    if (params.entityType) {
+      conditions.push(eq(schema.workflowInstances.entityType, params.entityType));
+    }
+    if (params.entityId) {
+      conditions.push(eq(schema.workflowInstances.entityId, params.entityId));
+    }
+    if (params.unitId) {
+      conditions.push(eq(schema.workflowInstances.unitId, params.unitId));
+    }
+    if (params.status) {
+      conditions.push(eq(schema.workflowInstances.status, params.status as any));
+    }
+
+    let query = db.select().from(schema.workflowInstances);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    return query.orderBy(desc(schema.workflowInstances.startedAt));
+  }
+
+  async getWorkflowInstanceById(id: string): Promise<WorkflowInstance | undefined> {
+    const results = await db
+      .select()
+      .from(schema.workflowInstances)
+      .where(eq(schema.workflowInstances.id, id))
+      .limit(1);
+    return results[0];
+  }
+
+  async createWorkflowInstance(instance: Partial<WorkflowInstance>): Promise<WorkflowInstance> {
+    const results = await db
+      .insert(schema.workflowInstances)
+      .values(instance as any)
+      .returning();
+    return results[0];
+  }
+
+  async updateWorkflowInstance(id: string, instance: Partial<WorkflowInstance>): Promise<WorkflowInstance | undefined> {
+    const results = await db
+      .update(schema.workflowInstances)
+      .set(instance)
+      .where(eq(schema.workflowInstances.id, id))
+      .returning();
+    return results[0];
+  }
+
+  // ============================================================================
+  // WORKFLOW ACTIONS
+  // ============================================================================
+  async getWorkflowActions(instanceId: string): Promise<WorkflowAction[]> {
+    return db
+      .select()
+      .from(schema.workflowActions)
+      .where(eq(schema.workflowActions.instanceId, instanceId))
+      .orderBy(asc(schema.workflowActions.createdAt));
+  }
+
+  async createWorkflowAction(action: Partial<WorkflowAction>): Promise<WorkflowAction> {
+    const results = await db
+      .insert(schema.workflowActions)
+      .values(action as any)
+      .returning();
+    return results[0];
+  }
+
+  // ============================================================================
+  // ALERT RULES
+  // ============================================================================
+  async getAlertRules(params: { category?: string; isActive?: boolean }): Promise<AlertRule[]> {
+    const conditions: any[] = [];
+    
+    if (params.category) {
+      conditions.push(eq(schema.alertRules.category, params.category as any));
+    }
+    if (params.isActive !== undefined) {
+      conditions.push(eq(schema.alertRules.isActive, params.isActive));
+    }
+
+    let query = db.select().from(schema.alertRules);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    return query.orderBy(asc(schema.alertRules.name));
+  }
+
+  async getAlertRuleBySlug(slug: string): Promise<AlertRule | undefined> {
+    const results = await db
+      .select()
+      .from(schema.alertRules)
+      .where(eq(schema.alertRules.slug, slug))
+      .limit(1);
+    return results[0];
+  }
+
+  async createAlertRule(rule: Partial<AlertRule>): Promise<AlertRule> {
+    const results = await db
+      .insert(schema.alertRules)
+      .values(rule as any)
+      .returning();
+    return results[0];
+  }
+
+  // ============================================================================
+  // ALERT INSTANCES
+  // ============================================================================
+  async getAlertInstances(params: { unitId?: string; severity?: string; category?: string; status?: string }): Promise<AlertInstance[]> {
+    const conditions: any[] = [];
+    
+    if (params.unitId) {
+      conditions.push(eq(schema.alertInstances.unitId, params.unitId));
+    }
+    if (params.severity) {
+      conditions.push(eq(schema.alertInstances.severity, params.severity as any));
+    }
+    if (params.category) {
+      conditions.push(eq(schema.alertInstances.category, params.category));
+    }
+    if (params.status) {
+      conditions.push(eq(schema.alertInstances.status, params.status as any));
+    }
+
+    let query = db.select().from(schema.alertInstances);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    return query.orderBy(desc(schema.alertInstances.createdAt));
+  }
+
+  async getAlertInstanceById(id: string): Promise<AlertInstance | undefined> {
+    const results = await db
+      .select()
+      .from(schema.alertInstances)
+      .where(eq(schema.alertInstances.id, id))
+      .limit(1);
+    return results[0];
+  }
+
+  async createAlertInstance(instance: Partial<AlertInstance>): Promise<AlertInstance> {
+    const results = await db
+      .insert(schema.alertInstances)
+      .values(instance as any)
+      .returning();
+    return results[0];
+  }
+
+  async updateAlertInstance(id: string, instance: Partial<AlertInstance>): Promise<AlertInstance | undefined> {
+    const results = await db
+      .update(schema.alertInstances)
+      .set(instance)
+      .where(eq(schema.alertInstances.id, id))
+      .returning();
+    return results[0];
+  }
+
+  // ============================================================================
+  // REPORT DEFINITIONS
+  // ============================================================================
+  async getReportDefinitions(params: { category?: string; isActive?: boolean }): Promise<ReportDefinition[]> {
+    const conditions: any[] = [];
+    
+    if (params.category) {
+      conditions.push(eq(schema.reportDefinitions.category, params.category as any));
+    }
+    if (params.isActive !== undefined) {
+      conditions.push(eq(schema.reportDefinitions.isActive, params.isActive));
+    }
+
+    let query = db.select().from(schema.reportDefinitions);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    return query.orderBy(asc(schema.reportDefinitions.name));
+  }
+
+  async getReportDefinitionBySlug(slug: string): Promise<ReportDefinition | undefined> {
+    const results = await db
+      .select()
+      .from(schema.reportDefinitions)
+      .where(eq(schema.reportDefinitions.slug, slug))
+      .limit(1);
+    return results[0];
+  }
+
+  async createReportDefinition(definition: Partial<ReportDefinition>): Promise<ReportDefinition> {
+    const results = await db
+      .insert(schema.reportDefinitions)
+      .values(definition as any)
+      .returning();
+    return results[0];
+  }
+
+  // ============================================================================
+  // REPORT EXECUTIONS
+  // ============================================================================
+  async getReportExecutions(params: { definitionId?: string; unitId?: string; limit?: number }): Promise<ReportExecution[]> {
+    const conditions: any[] = [];
+    
+    if (params.definitionId) {
+      conditions.push(eq(schema.reportExecutions.definitionId, params.definitionId));
+    }
+    if (params.unitId) {
+      conditions.push(eq(schema.reportExecutions.unitId, params.unitId));
+    }
+
+    let query = db.select().from(schema.reportExecutions);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    query = query.orderBy(desc(schema.reportExecutions.executedAt)) as any;
+    
+    if (params.limit) {
+      query = query.limit(params.limit) as any;
+    }
+    
+    return query;
+  }
+
+  async createReportExecution(execution: Partial<ReportExecution>): Promise<ReportExecution> {
+    const results = await db
+      .insert(schema.reportExecutions)
+      .values(execution as any)
+      .returning();
+    return results[0];
+  }
+
+  async updateReportExecution(id: string, execution: Partial<ReportExecution>): Promise<ReportExecution | undefined> {
+    const results = await db
+      .update(schema.reportExecutions)
+      .set(execution)
+      .where(eq(schema.reportExecutions.id, id))
+      .returning();
+    return results[0];
+  }
+
+  // ============================================================================
+  // SYSTEM AUDIT LOG
+  // ============================================================================
+  async createAuditLog(log: Partial<SystemAuditLog>): Promise<SystemAuditLog> {
+    const results = await db
+      .insert(schema.systemAuditLog)
+      .values(log as any)
+      .returning();
+    return results[0];
+  }
+
+  async getAuditLogs(params: { module?: string; userId?: string; unitId?: string; limit?: number }): Promise<SystemAuditLog[]> {
+    const conditions: any[] = [];
+    
+    if (params.module) {
+      conditions.push(eq(schema.systemAuditLog.module, params.module as any));
+    }
+    if (params.userId) {
+      conditions.push(eq(schema.systemAuditLog.userId, params.userId));
+    }
+    if (params.unitId) {
+      conditions.push(eq(schema.systemAuditLog.unitId, params.unitId));
+    }
+
+    let query = db.select().from(schema.systemAuditLog);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    query = query.orderBy(desc(schema.systemAuditLog.createdAt)) as any;
+    
+    if (params.limit) {
+      query = query.limit(params.limit) as any;
+    }
+    
+    return query;
   }
 }
 

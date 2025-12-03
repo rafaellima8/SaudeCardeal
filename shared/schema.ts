@@ -1104,6 +1104,389 @@ export const sinanExportBatches = sqliteTable("sinan_export_batches", {
 });
 
 // ============================================================================
+// FORM AUTOMATION MODULE (Isolated - Non-invasive)
+// ============================================================================
+
+export const formTemplates = sqliteTable("form_templates", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  category: text("category", {
+    enum: ["sinan", "vigilancia", "tfd", "bpa", "apac", "aih", "mortalidade", "ambiental", "violencia", "zoonoses", "outros"]
+  }).notNull(),
+  
+  description: text("description"),
+  pdfPath: text("pdf_path"),
+  thumbnailPath: text("thumbnail_path"),
+  
+  templateJson: text("template_json", { mode: "json" }).$type<{
+    pageSize: { width: number; height: number };
+    fields: Array<{
+      id: string;
+      label: string;
+      type: "text" | "number" | "date" | "select" | "checkbox" | "radio" | "textarea";
+      required: boolean;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      fontSize: number;
+      mask?: string;
+      options?: string[];
+      validation?: Record<string, any>;
+      mapping?: string;
+    }>;
+  }>(),
+  
+  validationRules: text("validation_rules", { mode: "json" }).$type<Record<string, any>>(),
+  mappingConfig: text("mapping_config", { mode: "json" }).$type<Record<string, string>>(),
+  
+  version: integer("version").default(1).notNull(),
+  isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),
+  
+  createdBy: text("created_by").references(() => users.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+export const formSubmissions = sqliteTable("form_submissions", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  
+  templateId: text("template_id").notNull().references(() => formTemplates.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  
+  submissionNumber: text("submission_number").notNull(),
+  
+  payload: text("payload", { mode: "json" }).$type<Record<string, any>>().notNull(),
+  validationResult: text("validation_result", { mode: "json" }).$type<{
+    isValid: boolean;
+    errors: Array<{ field: string; message: string }>;
+    warnings: Array<{ field: string; message: string }>;
+  }>(),
+  
+  status: text("status", {
+    enum: ["draft", "pending_validation", "validated", "pending_approval", "approved", "rejected", "exported", "cancelled"]
+  }).default("draft").notNull(),
+  
+  citizenId: text("citizen_id").references(() => citizens.id),
+  professionalId: text("professional_id").references(() => professionals.id),
+  
+  relatedEntityType: text("related_entity_type"),
+  relatedEntityId: text("related_entity_id"),
+  
+  pdfPath: text("pdf_path"),
+  exportPath: text("export_path"),
+  
+  createdBy: text("created_by").notNull().references(() => users.id),
+  updatedBy: text("updated_by").references(() => users.id),
+  
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  submittedAt: integer("submitted_at", { mode: "timestamp" }),
+  approvedAt: integer("approved_at", { mode: "timestamp" }),
+  exportedAt: integer("exported_at", { mode: "timestamp" }),
+});
+
+// ============================================================================
+// WORKFLOW APPROVAL MODULE (Isolated - Non-invasive)
+// ============================================================================
+
+export const workflowDefinitions = sqliteTable("workflow_definitions", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description"),
+  
+  entityType: text("entity_type", {
+    enum: ["form_submission", "sinan_notification", "tfd_request", "prescription", "diaper_request"]
+  }).notNull(),
+  
+  steps: text("steps", { mode: "json" }).$type<Array<{
+    order: number;
+    name: string;
+    role: string;
+    action: "approve" | "reject" | "review" | "forward";
+    autoApproveAfterHours?: number;
+    requiredFields?: string[];
+  }>>().notNull(),
+  
+  isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),
+  
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+export const workflowInstances = sqliteTable("workflow_instances", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  
+  definitionId: text("definition_id").notNull().references(() => workflowDefinitions.id),
+  entityType: text("entity_type").notNull(),
+  entityId: text("entity_id").notNull(),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  
+  currentStep: integer("current_step").default(0).notNull(),
+  
+  status: text("status", {
+    enum: ["pending", "in_progress", "approved", "rejected", "cancelled", "expired"]
+  }).default("pending").notNull(),
+  
+  metadata: text("metadata", { mode: "json" }).$type<Record<string, any>>(),
+  
+  startedAt: integer("started_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  completedAt: integer("completed_at", { mode: "timestamp" }),
+  dueAt: integer("due_at", { mode: "timestamp" }),
+  
+  createdBy: text("created_by").notNull().references(() => users.id),
+});
+
+export const workflowActions = sqliteTable("workflow_actions", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  
+  instanceId: text("instance_id").notNull().references(() => workflowInstances.id),
+  stepNumber: integer("step_number").notNull(),
+  
+  action: text("action", {
+    enum: ["submit", "approve", "reject", "request_changes", "forward", "comment", "auto_approve"]
+  }).notNull(),
+  
+  comment: text("comment"),
+  metadata: text("metadata", { mode: "json" }).$type<Record<string, any>>(),
+  
+  actionBy: text("action_by").notNull().references(() => users.id),
+  actionByName: text("action_by_name").notNull(),
+  actionByRole: text("action_by_role").notNull(),
+  
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  ipAddress: text("ip_address"),
+});
+
+// ============================================================================
+// ALERTS & NOTIFICATIONS MODULE (Isolated - Non-invasive)
+// ============================================================================
+
+export const alertRules = sqliteTable("alert_rules", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description"),
+  
+  category: text("category", {
+    enum: ["prazo", "pendencia", "risco_financeiro", "edital", "irregularidade", "epidemiologico", "estoque", "compliance"]
+  }).notNull(),
+  
+  triggerType: text("trigger_type", {
+    enum: ["scheduled", "event", "threshold", "deadline"]
+  }).notNull(),
+  
+  triggerConfig: text("trigger_config", { mode: "json" }).$type<{
+    schedule?: string;
+    eventType?: string;
+    threshold?: number;
+    deadlineField?: string;
+    daysBeforeDeadline?: number[];
+  }>().notNull(),
+  
+  conditions: text("conditions", { mode: "json" }).$type<Array<{
+    field: string;
+    operator: "eq" | "ne" | "gt" | "lt" | "gte" | "lte" | "contains" | "exists";
+    value: any;
+  }>>(),
+  
+  severity: text("severity", {
+    enum: ["info", "warning", "critical", "urgent"]
+  }).default("warning").notNull(),
+  
+  targetRoles: text("target_roles", { mode: "json" }).$type<string[]>(),
+  targetUnits: text("target_units", { mode: "json" }).$type<string[]>(),
+  
+  notificationChannels: text("notification_channels", { mode: "json" }).$type<("ui" | "email" | "sms")[]>().default(["ui"]),
+  
+  isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),
+  
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+export const alertInstances = sqliteTable("alert_instances", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  
+  ruleId: text("rule_id").notNull().references(() => alertRules.id),
+  unitId: text("unit_id").references(() => healthUnits.id),
+  
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  
+  severity: text("severity", {
+    enum: ["info", "warning", "critical", "urgent"]
+  }).notNull(),
+  
+  category: text("category").notNull(),
+  
+  entityType: text("entity_type"),
+  entityId: text("entity_id"),
+  
+  metadata: text("metadata", { mode: "json" }).$type<Record<string, any>>(),
+  actionUrl: text("action_url"),
+  
+  status: text("status", {
+    enum: ["active", "acknowledged", "resolved", "dismissed", "expired"]
+  }).default("active").notNull(),
+  
+  dueAt: integer("due_at", { mode: "timestamp" }),
+  acknowledgedAt: integer("acknowledged_at", { mode: "timestamp" }),
+  acknowledgedBy: text("acknowledged_by").references(() => users.id),
+  resolvedAt: integer("resolved_at", { mode: "timestamp" }),
+  resolvedBy: text("resolved_by").references(() => users.id),
+  
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+export const alertDeliveries = sqliteTable("alert_deliveries", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  
+  alertId: text("alert_id").notNull().references(() => alertInstances.id),
+  userId: text("user_id").notNull().references(() => users.id),
+  
+  channel: text("channel", { enum: ["ui", "email", "sms"] }).notNull(),
+  
+  status: text("status", {
+    enum: ["pending", "sent", "delivered", "failed", "read"]
+  }).default("pending").notNull(),
+  
+  sentAt: integer("sent_at", { mode: "timestamp" }),
+  deliveredAt: integer("delivered_at", { mode: "timestamp" }),
+  readAt: integer("read_at", { mode: "timestamp" }),
+  
+  errorMessage: text("error_message"),
+  
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// ============================================================================
+// EDITAIS MONITORING MODULE (Isolated - Non-invasive)
+// ============================================================================
+
+export const editais = sqliteTable("editais", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  
+  source: text("source", {
+    enum: ["ms", "fnde", "conass", "conasems", "mds", "ses", "outros"]
+  }).notNull(),
+  
+  title: text("title").notNull(),
+  description: text("description"),
+  url: text("url").notNull(),
+  
+  category: text("category", {
+    enum: ["infraestrutura", "equipamentos", "capacitacao", "programas", "custeio", "outros"]
+  }),
+  
+  openDate: integer("open_date", { mode: "timestamp" }),
+  closeDate: integer("close_date", { mode: "timestamp" }),
+  
+  estimatedValue: real("estimated_value"),
+  requirements: text("requirements", { mode: "json" }).$type<string[]>(),
+  documents: text("documents", { mode: "json" }).$type<string[]>(),
+  
+  status: text("status", {
+    enum: ["aberto", "em_analise", "inscrito", "aprovado", "rejeitado", "expirado"]
+  }).default("aberto").notNull(),
+  
+  impactAnalysis: text("impact_analysis"),
+  notes: text("notes"),
+  
+  scrapedAt: integer("scraped_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// ============================================================================
+// STRATEGIC REPORTS MODULE (Isolated - Non-invasive)
+// ============================================================================
+
+export const reportDefinitions = sqliteTable("report_definitions", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description"),
+  
+  category: text("category", {
+    enum: ["previne", "mac", "aih", "vigilancia", "suas_saude", "farmacia", "epidemiologico", "financeiro"]
+  }).notNull(),
+  
+  queryConfig: text("query_config", { mode: "json" }).$type<Record<string, any>>().notNull(),
+  
+  visualizationType: text("visualization_type", {
+    enum: ["table", "chart", "kpi", "dashboard", "export"]
+  }).default("table").notNull(),
+  
+  exportFormats: text("export_formats", { mode: "json" }).$type<("pdf" | "csv" | "xlsx" | "json")[]>().default(["pdf", "csv"]),
+  
+  schedule: text("schedule"),
+  
+  isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),
+  
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+export const reportExecutions = sqliteTable("report_executions", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  
+  definitionId: text("definition_id").notNull().references(() => reportDefinitions.id),
+  unitId: text("unit_id").references(() => healthUnits.id),
+  
+  parameters: text("parameters", { mode: "json" }).$type<Record<string, any>>(),
+  
+  status: text("status", {
+    enum: ["pending", "running", "completed", "failed"]
+  }).default("pending").notNull(),
+  
+  resultData: text("result_data", { mode: "json" }).$type<Record<string, any>>(),
+  resultPath: text("result_path"),
+  
+  executionTime: integer("execution_time"),
+  errorMessage: text("error_message"),
+  
+  executedBy: text("executed_by").references(() => users.id),
+  executedAt: integer("executed_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  completedAt: integer("completed_at", { mode: "timestamp" }),
+});
+
+// ============================================================================
+// UNIFIED AUDIT LOG (Extends existing saAuditLog concept)
+// ============================================================================
+
+export const systemAuditLog = sqliteTable("system_audit_log", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  
+  module: text("module", {
+    enum: ["forms", "workflow", "alerts", "reports", "editais", "sinan", "tfd", "pharmacy", "social_assistance", "system"]
+  }).notNull(),
+  
+  action: text("action").notNull(),
+  entityType: text("entity_type").notNull(),
+  entityId: text("entity_id"),
+  
+  userId: text("user_id").notNull().references(() => users.id),
+  userName: text("user_name").notNull(),
+  userRole: text("user_role").notNull(),
+  unitId: text("unit_id").references(() => healthUnits.id),
+  
+  oldValue: text("old_value", { mode: "json" }).$type<Record<string, any>>(),
+  newValue: text("new_value", { mode: "json" }).$type<Record<string, any>>(),
+  
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// ============================================================================
 // INSERT SCHEMAS
 // ============================================================================
 
@@ -1567,3 +1950,27 @@ export type InsertSinanLabExam = z.infer<typeof insertSinanLabExamSchema>;
 
 export type SinanExportBatch = typeof sinanExportBatches.$inferSelect;
 export type InsertSinanExportBatch = z.infer<typeof insertSinanExportBatchSchema>;
+
+// Form Automation Types
+export type FormTemplate = typeof formTemplates.$inferSelect;
+export type FormSubmission = typeof formSubmissions.$inferSelect;
+
+// Workflow Types
+export type WorkflowDefinition = typeof workflowDefinitions.$inferSelect;
+export type WorkflowInstance = typeof workflowInstances.$inferSelect;
+export type WorkflowAction = typeof workflowActions.$inferSelect;
+
+// Alert Types
+export type AlertRule = typeof alertRules.$inferSelect;
+export type AlertInstance = typeof alertInstances.$inferSelect;
+export type AlertDelivery = typeof alertDeliveries.$inferSelect;
+
+// Editais Types
+export type Edital = typeof editais.$inferSelect;
+
+// Report Types
+export type ReportDefinition = typeof reportDefinitions.$inferSelect;
+export type ReportExecution = typeof reportExecutions.$inferSelect;
+
+// System Audit Types
+export type SystemAuditLog = typeof systemAuditLog.$inferSelect;
