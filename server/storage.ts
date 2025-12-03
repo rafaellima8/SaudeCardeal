@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, or, desc, asc, like, sql, gte, lte } from "drizzle-orm";
+import { eq, and, or, desc, asc, like, sql, gte, lte, lt } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import type {
   InsertCitizen,
@@ -28,6 +28,20 @@ import type {
   InsertProfessional,
   Professional,
   User,
+  DiaperStock,
+  InsertDiaperStock,
+  DiaperStockMovement,
+  InsertDiaperStockMovement,
+  SaBeneficiary,
+  InsertSaBeneficiary,
+  DiaperRequest,
+  InsertDiaperRequest,
+  DiaperAuthorization,
+  InsertDiaperAuthorization,
+  DiaperDelivery,
+  InsertDiaperDelivery,
+  DiaperMonthlyList,
+  InsertDiaperMonthlyList,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -147,6 +161,75 @@ export interface IStorage {
 
   // RENAME Catalog
   searchRenameCatalog(params: { search?: string; therapeuticClass?: string; limit?: number }): Promise<schema.RenameCatalog[]>;
+
+  // Diaper Stock
+  getDiaperStock(params: { unitId?: string; size?: string; status?: string; search?: string }): Promise<DiaperStock[]>;
+  getDiaperStockById(id: string): Promise<DiaperStock | undefined>;
+  createDiaperStock(stock: InsertDiaperStock): Promise<DiaperStock>;
+  updateDiaperStock(id: string, stock: Partial<InsertDiaperStock>): Promise<DiaperStock | undefined>;
+  deleteDiaperStock(id: string): Promise<boolean>;
+  getLowDiaperStock(unitId: string): Promise<DiaperStock[]>;
+  getExpiringDiaperStock(unitId: string, daysAhead?: number): Promise<DiaperStock[]>;
+  getDiaperStockByFIFO(unitId: string, size: string, quantity: number): Promise<DiaperStock[]>;
+
+  // Diaper Stock Movements
+  createDiaperStockMovement(movement: InsertDiaperStockMovement): Promise<DiaperStockMovement>;
+  getDiaperStockMovements(params: { unitId?: string; stockId?: string; limit?: number }): Promise<DiaperStockMovement[]>;
+
+  // Social Assistance Beneficiaries
+  getSaBeneficiaries(params: { unitId?: string; search?: string; status?: string; limit?: number }): Promise<SaBeneficiary[]>;
+  getSaBeneficiaryById(id: string): Promise<SaBeneficiary | undefined>;
+  getSaBeneficiaryByCpf(cpf: string): Promise<SaBeneficiary | undefined>;
+  createSaBeneficiary(beneficiary: InsertSaBeneficiary): Promise<SaBeneficiary>;
+  updateSaBeneficiary(id: string, beneficiary: Partial<InsertSaBeneficiary>): Promise<SaBeneficiary | undefined>;
+  deleteSaBeneficiary(id: string): Promise<boolean>;
+
+  // Diaper Requests
+  getDiaperRequests(params: { unitId?: string; beneficiaryId?: string; status?: string; limit?: number }): Promise<DiaperRequest[]>;
+  getDiaperRequestById(id: string): Promise<DiaperRequest | undefined>;
+  createDiaperRequest(request: InsertDiaperRequest): Promise<DiaperRequest>;
+  updateDiaperRequest(id: string, request: Partial<InsertDiaperRequest>): Promise<DiaperRequest | undefined>;
+  deleteDiaperRequest(id: string): Promise<boolean>;
+  generateDiaperRequestNumber(): Promise<string>;
+
+  // Diaper Authorizations
+  getDiaperAuthorizations(params: { unitId?: string; beneficiaryId?: string; requestId?: string; status?: string }): Promise<DiaperAuthorization[]>;
+  getDiaperAuthorizationById(id: string): Promise<DiaperAuthorization | undefined>;
+  createDiaperAuthorization(auth: InsertDiaperAuthorization): Promise<DiaperAuthorization>;
+  updateDiaperAuthorization(id: string, auth: Partial<InsertDiaperAuthorization>): Promise<DiaperAuthorization | undefined>;
+  generateDiaperAuthorizationNumber(): Promise<string>;
+
+  // Diaper Deliveries
+  getDiaperDeliveries(params: { unitId?: string; beneficiaryId?: string; authorizationId?: string }): Promise<DiaperDelivery[]>;
+  getDiaperDeliveryById(id: string): Promise<DiaperDelivery | undefined>;
+  createDiaperDelivery(delivery: InsertDiaperDelivery): Promise<DiaperDelivery>;
+  generateDiaperDeliveryNumber(): Promise<string>;
+
+  // Diaper Monthly Lists
+  getDiaperMonthlyLists(params: { unitId?: string; status?: string }): Promise<DiaperMonthlyList[]>;
+  getDiaperMonthlyListById(id: string): Promise<DiaperMonthlyList | undefined>;
+  createDiaperMonthlyList(list: InsertDiaperMonthlyList): Promise<DiaperMonthlyList>;
+  updateDiaperMonthlyList(id: string, list: Partial<InsertDiaperMonthlyList>): Promise<DiaperMonthlyList | undefined>;
+  generateDiaperMonthlyListNumber(): Promise<string>;
+
+  // Social Assistance Dashboard Stats
+  getSaStats(unitId: string): Promise<{
+    totalBeneficiaries: number;
+    pendingRequests: number;
+    authorizedThisMonth: number;
+    deliveredThisMonth: number;
+    lowDiaperStock: number;
+  }>;
+
+  // Demand Forecasting (3-month moving average)
+  getDiaperDemandForecast(unitId: string): Promise<{
+    size: string;
+    avgMonthlyDemand: number;
+    currentStock: number;
+    monthsOfStock: number;
+    trend: 'increasing' | 'stable' | 'decreasing';
+    recommendation: string;
+  }[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -744,6 +827,623 @@ export class DbStorage implements IStorage {
       .where(and(...conditions))
       .limit(params.limit || 50)
       .orderBy(asc(schema.renameCatalog.commercialName));
+  }
+
+  // ============================================================================
+  // DIAPER STOCK
+  // ============================================================================
+  
+  async getDiaperStock(params: { unitId?: string; size?: string; status?: string; search?: string }): Promise<DiaperStock[]> {
+    const conditions: any[] = [eq(schema.diaperStock.active, true)];
+    
+    if (params.unitId) {
+      conditions.push(eq(schema.diaperStock.unitId, params.unitId));
+    }
+    if (params.size) {
+      conditions.push(eq(schema.diaperStock.size, params.size as any));
+    }
+    if (params.status) {
+      conditions.push(eq(schema.diaperStock.status, params.status as any));
+    }
+    if (params.search) {
+      conditions.push(
+        or(
+          like(schema.diaperStock.name, `%${params.search}%`),
+          like(schema.diaperStock.batch, `%${params.search}%`),
+          like(schema.diaperStock.brand, `%${params.search}%`)
+        )
+      );
+    }
+    
+    return db
+      .select()
+      .from(schema.diaperStock)
+      .where(and(...conditions))
+      .orderBy(asc(schema.diaperStock.expirationDate));
+  }
+
+  async getDiaperStockById(id: string): Promise<DiaperStock | undefined> {
+    const [stock] = await db.select().from(schema.diaperStock).where(eq(schema.diaperStock.id, id));
+    return stock;
+  }
+
+  async createDiaperStock(stock: InsertDiaperStock): Promise<DiaperStock> {
+    const availableQuantity = (stock.currentQuantity || 0) - (stock.reservedQuantity || 0);
+    const [created] = await db.insert(schema.diaperStock).values({
+      ...stock,
+      availableQuantity: availableQuantity,
+    }).returning();
+    return created;
+  }
+
+  async updateDiaperStock(id: string, stock: Partial<InsertDiaperStock>): Promise<DiaperStock | undefined> {
+    const existing = await this.getDiaperStockById(id);
+    if (!existing) return undefined;
+    
+    const currentQty = stock.currentQuantity ?? existing.currentQuantity;
+    const reservedQty = stock.reservedQuantity ?? existing.reservedQuantity;
+    const availableQuantity = currentQty - reservedQty;
+    
+    let status = existing.status;
+    if (currentQty <= 0) {
+      status = 'depleted';
+    } else if (existing.expirationDate && new Date(existing.expirationDate) < new Date()) {
+      status = 'expired';
+    } else if (currentQty <= existing.minStock) {
+      status = 'low_stock';
+    } else {
+      status = 'active';
+    }
+    
+    const [updated] = await db
+      .update(schema.diaperStock)
+      .set({ ...stock, availableQuantity, status, updatedAt: new Date() })
+      .where(eq(schema.diaperStock.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteDiaperStock(id: string): Promise<boolean> {
+    await db.update(schema.diaperStock).set({ active: false }).where(eq(schema.diaperStock.id, id));
+    return true;
+  }
+
+  async getLowDiaperStock(unitId: string): Promise<DiaperStock[]> {
+    return db
+      .select()
+      .from(schema.diaperStock)
+      .where(
+        and(
+          eq(schema.diaperStock.unitId, unitId),
+          eq(schema.diaperStock.active, true),
+          sql`${schema.diaperStock.currentQuantity} <= ${schema.diaperStock.minStock}`
+        )
+      )
+      .orderBy(asc(schema.diaperStock.currentQuantity));
+  }
+
+  async getExpiringDiaperStock(unitId: string, daysAhead: number = 60): Promise<DiaperStock[]> {
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + daysAhead);
+    
+    return db
+      .select()
+      .from(schema.diaperStock)
+      .where(
+        and(
+          eq(schema.diaperStock.unitId, unitId),
+          eq(schema.diaperStock.active, true),
+          lte(schema.diaperStock.expirationDate, futureDate),
+          sql`${schema.diaperStock.currentQuantity} > 0`
+        )
+      )
+      .orderBy(asc(schema.diaperStock.expirationDate));
+  }
+
+  async getDiaperStockByFIFO(unitId: string, size: string, quantity: number): Promise<DiaperStock[]> {
+    return db
+      .select()
+      .from(schema.diaperStock)
+      .where(
+        and(
+          eq(schema.diaperStock.unitId, unitId),
+          eq(schema.diaperStock.size, size as any),
+          eq(schema.diaperStock.active, true),
+          sql`${schema.diaperStock.availableQuantity} > 0`,
+          gte(schema.diaperStock.expirationDate, new Date())
+        )
+      )
+      .orderBy(asc(schema.diaperStock.expirationDate));
+  }
+
+  // Diaper Stock Movements
+  async createDiaperStockMovement(movement: InsertDiaperStockMovement): Promise<DiaperStockMovement> {
+    const [created] = await db.insert(schema.diaperStockMovements).values(movement).returning();
+    
+    const stock = await this.getDiaperStockById(movement.stockId);
+    if (stock) {
+      await this.updateDiaperStock(movement.stockId, {
+        currentQuantity: movement.newQuantity,
+      });
+    }
+    
+    return created;
+  }
+
+  async getDiaperStockMovements(params: { unitId?: string; stockId?: string; limit?: number }): Promise<DiaperStockMovement[]> {
+    const conditions: any[] = [];
+    
+    if (params.unitId) {
+      conditions.push(eq(schema.diaperStockMovements.unitId, params.unitId));
+    }
+    if (params.stockId) {
+      conditions.push(eq(schema.diaperStockMovements.stockId, params.stockId));
+    }
+    
+    let query = db.select().from(schema.diaperStockMovements);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return query.orderBy(desc(schema.diaperStockMovements.createdAt)).limit(params.limit || 100);
+  }
+
+  // ============================================================================
+  // SOCIAL ASSISTANCE BENEFICIARIES
+  // ============================================================================
+  
+  async getSaBeneficiaries(params: { unitId?: string; search?: string; status?: string; limit?: number }): Promise<SaBeneficiary[]> {
+    const conditions: any[] = [eq(schema.saBeneficiaries.active, true)];
+    
+    if (params.unitId) {
+      conditions.push(eq(schema.saBeneficiaries.unitId, params.unitId));
+    }
+    if (params.status) {
+      conditions.push(eq(schema.saBeneficiaries.status, params.status as any));
+    }
+    if (params.search) {
+      conditions.push(
+        or(
+          like(schema.saBeneficiaries.name, `%${params.search}%`),
+          like(schema.saBeneficiaries.cpf, `%${params.search}%`),
+          like(schema.saBeneficiaries.nis, `%${params.search}%`)
+        )
+      );
+    }
+    
+    return db
+      .select()
+      .from(schema.saBeneficiaries)
+      .where(and(...conditions))
+      .orderBy(asc(schema.saBeneficiaries.name))
+      .limit(params.limit || 100);
+  }
+
+  async getSaBeneficiaryById(id: string): Promise<SaBeneficiary | undefined> {
+    const [beneficiary] = await db.select().from(schema.saBeneficiaries).where(eq(schema.saBeneficiaries.id, id));
+    return beneficiary;
+  }
+
+  async getSaBeneficiaryByCpf(cpf: string): Promise<SaBeneficiary | undefined> {
+    const [beneficiary] = await db.select().from(schema.saBeneficiaries).where(eq(schema.saBeneficiaries.cpf, cpf));
+    return beneficiary;
+  }
+
+  async createSaBeneficiary(beneficiary: InsertSaBeneficiary): Promise<SaBeneficiary> {
+    const [created] = await db.insert(schema.saBeneficiaries).values(beneficiary).returning();
+    return created;
+  }
+
+  async updateSaBeneficiary(id: string, beneficiary: Partial<InsertSaBeneficiary>): Promise<SaBeneficiary | undefined> {
+    const [updated] = await db
+      .update(schema.saBeneficiaries)
+      .set({ ...beneficiary, updatedAt: new Date() })
+      .where(eq(schema.saBeneficiaries.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteSaBeneficiary(id: string): Promise<boolean> {
+    await db.update(schema.saBeneficiaries).set({ active: false }).where(eq(schema.saBeneficiaries.id, id));
+    return true;
+  }
+
+  // ============================================================================
+  // DIAPER REQUESTS
+  // ============================================================================
+  
+  async getDiaperRequests(params: { unitId?: string; beneficiaryId?: string; status?: string; limit?: number }): Promise<DiaperRequest[]> {
+    const conditions: any[] = [];
+    
+    if (params.unitId) {
+      conditions.push(eq(schema.diaperRequests.unitId, params.unitId));
+    }
+    if (params.beneficiaryId) {
+      conditions.push(eq(schema.diaperRequests.beneficiaryId, params.beneficiaryId));
+    }
+    if (params.status) {
+      conditions.push(eq(schema.diaperRequests.status, params.status as any));
+    }
+    
+    let query = db.select().from(schema.diaperRequests);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return query.orderBy(desc(schema.diaperRequests.createdAt)).limit(params.limit || 100);
+  }
+
+  async getDiaperRequestById(id: string): Promise<DiaperRequest | undefined> {
+    const [request] = await db.select().from(schema.diaperRequests).where(eq(schema.diaperRequests.id, id));
+    return request;
+  }
+
+  async createDiaperRequest(request: InsertDiaperRequest): Promise<DiaperRequest> {
+    const [created] = await db.insert(schema.diaperRequests).values(request).returning();
+    return created;
+  }
+
+  async updateDiaperRequest(id: string, request: Partial<InsertDiaperRequest>): Promise<DiaperRequest | undefined> {
+    const [updated] = await db
+      .update(schema.diaperRequests)
+      .set({ ...request, updatedAt: new Date() })
+      .where(eq(schema.diaperRequests.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteDiaperRequest(id: string): Promise<boolean> {
+    await db.update(schema.diaperRequests).set({ status: 'cancelado' }).where(eq(schema.diaperRequests.id, id));
+    return true;
+  }
+
+  async generateDiaperRequestNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.diaperRequests)
+      .where(like(schema.diaperRequests.requestNumber, `SOL-${year}-%`));
+    
+    const count = result[0]?.count || 0;
+    return `SOL-${year}-${String(count + 1).padStart(5, '0')}`;
+  }
+
+  // ============================================================================
+  // DIAPER AUTHORIZATIONS
+  // ============================================================================
+  
+  async getDiaperAuthorizations(params: { unitId?: string; beneficiaryId?: string; requestId?: string; status?: string }): Promise<DiaperAuthorization[]> {
+    const conditions: any[] = [];
+    
+    if (params.unitId) {
+      conditions.push(eq(schema.diaperAuthorizations.unitId, params.unitId));
+    }
+    if (params.beneficiaryId) {
+      conditions.push(eq(schema.diaperAuthorizations.beneficiaryId, params.beneficiaryId));
+    }
+    if (params.requestId) {
+      conditions.push(eq(schema.diaperAuthorizations.requestId, params.requestId));
+    }
+    if (params.status) {
+      conditions.push(eq(schema.diaperAuthorizations.status, params.status as any));
+    }
+    
+    let query = db.select().from(schema.diaperAuthorizations);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return query.orderBy(desc(schema.diaperAuthorizations.createdAt));
+  }
+
+  async getDiaperAuthorizationById(id: string): Promise<DiaperAuthorization | undefined> {
+    const [auth] = await db.select().from(schema.diaperAuthorizations).where(eq(schema.diaperAuthorizations.id, id));
+    return auth;
+  }
+
+  async createDiaperAuthorization(auth: InsertDiaperAuthorization): Promise<DiaperAuthorization> {
+    const quantityRemaining = auth.quantityAuthorized - (auth.quantityDelivered || 0);
+    const [created] = await db.insert(schema.diaperAuthorizations).values({
+      ...auth,
+      quantityRemaining,
+    }).returning();
+    return created;
+  }
+
+  async updateDiaperAuthorization(id: string, auth: Partial<InsertDiaperAuthorization>): Promise<DiaperAuthorization | undefined> {
+    const existing = await this.getDiaperAuthorizationById(id);
+    if (!existing) return undefined;
+    
+    const quantityDelivered = auth.quantityDelivered ?? existing.quantityDelivered ?? 0;
+    const quantityAuthorized = auth.quantityAuthorized ?? existing.quantityAuthorized;
+    const quantityRemaining = quantityAuthorized - quantityDelivered;
+    
+    let status = existing.status;
+    if (quantityRemaining <= 0) {
+      status = 'utilizada';
+    } else if (quantityDelivered > 0) {
+      status = 'parcialmente_utilizada';
+    }
+    
+    const [updated] = await db
+      .update(schema.diaperAuthorizations)
+      .set({ ...auth, quantityRemaining, status, updatedAt: new Date() })
+      .where(eq(schema.diaperAuthorizations.id, id))
+      .returning();
+    return updated;
+  }
+
+  async generateDiaperAuthorizationNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.diaperAuthorizations)
+      .where(like(schema.diaperAuthorizations.authorizationNumber, `AUT-${year}-%`));
+    
+    const count = result[0]?.count || 0;
+    return `AUT-${year}-${String(count + 1).padStart(5, '0')}`;
+  }
+
+  // ============================================================================
+  // DIAPER DELIVERIES
+  // ============================================================================
+  
+  async getDiaperDeliveries(params: { unitId?: string; beneficiaryId?: string; authorizationId?: string }): Promise<DiaperDelivery[]> {
+    const conditions: any[] = [];
+    
+    if (params.unitId) {
+      conditions.push(eq(schema.diaperDeliveries.unitId, params.unitId));
+    }
+    if (params.beneficiaryId) {
+      conditions.push(eq(schema.diaperDeliveries.beneficiaryId, params.beneficiaryId));
+    }
+    if (params.authorizationId) {
+      conditions.push(eq(schema.diaperDeliveries.authorizationId, params.authorizationId));
+    }
+    
+    let query = db.select().from(schema.diaperDeliveries);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return query.orderBy(desc(schema.diaperDeliveries.createdAt));
+  }
+
+  async getDiaperDeliveryById(id: string): Promise<DiaperDelivery | undefined> {
+    const [delivery] = await db.select().from(schema.diaperDeliveries).where(eq(schema.diaperDeliveries.id, id));
+    return delivery;
+  }
+
+  async createDiaperDelivery(delivery: InsertDiaperDelivery): Promise<DiaperDelivery> {
+    const [created] = await db.insert(schema.diaperDeliveries).values(delivery).returning();
+    return created;
+  }
+
+  async generateDiaperDeliveryNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.diaperDeliveries)
+      .where(like(schema.diaperDeliveries.deliveryNumber, `ENT-${year}-%`));
+    
+    const count = result[0]?.count || 0;
+    return `ENT-${year}-${String(count + 1).padStart(5, '0')}`;
+  }
+
+  // ============================================================================
+  // DIAPER MONTHLY LISTS
+  // ============================================================================
+  
+  async getDiaperMonthlyLists(params: { unitId?: string; status?: string }): Promise<DiaperMonthlyList[]> {
+    const conditions: any[] = [];
+    
+    if (params.unitId) {
+      conditions.push(eq(schema.diaperMonthlyLists.unitId, params.unitId));
+    }
+    if (params.status) {
+      conditions.push(eq(schema.diaperMonthlyLists.processingStatus, params.status as any));
+    }
+    
+    let query = db.select().from(schema.diaperMonthlyLists);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return query.orderBy(desc(schema.diaperMonthlyLists.createdAt));
+  }
+
+  async getDiaperMonthlyListById(id: string): Promise<DiaperMonthlyList | undefined> {
+    const [list] = await db.select().from(schema.diaperMonthlyLists).where(eq(schema.diaperMonthlyLists.id, id));
+    return list;
+  }
+
+  async createDiaperMonthlyList(list: InsertDiaperMonthlyList): Promise<DiaperMonthlyList> {
+    const [created] = await db.insert(schema.diaperMonthlyLists).values(list).returning();
+    return created;
+  }
+
+  async updateDiaperMonthlyList(id: string, list: Partial<InsertDiaperMonthlyList>): Promise<DiaperMonthlyList | undefined> {
+    const [updated] = await db
+      .update(schema.diaperMonthlyLists)
+      .set({ ...list, updatedAt: new Date() })
+      .where(eq(schema.diaperMonthlyLists.id, id))
+      .returning();
+    return updated;
+  }
+
+  async generateDiaperMonthlyListNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const month = new Date().getMonth() + 1;
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.diaperMonthlyLists)
+      .where(like(schema.diaperMonthlyLists.listNumber, `LIST-${year}${String(month).padStart(2, '0')}-%`));
+    
+    const count = result[0]?.count || 0;
+    return `LIST-${year}${String(month).padStart(2, '0')}-${String(count + 1).padStart(3, '0')}`;
+  }
+
+  // ============================================================================
+  // SOCIAL ASSISTANCE STATS
+  // ============================================================================
+  
+  async getSaStats(unitId: string): Promise<{
+    totalBeneficiaries: number;
+    pendingRequests: number;
+    authorizedThisMonth: number;
+    deliveredThisMonth: number;
+    lowDiaperStock: number;
+  }> {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    const [beneficiariesResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.saBeneficiaries)
+      .where(and(
+        eq(schema.saBeneficiaries.unitId, unitId),
+        eq(schema.saBeneficiaries.active, true)
+      ));
+    
+    const [pendingResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.diaperRequests)
+      .where(and(
+        eq(schema.diaperRequests.unitId, unitId),
+        eq(schema.diaperRequests.status, 'pendente')
+      ));
+    
+    const [authorizedResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.diaperAuthorizations)
+      .where(and(
+        eq(schema.diaperAuthorizations.unitId, unitId),
+        gte(schema.diaperAuthorizations.issuedAt, startOfMonth)
+      ));
+    
+    const [deliveredResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.diaperDeliveries)
+      .where(and(
+        eq(schema.diaperDeliveries.unitId, unitId),
+        gte(schema.diaperDeliveries.deliveredAt, startOfMonth)
+      ));
+    
+    const lowStock = await this.getLowDiaperStock(unitId);
+    
+    return {
+      totalBeneficiaries: beneficiariesResult?.count || 0,
+      pendingRequests: pendingResult?.count || 0,
+      authorizedThisMonth: authorizedResult?.count || 0,
+      deliveredThisMonth: deliveredResult?.count || 0,
+      lowDiaperStock: lowStock.length,
+    };
+  }
+
+  async getDiaperDemandForecast(unitId: string): Promise<{
+    size: string;
+    avgMonthlyDemand: number;
+    currentStock: number;
+    monthsOfStock: number;
+    trend: 'increasing' | 'stable' | 'decreasing';
+    recommendation: string;
+  }[]> {
+    const now = new Date();
+    const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+    const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    
+    const sizes = ['RN', 'P', 'M', 'G', 'XG', 'XXG', 'geriatrica_P', 'geriatrica_M', 'geriatrica_G', 'geriatrica_XG'];
+    const forecasts: {
+      size: string;
+      avgMonthlyDemand: number;
+      currentStock: number;
+      monthsOfStock: number;
+      trend: 'increasing' | 'stable' | 'decreasing';
+      recommendation: string;
+    }[] = [];
+
+    for (const size of sizes) {
+      const deliveriesM3 = await db
+        .select({ total: sql<number>`COALESCE(SUM(${schema.diaperDeliveries.quantityDelivered}), 0)` })
+        .from(schema.diaperDeliveries)
+        .where(and(
+          eq(schema.diaperDeliveries.unitId, unitId),
+          eq(schema.diaperDeliveries.diaperSize, size as any),
+          gte(schema.diaperDeliveries.deliveredAt, threeMonthsAgo),
+          lt(schema.diaperDeliveries.deliveredAt, twoMonthsAgo)
+        ));
+
+      const deliveriesM2 = await db
+        .select({ total: sql<number>`COALESCE(SUM(${schema.diaperDeliveries.quantityDelivered}), 0)` })
+        .from(schema.diaperDeliveries)
+        .where(and(
+          eq(schema.diaperDeliveries.unitId, unitId),
+          eq(schema.diaperDeliveries.diaperSize, size as any),
+          gte(schema.diaperDeliveries.deliveredAt, twoMonthsAgo),
+          lt(schema.diaperDeliveries.deliveredAt, oneMonthAgo)
+        ));
+
+      const deliveriesM1 = await db
+        .select({ total: sql<number>`COALESCE(SUM(${schema.diaperDeliveries.quantityDelivered}), 0)` })
+        .from(schema.diaperDeliveries)
+        .where(and(
+          eq(schema.diaperDeliveries.unitId, unitId),
+          eq(schema.diaperDeliveries.diaperSize, size as any),
+          gte(schema.diaperDeliveries.deliveredAt, oneMonthAgo)
+        ));
+
+      const m3 = deliveriesM3[0]?.total || 0;
+      const m2 = deliveriesM2[0]?.total || 0;
+      const m1 = deliveriesM1[0]?.total || 0;
+
+      const avgMonthlyDemand = Math.round((m1 + m2 + m3) / 3);
+
+      const stockResult = await db
+        .select({ total: sql<number>`COALESCE(SUM(${schema.diaperStock.currentQuantity}), 0)` })
+        .from(schema.diaperStock)
+        .where(and(
+          eq(schema.diaperStock.unitId, unitId),
+          eq(schema.diaperStock.size, size as any),
+          eq(schema.diaperStock.active, true)
+        ));
+
+      const currentStock = stockResult[0]?.total || 0;
+      const monthsOfStock = avgMonthlyDemand > 0 ? Math.round((currentStock / avgMonthlyDemand) * 10) / 10 : 999;
+
+      let trend: 'increasing' | 'stable' | 'decreasing' = 'stable';
+      if (m1 > m2 * 1.1 && m2 > m3 * 1.1) {
+        trend = 'increasing';
+      } else if (m1 < m2 * 0.9 && m2 < m3 * 0.9) {
+        trend = 'decreasing';
+      }
+
+      let recommendation = '';
+      if (monthsOfStock < 1) {
+        recommendation = 'URGENTE: Estoque crítico, reabastecer imediatamente';
+      } else if (monthsOfStock < 2) {
+        recommendation = 'ATENÇÃO: Estoque baixo, programar reposição';
+      } else if (monthsOfStock > 6) {
+        recommendation = 'Estoque elevado, considerar redistribuição';
+      } else {
+        recommendation = 'Estoque adequado';
+      }
+
+      if (trend === 'increasing' && monthsOfStock < 3) {
+        recommendation += ' (demanda em alta)';
+      }
+
+      forecasts.push({
+        size,
+        avgMonthlyDemand,
+        currentStock,
+        monthsOfStock,
+        trend,
+        recommendation,
+      });
+    }
+
+    return forecasts.filter(f => f.avgMonthlyDemand > 0 || f.currentStock > 0);
   }
 }
 

@@ -18,7 +18,9 @@ import Prescriptions from "@/pages/prescriptions";
 import Pharmacy from "@/pages/pharmacy";
 import PharmacyDispensation from "@/pages/pharmacy-dispensation";
 import PharmacyStock from "@/pages/pharmacy-stock";
+import PharmacyDiaperStock from "@/pages/pharmacy-diaper-stock";
 import TFD from "@/pages/tfd";
+import SocialAssistance from "@/pages/social-assistance";
 import Reports from "@/pages/reports";
 import Units from "@/pages/units";
 import Professionals from "@/pages/professionals";
@@ -38,7 +40,9 @@ function ProtectedRoutes() {
       <Route path="/farmacia" component={Pharmacy} />
       <Route path="/farmacia/dispensacao" component={PharmacyDispensation} />
       <Route path="/farmacia/estoque" component={PharmacyStock} />
+      <Route path="/farmacia/fraldas" component={PharmacyDiaperStock} />
       <Route path="/tfd" component={TFD} />
+      <Route path="/assistencia-social" component={SocialAssistance} />
       <Route path="/relatorios" component={Reports} />
       <Route path="/unidades" component={Units} />
       <Route path="/profissionais" component={Professionals} />

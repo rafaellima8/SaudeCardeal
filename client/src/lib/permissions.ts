@@ -3,7 +3,7 @@
  * Define quais funcionalidades cada role pode acessar
  */
 
-export type UserRole = "admin" | "medico" | "enfermeiro" | "acs" | "farmaceutico" | "gestor" | "recepcao";
+export type UserRole = "admin" | "medico" | "enfermeiro" | "acs" | "farmaceutico" | "gestor" | "recepcao" | "assistencia_social";
 
 export interface MenuItem {
   title: string;
@@ -15,7 +15,7 @@ export interface MenuItem {
  * Configuração de permissões de menu por funcionalidade
  */
 export const menuPermissions = {
-  dashboard: ["admin", "medico", "enfermeiro", "farmaceutico", "gestor", "recepcao"] as UserRole[],
+  dashboard: ["admin", "medico", "enfermeiro", "farmaceutico", "gestor", "recepcao", "assistencia_social"] as UserRole[],
   recepcao: ["admin", "recepcao", "enfermeiro"] as UserRole[],
   pacientes: ["admin", "medico", "enfermeiro", "recepcao"] as UserRole[],
   agendamentos: ["admin", "medico", "enfermeiro", "recepcao"] as UserRole[],
@@ -32,8 +32,11 @@ export const menuPermissions = {
   farmacia: ["admin", "farmaceutico", "gestor"] as UserRole[],
   dispensacao: ["admin", "farmaceutico", "gestor"] as UserRole[],
   estoque: ["admin", "farmaceutico", "gestor"] as UserRole[],
+  fraldas: ["admin", "farmaceutico", "gestor", "assistencia_social"] as UserRole[],
   tfd: ["admin", "gestor", "recepcao"] as UserRole[],
-  relatorios: ["admin", "medico", "gestor"] as UserRole[],
+  "assistencia social": ["admin", "gestor", "assistencia_social"] as UserRole[],
+  beneficiarios: ["admin", "gestor", "assistencia_social"] as UserRole[],
+  relatorios: ["admin", "medico", "gestor", "assistencia_social"] as UserRole[],
   unidades: ["admin", "gestor"] as UserRole[],
   profissionais: ["admin", "gestor"] as UserRole[],
   indicadores: ["admin", "gestor"] as UserRole[],

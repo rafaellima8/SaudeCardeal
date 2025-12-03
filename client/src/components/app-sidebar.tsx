@@ -9,6 +9,8 @@ import {
   ChevronDown,
   LogOut,
   FileCheck,
+  Baby,
+  Heart,
 } from "lucide-react";
 import {
   Sidebar,
@@ -39,7 +41,9 @@ const allMenuItems = [
   { title: "Farmácia", icon: Pill, url: "/farmacia" },
   { title: "Dispensação", icon: Pill, url: "/farmacia/dispensacao" },
   { title: "Estoque", icon: Pill, url: "/farmacia/estoque" },
+  { title: "Fraldas", icon: Baby, url: "/farmacia/fraldas" },
   { title: "TFD", icon: Truck, url: "/tfd" },
+  { title: "Assistência Social", icon: Heart, url: "/assistencia-social" },
   { title: "Relatórios", icon: FileText, url: "/relatorios" },
 ];
 
@@ -56,6 +60,7 @@ const roleLabels: Record<string, string> = {
   farmaceutico: "Farmacêutico(a)",
   gestor: "Gestor(a)",
   recepcao: "Recepcionista",
+  assistencia_social: "Assistente Social",
 };
 
 export function AppSidebar() {

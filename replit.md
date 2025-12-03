@@ -11,7 +11,8 @@ MuniSaúde Integrado is a streamlined municipal health management system designe
 - **Electronic Prescriptions**: Full prescription management with Portaria 344/98 controlled substance tracking, dosage calculations, and PDF export
 - **Pharmacy Management**: 
   - RENAME catalog with 29+ essential medications
-  - Stock control with low stock alerts and expiration tracking
+  - Medication stock control with low stock alerts and expiration tracking
+  - Diaper stock control with FIFO, lot tracking, and 10 sizes (RN, P, M, G, XG, XXG, geriatrica_P/M/G/XG)
   - Dispensation workflow linked to prescriptions
 - **TFD (Inter-municipal Transport)**: Complete vehicle, driver, trip, and passenger management for patient transport
   - SUS compliance layer with Portaria SAS/MS nº 55/1999 adherence
@@ -20,6 +21,14 @@ MuniSaúde Integrado is a streamlined municipal health management system designe
   - 50km minimum distance enforcement
   - CID-10 diagnosis, IBGE municipality codes, and race/ethnicity fields
   - APAC authorization tracking
+- **Social Assistance (Assistência Social)**:
+  - Beneficiary management (NIS, CPF, address, family composition)
+  - Diaper request and authorization workflow
+  - Delivery management with FIFO stock allocation
+  - Monthly list CSV upload for batch processing
+  - Demand forecasting
+  - Integration with Pharmacy diaper stock
+  - Full audit logging
 
 ### Removed Modules (Refactored Out)
 - Endemic Disease Control (ACE)
@@ -47,7 +56,7 @@ MuniSaúde Integrado is a streamlined municipal health management system designe
 - Session-based authentication with bcrypt
 
 ### Security
-- Role-Based Access Control (RBAC) for 7 user roles: admin, medico, enfermeiro, acs, farmaceutico, gestor, recepcao
+- Role-Based Access Control (RBAC) for 8 user roles: admin, medico, enfermeiro, acs, farmaceutico, gestor, recepcao, assistencia_social
 - Multi-tenant isolation via `enforceUnitScope()` middleware
 - Cross-unit access for admin and gestor roles only
 
@@ -99,6 +108,29 @@ MuniSaúde Integrado is a streamlined municipal health management system designe
 - `POST/GET /api/pharmacy/stock-movements` - Stock movements
 - `GET /api/rename-catalog` - RENAME medication catalog
 
+### Diaper Stock (Pharmacy Module)
+- `GET/POST /api/pharmacy/diaper-stock` - Diaper stock management
+- `GET /api/pharmacy/diaper-stock/:id` - Get specific stock item
+- `PATCH/DELETE /api/pharmacy/diaper-stock/:id` - Update/Delete stock
+- `GET /api/pharmacy/diaper-stock/low` - Low stock alerts
+- `GET /api/pharmacy/diaper-stock/expiring` - Expiring items
+- `GET /api/pharmacy/diaper-stock/fifo/:size` - FIFO allocation by size
+- `GET /api/pharmacy/diaper-movements` - Stock movements history
+
+### Social Assistance
+- `GET/POST /api/social-assistance/beneficiaries` - Beneficiary management
+- `GET/PATCH/DELETE /api/social-assistance/beneficiaries/:id` - CRUD operations
+- `GET /api/social-assistance/beneficiaries/cpf/:cpf` - Find by CPF
+- `GET/POST /api/social-assistance/requests` - Diaper requests
+- `GET/PATCH/DELETE /api/social-assistance/requests/:id` - CRUD operations
+- `GET/POST /api/social-assistance/authorizations` - Authorization management
+- `GET/PATCH /api/social-assistance/authorizations/:id` - CRUD operations
+- `GET/POST /api/social-assistance/deliveries` - Delivery management
+- `GET /api/social-assistance/deliveries/:id` - Get delivery details
+- `GET/POST /api/social-assistance/monthly-lists` - Monthly list upload
+- `GET/PATCH /api/social-assistance/monthly-lists/:id` - CRUD operations
+- `GET /api/social-assistance/stats` - Module statistics
+
 ### TFD
 - `GET/POST /api/tfd/requests` - Transport requests
 - `GET/POST /api/tfd/vehicles` - Vehicle management
@@ -135,7 +167,24 @@ SQLite database with automatic seeding of:
 
 ## Recent Changes (December 2025)
 
-### TFD Companion and Pernoite Enhancements (Latest)
+### Diaper Stock and Social Assistance Modules (Latest)
+- Added "assistencia_social" role to users table enum for new module access control
+- Created 9 new database tables:
+  - diaper_stock: Diaper inventory with 10 sizes (RN, P, M, G, XG, XXG, geriatrica_P/M/G/XG)
+  - diaper_stock_movements: Audit trail for stock changes
+  - sa_beneficiaries: Social assistance beneficiaries with NIS, CPF, family data
+  - diaper_requests: Request workflow management
+  - diaper_authorizations: Authorization with quantity tracking
+  - diaper_deliveries: Delivery records with stock allocation
+  - diaper_monthly_lists: CSV upload for batch processing
+  - diaper_demand_forecast: Predictive demand analytics
+  - sa_audit_log: Comprehensive audit logging
+- Implemented complete storage layer with CRUD operations
+- Added FIFO stock allocation algorithm by expiration date
+- Created API endpoints for both Pharmacy diaper stock and Social Assistance modules
+- Bidirectional integration between Pharmacy and Social Assistance for stock management
+
+### TFD Companion and Pernoite Enhancements
 - Added conditional companion data collection fields:
   - companionCpf, companionCns, companionName (existing)
   - companionPhone (new) for contact information

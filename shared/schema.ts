@@ -26,7 +26,7 @@ export const users = sqliteTable("users", {
   passwordHash: text("password_hash").notNull(),
   cpf: text("cpf"),
   role: text("role", { 
-    enum: ["admin", "medico", "enfermeiro", "acs", "farmaceutico", "gestor", "recepcao"] 
+    enum: ["admin", "medico", "enfermeiro", "acs", "farmaceutico", "gestor", "recepcao", "assistencia_social"] 
   }).notNull().default("recepcao"),
   unitId: text("unit_id").references(() => healthUnits.id),
   active: integer("active", { mode: "boolean" }).default(true).notNull(),
@@ -510,6 +510,399 @@ export const tfdTripPassengers = sqliteTable("tfd_trip_passengers", {
 });
 
 // ============================================================================
+// DIAPER STOCK TABLES (Pharmacy Extension)
+// ============================================================================
+
+export const diaperStock = sqliteTable("diaper_stock", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  
+  sku: text("sku"),
+  name: text("name").notNull(),
+  brand: text("brand"),
+  size: text("size", { 
+    enum: ["RN", "P", "M", "G", "XG", "XXG", "geriatrica_P", "geriatrica_M", "geriatrica_G", "geriatrica_XG"] 
+  }).notNull(),
+  
+  unitsPerPackage: integer("units_per_package").notNull().default(1),
+  batch: text("batch").notNull(),
+  expirationDate: integer("expiration_date", { mode: "timestamp" }).notNull(),
+  
+  manufacturer: text("manufacturer"),
+  supplier: text("supplier"),
+  invoiceNumber: text("invoice_number"),
+  receivedDate: integer("received_date", { mode: "timestamp" }),
+  
+  currentQuantity: integer("current_quantity").notNull().default(0),
+  reservedQuantity: integer("reserved_quantity").notNull().default(0),
+  availableQuantity: integer("available_quantity").notNull().default(0),
+  
+  minStock: integer("min_stock").notNull().default(50),
+  maxStock: integer("max_stock"),
+  reorderPoint: integer("reorder_point").default(100),
+  
+  unitCost: real("unit_cost"),
+  totalCost: real("total_cost"),
+  
+  location: text("location"),
+  storageConditions: text("storage_conditions"),
+  
+  status: text("status", { 
+    enum: ["active", "low_stock", "expired", "depleted", "blocked"] 
+  }).default("active"),
+  active: integer("active", { mode: "boolean" }).default(true),
+  
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+export const diaperStockMovements = sqliteTable("diaper_stock_movements", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  stockId: text("stock_id").notNull().references(() => diaperStock.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  
+  movementType: text("movement_type", { 
+    enum: ["entrada", "saida", "ajuste_positivo", "ajuste_negativo", "transferencia_entrada", "transferencia_saida", "perda", "vencimento", "devolucao", "reserva", "liberacao_reserva", "doacao_assistencia"] 
+  }).notNull(),
+  
+  quantity: integer("quantity").notNull(),
+  previousQuantity: integer("previous_quantity").notNull(),
+  newQuantity: integer("new_quantity").notNull(),
+  
+  reason: text("reason").notNull(),
+  documentNumber: text("document_number"),
+  
+  diaperRequestId: text("diaper_request_id"),
+  diaperDeliveryId: text("diaper_delivery_id"),
+  
+  sourceUnitId: text("source_unit_id").references(() => healthUnits.id),
+  destinationUnitId: text("destination_unit_id").references(() => healthUnits.id),
+  
+  userId: text("user_id").notNull().references(() => users.id),
+  authorizedBy: text("authorized_by").references(() => users.id),
+  
+  observations: text("observations"),
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// ============================================================================
+// SOCIAL ASSISTANCE TABLES (Diaper Management)
+// ============================================================================
+
+export const saBeneficiaries = sqliteTable("sa_beneficiaries", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  citizenId: text("citizen_id").references(() => citizens.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  
+  name: text("name").notNull(),
+  cpf: text("cpf"),
+  nis: text("nis"),
+  cns: text("cns"),
+  
+  birthDate: integer("birth_date", { mode: "timestamp" }),
+  gender: text("gender", { enum: ["M", "F", "outro"] }),
+  
+  phone: text("phone"),
+  phoneSecondary: text("phone_secondary"),
+  email: text("email"),
+  
+  address: text("address"),
+  addressNumber: text("address_number"),
+  neighborhood: text("neighborhood"),
+  city: text("city").default("Cardeal da Silva"),
+  state: text("state").default("BA"),
+  zipCode: text("zip_code"),
+  
+  crasId: text("cras_id"),
+  crasName: text("cras_name"),
+  
+  responsibleName: text("responsible_name"),
+  responsibleCpf: text("responsible_cpf"),
+  responsiblePhone: text("responsible_phone"),
+  responsibleRelationship: text("responsible_relationship"),
+  
+  medicalDocumentUrl: text("medical_document_url"),
+  medicalDocumentType: text("medical_document_type"),
+  diagnosisCid: text("diagnosis_cid"),
+  diagnosisDescription: text("diagnosis_description"),
+  
+  beneficiaryType: text("beneficiary_type", { 
+    enum: ["idoso", "crianca", "pessoa_com_deficiencia", "acamado", "outro"] 
+  }),
+  incontinenceLevel: text("incontinence_level", { 
+    enum: ["leve", "moderada", "grave", "total"] 
+  }),
+  
+  recommendedSize: text("recommended_size", { 
+    enum: ["RN", "P", "M", "G", "XG", "XXG", "geriatrica_P", "geriatrica_M", "geriatrica_G", "geriatrica_XG"] 
+  }),
+  recommendedQuantityPerDay: integer("recommended_quantity_per_day").default(6),
+  recommendedQuantityPerMonth: integer("recommended_quantity_per_month").default(180),
+  
+  incomePerCapita: real("income_per_capita"),
+  familySize: integer("family_size"),
+  
+  observations: text("observations"),
+  
+  status: text("status", { 
+    enum: ["ativo", "inativo", "suspenso", "aguardando_documentacao"] 
+  }).default("ativo"),
+  active: integer("active", { mode: "boolean" }).default(true),
+  
+  registeredById: text("registered_by_id").references(() => users.id),
+  
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+export const diaperRequests = sqliteTable("diaper_requests", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  requestNumber: text("request_number").notNull().unique(),
+  beneficiaryId: text("beneficiary_id").notNull().references(() => saBeneficiaries.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  
+  diaperSize: text("diaper_size", { 
+    enum: ["RN", "P", "M", "G", "XG", "XXG", "geriatrica_P", "geriatrica_M", "geriatrica_G", "geriatrica_XG"] 
+  }).notNull(),
+  quantityRequested: integer("quantity_requested").notNull(),
+  quantityApproved: integer("quantity_approved"),
+  
+  periodStart: integer("period_start", { mode: "timestamp" }).notNull(),
+  periodEnd: integer("period_end", { mode: "timestamp" }).notNull(),
+  
+  justification: text("justification"),
+  medicalReportUrl: text("medical_report_url"),
+  medicalReportDate: integer("medical_report_date", { mode: "timestamp" }),
+  
+  requestType: text("request_type", { 
+    enum: ["individual", "lista_mensal", "renovacao", "emergencial"] 
+  }).notNull().default("individual"),
+  
+  monthlyListId: text("monthly_list_id"),
+  
+  crasResponsibleName: text("cras_responsible_name"),
+  crasResponsibleId: text("cras_responsible_id").references(() => users.id),
+  
+  priority: text("priority", { 
+    enum: ["baixa", "normal", "alta", "urgente"] 
+  }).default("normal"),
+  
+  status: text("status", { 
+    enum: ["pendente", "em_analise", "autorizado", "parcialmente_autorizado", "negado", "entregue", "cancelado", "expirado"] 
+  }).notNull().default("pendente"),
+  
+  statusHistory: text("status_history", { mode: "json" }).$type<Array<{
+    status: string;
+    changedAt: string;
+    changedBy: string;
+    reason?: string;
+  }>>(),
+  
+  requestedById: text("requested_by_id").notNull().references(() => users.id),
+  requestedAt: integer("requested_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  
+  analyzedById: text("analyzed_by_id").references(() => users.id),
+  analyzedAt: integer("analyzed_at", { mode: "timestamp" }),
+  analysisNotes: text("analysis_notes"),
+  
+  approvedById: text("approved_by_id").references(() => users.id),
+  approvedAt: integer("approved_at", { mode: "timestamp" }),
+  approvalNotes: text("approval_notes"),
+  
+  rejectedById: text("rejected_by_id").references(() => users.id),
+  rejectedAt: integer("rejected_at", { mode: "timestamp" }),
+  rejectionReason: text("rejection_reason"),
+  
+  observations: text("observations"),
+  
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+export const diaperAuthorizations = sqliteTable("diaper_authorizations", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  authorizationNumber: text("authorization_number").notNull().unique(),
+  requestId: text("request_id").notNull().references(() => diaperRequests.id),
+  beneficiaryId: text("beneficiary_id").notNull().references(() => saBeneficiaries.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  
+  diaperSize: text("diaper_size", { 
+    enum: ["RN", "P", "M", "G", "XG", "XXG", "geriatrica_P", "geriatrica_M", "geriatrica_G", "geriatrica_XG"] 
+  }).notNull(),
+  quantityAuthorized: integer("quantity_authorized").notNull(),
+  
+  periodStart: integer("period_start", { mode: "timestamp" }).notNull(),
+  periodEnd: integer("period_end", { mode: "timestamp" }).notNull(),
+  
+  authorizationType: text("authorization_type", { 
+    enum: ["individual", "batch", "renovacao", "emergencial"] 
+  }).notNull().default("individual"),
+  
+  documentGenerated: integer("document_generated", { mode: "boolean" }).default(false),
+  documentUrl: text("document_url"),
+  documentGeneratedAt: integer("document_generated_at", { mode: "timestamp" }),
+  
+  issuedById: text("issued_by_id").notNull().references(() => users.id),
+  issuedAt: integer("issued_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  
+  validUntil: integer("valid_until", { mode: "timestamp" }),
+  
+  status: text("status", { 
+    enum: ["ativa", "utilizada", "parcialmente_utilizada", "expirada", "cancelada"] 
+  }).notNull().default("ativa"),
+  
+  quantityDelivered: integer("quantity_delivered").default(0),
+  quantityRemaining: integer("quantity_remaining"),
+  
+  observations: text("observations"),
+  
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+export const diaperDeliveries = sqliteTable("diaper_deliveries", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  deliveryNumber: text("delivery_number").notNull().unique(),
+  authorizationId: text("authorization_id").notNull().references(() => diaperAuthorizations.id),
+  beneficiaryId: text("beneficiary_id").notNull().references(() => saBeneficiaries.id),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  
+  diaperSize: text("diaper_size", { 
+    enum: ["RN", "P", "M", "G", "XG", "XXG", "geriatrica_P", "geriatrica_M", "geriatrica_G", "geriatrica_XG"] 
+  }).notNull(),
+  quantityDelivered: integer("quantity_delivered").notNull(),
+  
+  stockId: text("stock_id").references(() => diaperStock.id),
+  batch: text("batch"),
+  
+  receivedByName: text("received_by_name").notNull(),
+  receivedByCpf: text("received_by_cpf"),
+  receivedByRelationship: text("received_by_relationship"),
+  signatureUrl: text("signature_url"),
+  
+  deliveredById: text("delivered_by_id").notNull().references(() => users.id),
+  deliveredAt: integer("delivered_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  
+  deliveryTermGenerated: integer("delivery_term_generated", { mode: "boolean" }).default(false),
+  deliveryTermUrl: text("delivery_term_url"),
+  
+  observations: text("observations"),
+  
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+export const diaperMonthlyLists = sqliteTable("diaper_monthly_lists", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  listNumber: text("list_number").notNull().unique(),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  
+  referenceMonth: integer("reference_month").notNull(),
+  referenceYear: integer("reference_year").notNull(),
+  
+  periodStart: integer("period_start", { mode: "timestamp" }).notNull(),
+  periodEnd: integer("period_end", { mode: "timestamp" }).notNull(),
+  
+  fileName: text("file_name"),
+  fileUrl: text("file_url"),
+  fileType: text("file_type", { enum: ["csv", "xlsx", "xls"] }),
+  
+  totalRecords: integer("total_records").default(0),
+  validRecords: integer("valid_records").default(0),
+  invalidRecords: integer("invalid_records").default(0),
+  
+  validationErrors: text("validation_errors", { mode: "json" }).$type<Array<{
+    row: number;
+    field: string;
+    value: string;
+    error: string;
+  }>>(),
+  
+  processingStatus: text("processing_status", { 
+    enum: ["pendente", "validando", "validado", "processando", "concluido", "erro"] 
+  }).default("pendente"),
+  processingStartedAt: integer("processing_started_at", { mode: "timestamp" }),
+  processingCompletedAt: integer("processing_completed_at", { mode: "timestamp" }),
+  
+  uploadedById: text("uploaded_by_id").notNull().references(() => users.id),
+  uploadedAt: integer("uploaded_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  
+  approvedById: text("approved_by_id").references(() => users.id),
+  approvedAt: integer("approved_at", { mode: "timestamp" }),
+  
+  requestsGenerated: integer("requests_generated").default(0),
+  authorizationsGenerated: integer("authorizations_generated").default(0),
+  
+  observations: text("observations"),
+  
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+export const diaperDemandForecast = sqliteTable("diaper_demand_forecast", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  
+  referenceMonth: integer("reference_month").notNull(),
+  referenceYear: integer("reference_year").notNull(),
+  
+  diaperSize: text("diaper_size", { 
+    enum: ["RN", "P", "M", "G", "XG", "XXG", "geriatrica_P", "geriatrica_M", "geriatrica_G", "geriatrica_XG"] 
+  }).notNull(),
+  
+  forecastMethod: text("forecast_method", { 
+    enum: ["media_movel_3m", "media_movel_6m", "tendencia_linear", "sazonalidade"] 
+  }).notNull().default("media_movel_3m"),
+  
+  predictedQuantity: integer("predicted_quantity").notNull(),
+  actualQuantity: integer("actual_quantity"),
+  
+  lowerBound: integer("lower_bound"),
+  upperBound: integer("upper_bound"),
+  
+  confidence: real("confidence"),
+  accuracy: real("accuracy"),
+  
+  historicalData: text("historical_data", { mode: "json" }).$type<Array<{
+    month: number;
+    year: number;
+    quantity: number;
+  }>>(),
+  
+  calculatedAt: integer("calculated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+  calculatedById: text("calculated_by_id").references(() => users.id),
+  
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+export const saAuditLog = sqliteTable("sa_audit_log", {
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  
+  entityType: text("entity_type", { 
+    enum: ["beneficiario", "solicitacao", "autorizacao", "entrega", "estoque", "lista_mensal"] 
+  }).notNull(),
+  entityId: text("entity_id").notNull(),
+  
+  action: text("action", { 
+    enum: ["criar", "atualizar", "excluir", "aprovar", "rejeitar", "entregar", "cancelar", "estornar"] 
+  }).notNull(),
+  
+  previousData: text("previous_data", { mode: "json" }),
+  newData: text("new_data", { mode: "json" }),
+  
+  userId: text("user_id").notNull().references(() => users.id),
+  userName: text("user_name").notNull(),
+  userRole: text("user_role").notNull(),
+  
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  
+  description: text("description"),
+  
+  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
+});
+
+// ============================================================================
 // SYSTEM TABLES
 // ============================================================================
 
@@ -764,6 +1157,130 @@ export const insertSigtapTfdCatalogSchema = createInsertSchema(sigtapTfdCatalog)
   updatedAt: true,
 });
 
+// Diaper Stock Schemas
+export const insertDiaperStockSchema = createInsertSchema(diaperStock).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertDiaperStockMovementSchema = createInsertSchema(diaperStockMovements).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Social Assistance Schemas
+export const insertSaBeneficiarySchema = createInsertSchema(saBeneficiaries).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertDiaperRequestSchema = createInsertSchema(diaperRequests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  statusHistory: true,
+});
+
+export const insertDiaperAuthorizationSchema = createInsertSchema(diaperAuthorizations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertDiaperDeliverySchema = createInsertSchema(diaperDeliveries).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertDiaperMonthlyListSchema = createInsertSchema(diaperMonthlyLists).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  validationErrors: true,
+});
+
+export const insertDiaperDemandForecastSchema = createInsertSchema(diaperDemandForecast).omit({
+  id: true,
+  createdAt: true,
+  historicalData: true,
+});
+
+// ============================================================================
+// UPDATE SCHEMAS (Social Assistance)
+// ============================================================================
+
+export const updateSaBeneficiarySchema = z.object({
+  name: z.string().min(2).optional(),
+  cpf: z.string().nullable().optional(),
+  nis: z.string().nullable().optional(),
+  cns: z.string().nullable().optional(),
+  birthDate: z.date().nullable().optional(),
+  gender: z.enum(["M", "F", "outro"]).nullable().optional(),
+  phone: z.string().nullable().optional(),
+  phoneSecondary: z.string().nullable().optional(),
+  email: z.string().email().nullable().optional(),
+  address: z.string().nullable().optional(),
+  addressNumber: z.string().nullable().optional(),
+  neighborhood: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+  state: z.string().nullable().optional(),
+  zipCode: z.string().nullable().optional(),
+  crasId: z.string().nullable().optional(),
+  crasName: z.string().nullable().optional(),
+  responsibleName: z.string().nullable().optional(),
+  responsibleCpf: z.string().nullable().optional(),
+  responsiblePhone: z.string().nullable().optional(),
+  responsibleRelationship: z.string().nullable().optional(),
+  medicalDocumentUrl: z.string().nullable().optional(),
+  medicalDocumentType: z.string().nullable().optional(),
+  diagnosisCid: z.string().nullable().optional(),
+  diagnosisDescription: z.string().nullable().optional(),
+  beneficiaryType: z.enum(["idoso", "crianca", "pessoa_com_deficiencia", "acamado", "outro"]).nullable().optional(),
+  incontinenceLevel: z.enum(["leve", "moderada", "grave", "total"]).nullable().optional(),
+  recommendedSize: z.enum(["RN", "P", "M", "G", "XG", "XXG", "geriatrica_P", "geriatrica_M", "geriatrica_G", "geriatrica_XG"]).nullable().optional(),
+  recommendedQuantityPerDay: z.number().nullable().optional(),
+  recommendedQuantityPerMonth: z.number().nullable().optional(),
+  incomePerCapita: z.number().nullable().optional(),
+  familySize: z.number().nullable().optional(),
+  observations: z.string().nullable().optional(),
+  status: z.enum(["ativo", "inativo", "suspenso", "aguardando_documentacao"]).optional(),
+  active: z.boolean().optional(),
+}).refine(data => Object.keys(data).length > 0, { message: "Nenhum campo para atualizar" });
+
+export const updateDiaperRequestSchema = z.object({
+  diaperSize: z.enum(["RN", "P", "M", "G", "XG", "XXG", "geriatrica_P", "geriatrica_M", "geriatrica_G", "geriatrica_XG"]).optional(),
+  quantityRequested: z.number().optional(),
+  quantityApproved: z.number().nullable().optional(),
+  periodStart: z.date().optional(),
+  periodEnd: z.date().optional(),
+  justification: z.string().nullable().optional(),
+  medicalReportUrl: z.string().nullable().optional(),
+  medicalReportDate: z.date().nullable().optional(),
+  priority: z.enum(["baixa", "normal", "alta", "urgente"]).optional(),
+  status: z.enum(["pendente", "em_analise", "autorizado", "parcialmente_autorizado", "negado", "entregue", "cancelado", "expirado"]).optional(),
+  analysisNotes: z.string().nullable().optional(),
+  approvalNotes: z.string().nullable().optional(),
+  rejectionReason: z.string().nullable().optional(),
+  observations: z.string().nullable().optional(),
+}).refine(data => Object.keys(data).length > 0, { message: "Nenhum campo para atualizar" });
+
+export const updateDiaperStockSchema = z.object({
+  name: z.string().optional(),
+  brand: z.string().nullable().optional(),
+  currentQuantity: z.number().optional(),
+  reservedQuantity: z.number().optional(),
+  availableQuantity: z.number().optional(),
+  minStock: z.number().optional(),
+  maxStock: z.number().nullable().optional(),
+  reorderPoint: z.number().nullable().optional(),
+  location: z.string().nullable().optional(),
+  storageConditions: z.string().nullable().optional(),
+  status: z.enum(["active", "low_stock", "expired", "depleted", "blocked"]).optional(),
+  active: z.boolean().optional(),
+}).refine(data => Object.keys(data).length > 0, { message: "Nenhum campo para atualizar" });
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -818,3 +1335,34 @@ export type CitizenAllergy = typeof citizenAllergies.$inferSelect;
 
 export type SigtapTfdCatalog = typeof sigtapTfdCatalog.$inferSelect;
 export type InsertSigtapTfdCatalog = z.infer<typeof insertSigtapTfdCatalogSchema>;
+
+// Diaper Stock Types
+export type DiaperStock = typeof diaperStock.$inferSelect;
+export type InsertDiaperStock = z.infer<typeof insertDiaperStockSchema>;
+export type UpdateDiaperStock = z.infer<typeof updateDiaperStockSchema>;
+
+export type DiaperStockMovement = typeof diaperStockMovements.$inferSelect;
+export type InsertDiaperStockMovement = z.infer<typeof insertDiaperStockMovementSchema>;
+
+// Social Assistance Types
+export type SaBeneficiary = typeof saBeneficiaries.$inferSelect;
+export type InsertSaBeneficiary = z.infer<typeof insertSaBeneficiarySchema>;
+export type UpdateSaBeneficiary = z.infer<typeof updateSaBeneficiarySchema>;
+
+export type DiaperRequest = typeof diaperRequests.$inferSelect;
+export type InsertDiaperRequest = z.infer<typeof insertDiaperRequestSchema>;
+export type UpdateDiaperRequest = z.infer<typeof updateDiaperRequestSchema>;
+
+export type DiaperAuthorization = typeof diaperAuthorizations.$inferSelect;
+export type InsertDiaperAuthorization = z.infer<typeof insertDiaperAuthorizationSchema>;
+
+export type DiaperDelivery = typeof diaperDeliveries.$inferSelect;
+export type InsertDiaperDelivery = z.infer<typeof insertDiaperDeliverySchema>;
+
+export type DiaperMonthlyList = typeof diaperMonthlyLists.$inferSelect;
+export type InsertDiaperMonthlyList = z.infer<typeof insertDiaperMonthlyListSchema>;
+
+export type DiaperDemandForecast = typeof diaperDemandForecast.$inferSelect;
+export type InsertDiaperDemandForecast = z.infer<typeof insertDiaperDemandForecastSchema>;
+
+export type SaAuditLog = typeof saAuditLog.$inferSelect;

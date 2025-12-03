@@ -9,6 +9,10 @@ import {
   insertPrescriptionSchema,
   insertTfdRequestSchema,
   insertProfessionalSchema,
+  insertDiaperRequestSchema,
+  insertDiaperAuthorizationSchema,
+  insertDiaperDeliverySchema,
+  insertSaBeneficiarySchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { 
@@ -518,6 +522,685 @@ export async function registerRoutes(app: Express): Promise<Server> {
         limit: limit ? parseInt(limit as string) : undefined,
       });
       res.json(medications);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // DIAPER STOCK API (Pharmacy Module)
+  // ============================================================================
+  
+  app.get("/api/pharmacy/diaper-stock", enforceUnitScope(), async (req, res) => {
+    try {
+      const effectiveUnitId = getEffectiveUnitId(req);
+      const { size, status, search } = req.query;
+      
+      const stock = await storage.getDiaperStock({
+        unitId: effectiveUnitId || undefined,
+        size: size as string,
+        status: status as string,
+        search: search as string,
+      });
+      res.json(stock);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/pharmacy/diaper-stock/low", enforceUnitScope(), async (req, res) => {
+    try {
+      const effectiveUnitId = getEffectiveUnitId(req);
+      if (!effectiveUnitId) {
+        return res.status(400).json({ error: "Unidade não identificada" });
+      }
+      
+      const lowStock = await storage.getLowDiaperStock(effectiveUnitId);
+      res.json(lowStock);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/pharmacy/diaper-stock/expiring", enforceUnitScope(), async (req, res) => {
+    try {
+      const effectiveUnitId = getEffectiveUnitId(req);
+      if (!effectiveUnitId) {
+        return res.status(400).json({ error: "Unidade não identificada" });
+      }
+      
+      const { days } = req.query;
+      const expiringStock = await storage.getExpiringDiaperStock(
+        effectiveUnitId, 
+        days ? parseInt(days as string) : 60
+      );
+      res.json(expiringStock);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/pharmacy/diaper-stock/fifo/:size", enforceUnitScope(), async (req, res) => {
+    try {
+      const effectiveUnitId = getEffectiveUnitId(req);
+      if (!effectiveUnitId) {
+        return res.status(400).json({ error: "Unidade não identificada" });
+      }
+      
+      const { quantity } = req.query;
+      const stock = await storage.getDiaperStockByFIFO(
+        effectiveUnitId,
+        req.params.size,
+        quantity ? parseInt(quantity as string) : 0
+      );
+      res.json(stock);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/pharmacy/diaper-stock/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const stock = await storage.getDiaperStockById(req.params.id);
+      if (!stock) {
+        return res.status(404).json({ error: "Item de estoque não encontrado" });
+      }
+      res.json(stock);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/pharmacy/diaper-stock", enforceUnitScope(), async (req, res) => {
+    try {
+      const sessionUnitId = req.session?.user?.unitId;
+      if (!sessionUnitId) {
+        return res.status(401).json({ error: "Unidade não identificada" });
+      }
+
+      const data = { ...req.body, unitId: sessionUnitId };
+      const stock = await storage.createDiaperStock(data);
+      
+      await storage.createDiaperStockMovement({
+        stockId: stock.id,
+        unitId: sessionUnitId,
+        movementType: 'entrada',
+        quantity: stock.currentQuantity,
+        previousQuantity: 0,
+        newQuantity: stock.currentQuantity,
+        reason: 'Entrada inicial de estoque',
+        performedBy: req.session.user!.id,
+      });
+      
+      res.status(201).json(stock);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/pharmacy/diaper-stock/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const existing = await storage.getDiaperStockById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Item de estoque não encontrado" });
+      }
+
+      const sessionUnitId = req.session?.user?.unitId;
+      if (req.body.currentQuantity !== undefined && req.body.currentQuantity !== existing.currentQuantity) {
+        const movementType = req.body.currentQuantity > existing.currentQuantity ? 'entrada' : 'saida';
+        const quantity = Math.abs(req.body.currentQuantity - existing.currentQuantity);
+        
+        await storage.createDiaperStockMovement({
+          stockId: existing.id,
+          unitId: sessionUnitId || existing.unitId,
+          movementType,
+          quantity,
+          previousQuantity: existing.currentQuantity,
+          newQuantity: req.body.currentQuantity,
+          reason: req.body.movementReason || 'Ajuste manual de estoque',
+          performedBy: req.session?.user?.id || 'system',
+        });
+      }
+
+      const stock = await storage.updateDiaperStock(req.params.id, req.body);
+      res.json(stock);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/pharmacy/diaper-stock/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const existing = await storage.getDiaperStockById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Item de estoque não encontrado" });
+      }
+      
+      await storage.deleteDiaperStock(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/pharmacy/diaper-movements", enforceUnitScope(), async (req, res) => {
+    try {
+      const effectiveUnitId = getEffectiveUnitId(req);
+      const { stockId, limit } = req.query;
+      
+      const movements = await storage.getDiaperStockMovements({
+        unitId: effectiveUnitId || undefined,
+        stockId: stockId as string,
+        limit: limit ? parseInt(limit as string) : undefined,
+      });
+      res.json(movements);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // SOCIAL ASSISTANCE API
+  // ============================================================================
+  
+  // Beneficiaries
+  app.get("/api/social-assistance/beneficiaries", enforceUnitScope(), async (req, res) => {
+    try {
+      const effectiveUnitId = getEffectiveUnitId(req);
+      const { search, status, limit } = req.query;
+      
+      const beneficiaries = await storage.getSaBeneficiaries({
+        unitId: effectiveUnitId || undefined,
+        search: search as string,
+        status: status as string,
+        limit: limit ? parseInt(limit as string) : undefined,
+      });
+      res.json(beneficiaries);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/social-assistance/beneficiaries/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const beneficiary = await storage.getSaBeneficiaryById(req.params.id);
+      if (!beneficiary) {
+        return res.status(404).json({ error: "Beneficiário não encontrado" });
+      }
+      res.json(beneficiary);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/social-assistance/beneficiaries/cpf/:cpf", enforceUnitScope(), async (req, res) => {
+    try {
+      const beneficiary = await storage.getSaBeneficiaryByCpf(req.params.cpf);
+      if (!beneficiary) {
+        return res.status(404).json({ error: "Beneficiário não encontrado" });
+      }
+      res.json(beneficiary);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/social-assistance/beneficiaries", enforceUnitScope(), async (req, res) => {
+    try {
+      const sessionUnitId = req.session?.user?.unitId;
+      if (!sessionUnitId) {
+        return res.status(401).json({ error: "Unidade não identificada" });
+      }
+
+      const existingCpf = await storage.getSaBeneficiaryByCpf(req.body.cpf);
+      if (existingCpf) {
+        return res.status(400).json({ error: "Já existe um beneficiário cadastrado com este CPF" });
+      }
+
+      const data = { ...req.body, unitId: sessionUnitId };
+      const beneficiary = await storage.createSaBeneficiary(data);
+      res.status(201).json(beneficiary);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/social-assistance/beneficiaries/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const existing = await storage.getSaBeneficiaryById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Beneficiário não encontrado" });
+      }
+      
+      const beneficiary = await storage.updateSaBeneficiary(req.params.id, req.body);
+      res.json(beneficiary);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/social-assistance/beneficiaries/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const existing = await storage.getSaBeneficiaryById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Beneficiário não encontrado" });
+      }
+      
+      await storage.deleteSaBeneficiary(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Diaper Requests
+  app.get("/api/social-assistance/requests", enforceUnitScope(), async (req, res) => {
+    try {
+      const effectiveUnitId = getEffectiveUnitId(req);
+      const { beneficiaryId, status, limit } = req.query;
+      
+      const requests = await storage.getDiaperRequests({
+        unitId: effectiveUnitId || undefined,
+        beneficiaryId: beneficiaryId as string,
+        status: status as string,
+        limit: limit ? parseInt(limit as string) : undefined,
+      });
+      res.json(requests);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/social-assistance/requests/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const request = await storage.getDiaperRequestById(req.params.id);
+      if (!request) {
+        return res.status(404).json({ error: "Solicitação não encontrada" });
+      }
+      res.json(request);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/social-assistance/requests", enforceUnitScope(), async (req, res) => {
+    try {
+      const sessionUnitId = req.session?.user?.unitId;
+      if (!sessionUnitId) {
+        return res.status(401).json({ error: "Unidade não identificada" });
+      }
+
+      // Validate required fields
+      if (!req.body.beneficiaryId || !req.body.diaperSize || !req.body.quantityRequested) {
+        return res.status(400).json({ error: "Campos obrigatórios: beneficiaryId, diaperSize, quantityRequested" });
+      }
+
+      // Generate request dates (current period = current month)
+      const now = new Date();
+      const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+      const requestNumber = await storage.generateDiaperRequestNumber();
+      const data = { 
+        beneficiaryId: req.body.beneficiaryId,
+        diaperSize: req.body.diaperSize,
+        quantityRequested: req.body.quantityRequested,
+        justification: req.body.justification || null,
+        periodStart,
+        periodEnd,
+        unitId: sessionUnitId,
+        requestNumber,
+        requestedById: req.session.user!.id,
+        requestType: req.body.requestType || 'individual',
+      };
+      const request = await storage.createDiaperRequest(data);
+      res.status(201).json(request);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/social-assistance/requests/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const existing = await storage.getDiaperRequestById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Solicitação não encontrada" });
+      }
+      
+      const request = await storage.updateDiaperRequest(req.params.id, req.body);
+      res.json(request);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/social-assistance/requests/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const existing = await storage.getDiaperRequestById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Solicitação não encontrada" });
+      }
+      
+      await storage.deleteDiaperRequest(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Diaper Authorizations
+  app.get("/api/social-assistance/authorizations", enforceUnitScope(), async (req, res) => {
+    try {
+      const effectiveUnitId = getEffectiveUnitId(req);
+      const { beneficiaryId, requestId, status } = req.query;
+      
+      const authorizations = await storage.getDiaperAuthorizations({
+        unitId: effectiveUnitId || undefined,
+        beneficiaryId: beneficiaryId as string,
+        requestId: requestId as string,
+        status: status as string,
+      });
+      res.json(authorizations);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/social-assistance/authorizations/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const auth = await storage.getDiaperAuthorizationById(req.params.id);
+      if (!auth) {
+        return res.status(404).json({ error: "Autorização não encontrada" });
+      }
+      res.json(auth);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/social-assistance/authorizations", enforceUnitScope(), async (req, res) => {
+    try {
+      const sessionUnitId = req.session?.user?.unitId;
+      if (!sessionUnitId) {
+        return res.status(401).json({ error: "Unidade não identificada" });
+      }
+
+      // Validate required fields
+      if (!req.body.requestId && !req.body.beneficiaryId) {
+        return res.status(400).json({ error: "Informe requestId ou beneficiaryId" });
+      }
+
+      // Get request details if requestId is provided
+      let request;
+      if (req.body.requestId) {
+        request = await storage.getDiaperRequestById(req.body.requestId);
+        if (!request) {
+          return res.status(404).json({ error: "Solicitação não encontrada" });
+        }
+      }
+
+      // Calculate period dates
+      const now = new Date();
+      const periodStart = req.body.periodStart ? new Date(req.body.periodStart) : new Date(now.getFullYear(), now.getMonth(), 1);
+      const periodEnd = req.body.periodEnd ? new Date(req.body.periodEnd) : new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const validUntil = new Date(periodEnd);
+      validUntil.setMonth(validUntil.getMonth() + 1);
+
+      const authorizationNumber = await storage.generateDiaperAuthorizationNumber();
+      const data = { 
+        requestId: req.body.requestId,
+        beneficiaryId: req.body.beneficiaryId || request?.beneficiaryId,
+        diaperSize: req.body.diaperSize || request?.diaperSize,
+        quantityAuthorized: req.body.quantityAuthorized || req.body.quantityRequested || request?.quantityRequested,
+        periodStart,
+        periodEnd,
+        validUntil,
+        unitId: sessionUnitId,
+        authorizationNumber,
+        issuedById: req.session.user!.id,
+        issuedAt: new Date(),
+        authorizationType: req.body.authorizationType || 'individual',
+      };
+      
+      const authorization = await storage.createDiaperAuthorization(data);
+
+      if (req.body.requestId) {
+        await storage.updateDiaperRequest(req.body.requestId, { 
+          status: 'autorizado',
+          quantityApproved: data.quantityAuthorized,
+        });
+      }
+
+      res.status(201).json(authorization);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/social-assistance/authorizations/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const existing = await storage.getDiaperAuthorizationById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Autorização não encontrada" });
+      }
+      
+      const authorization = await storage.updateDiaperAuthorization(req.params.id, req.body);
+      res.json(authorization);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Diaper Deliveries
+  app.get("/api/social-assistance/deliveries", enforceUnitScope(), async (req, res) => {
+    try {
+      const effectiveUnitId = getEffectiveUnitId(req);
+      const { beneficiaryId, authorizationId } = req.query;
+      
+      const deliveries = await storage.getDiaperDeliveries({
+        unitId: effectiveUnitId || undefined,
+        beneficiaryId: beneficiaryId as string,
+        authorizationId: authorizationId as string,
+      });
+      res.json(deliveries);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/social-assistance/deliveries/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const delivery = await storage.getDiaperDeliveryById(req.params.id);
+      if (!delivery) {
+        return res.status(404).json({ error: "Entrega não encontrada" });
+      }
+      res.json(delivery);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/social-assistance/deliveries", enforceUnitScope(), async (req, res) => {
+    try {
+      const sessionUnitId = req.session?.user?.unitId;
+      if (!sessionUnitId) {
+        return res.status(401).json({ error: "Unidade não identificada" });
+      }
+
+      // Accept quantityDelivered from frontend (normalized field name)
+      const quantity = req.body.quantityDelivered || req.body.quantity;
+      if (!quantity || quantity <= 0) {
+        return res.status(400).json({ error: "Quantidade inválida" });
+      }
+
+      const authorization = await storage.getDiaperAuthorizationById(req.body.authorizationId);
+      if (!authorization) {
+        return res.status(404).json({ error: "Autorização não encontrada" });
+      }
+
+      if ((authorization.quantityRemaining || 0) < quantity) {
+        return res.status(400).json({ error: "Quantidade solicitada excede o saldo disponível da autorização" });
+      }
+
+      const availableStock = await storage.getDiaperStockByFIFO(
+        sessionUnitId,
+        authorization.diaperSize,
+        quantity
+      );
+
+      let remainingQty = quantity;
+      const stockAllocations: { stockId: string; quantity: number }[] = [];
+
+      for (const stock of availableStock) {
+        if (remainingQty <= 0) break;
+        
+        const allocateQty = Math.min(remainingQty, stock.availableQuantity);
+        stockAllocations.push({ stockId: stock.id, quantity: allocateQty });
+        remainingQty -= allocateQty;
+      }
+
+      if (remainingQty > 0) {
+        return res.status(400).json({ 
+          error: `Estoque insuficiente. Faltam ${remainingQty} unidades do tamanho ${authorization.diaperSize}` 
+        });
+      }
+
+      for (const allocation of stockAllocations) {
+        const stock = await storage.getDiaperStockById(allocation.stockId);
+        if (stock) {
+          await storage.createDiaperStockMovement({
+            stockId: allocation.stockId,
+            unitId: sessionUnitId,
+            movementType: 'dispensacao',
+            quantity: allocation.quantity,
+            previousQuantity: stock.currentQuantity,
+            newQuantity: stock.currentQuantity - allocation.quantity,
+            reason: `Entrega para autorização ${authorization.authorizationNumber}`,
+            performedBy: req.session.user!.id,
+            referenceId: authorization.id,
+            referenceType: 'diaper_authorization',
+          });
+        }
+      }
+
+      const deliveryNumber = await storage.generateDiaperDeliveryNumber();
+      
+      // Map frontend field names to schema field names
+      const data = { 
+        authorizationId: req.body.authorizationId,
+        unitId: sessionUnitId,
+        deliveryNumber,
+        beneficiaryId: authorization.beneficiaryId,
+        diaperSize: authorization.diaperSize,
+        quantityDelivered: quantity,
+        receivedByName: req.body.receivedByName,
+        receivedByCpf: req.body.receivedByDocument || req.body.receivedByCpf,
+        observations: req.body.observations,
+        deliveredAt: new Date(),
+        deliveredById: req.session.user!.id,
+        stockAllocations: JSON.stringify(stockAllocations),
+      };
+      
+      const delivery = await storage.createDiaperDelivery(data);
+
+      await storage.updateDiaperAuthorization(authorization.id, {
+        quantityDelivered: (authorization.quantityDelivered || 0) + quantity,
+      });
+
+      res.status(201).json(delivery);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Monthly Lists
+  app.get("/api/social-assistance/monthly-lists", enforceUnitScope(), async (req, res) => {
+    try {
+      const effectiveUnitId = getEffectiveUnitId(req);
+      const { status } = req.query;
+      
+      const lists = await storage.getDiaperMonthlyLists({
+        unitId: effectiveUnitId || undefined,
+        status: status as string,
+      });
+      res.json(lists);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/social-assistance/monthly-lists/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const list = await storage.getDiaperMonthlyListById(req.params.id);
+      if (!list) {
+        return res.status(404).json({ error: "Lista mensal não encontrada" });
+      }
+      res.json(list);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/social-assistance/monthly-lists", enforceUnitScope(), async (req, res) => {
+    try {
+      const sessionUnitId = req.session?.user?.unitId;
+      if (!sessionUnitId) {
+        return res.status(401).json({ error: "Unidade não identificada" });
+      }
+
+      const listNumber = await storage.generateDiaperMonthlyListNumber();
+      const data = { 
+        ...req.body, 
+        unitId: sessionUnitId,
+        listNumber,
+        uploadedBy: req.session.user!.id,
+      };
+      const list = await storage.createDiaperMonthlyList(data);
+      res.status(201).json(list);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/social-assistance/monthly-lists/:id", enforceUnitScope(), async (req, res) => {
+    try {
+      const existing = await storage.getDiaperMonthlyListById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Lista mensal não encontrada" });
+      }
+      
+      const list = await storage.updateDiaperMonthlyList(req.params.id, req.body);
+      res.json(list);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Stats
+  app.get("/api/social-assistance/stats", enforceUnitScope(), async (req, res) => {
+    try {
+      const effectiveUnitId = getEffectiveUnitId(req);
+      if (!effectiveUnitId) {
+        return res.status(400).json({ error: "Unidade não identificada" });
+      }
+      
+      const stats = await storage.getSaStats(effectiveUnitId);
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Demand Forecasting (3-month moving average)
+  app.get("/api/social-assistance/forecast", enforceUnitScope(), async (req, res) => {
+    try {
+      const effectiveUnitId = getEffectiveUnitId(req);
+      if (!effectiveUnitId) {
+        return res.status(400).json({ error: "Unidade não identificada" });
+      }
+      
+      const forecast = await storage.getDiaperDemandForecast(effectiveUnitId);
+      res.json(forecast);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

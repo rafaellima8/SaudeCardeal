@@ -1,0 +1,232 @@
+Você é um engenheiro de software SÊNIOR e arquiteto de produto responsável por analisar, projetar, desenvolver e entregar um conjunto de recursos para um SaaS já existente (não remova ou quebre funcionalidades já implementadas). Seu objetivo: adicionar suporte completo ao ciclo de vida de fraldas (entrada/saída/estoque) na aba Farmácia e criar uma aba separada para a Secretaria Municipal de Assistência Social que controle doações, autorizações, previsões, integrações e geração de documentos, integrada com o controle de estoque da farmácia. Abaixo estão requisitos detalhados — siga-os rigorosamente.
+
+1) Objetivo de alto nível
+
+Implementar módulo Farmácia (estoque de fraldas): registrar entradas, saídas, transferências, lotes, validade, unidades por embalagem e auditoria.
+
+Implementar módulo Assistência Social: gestão de solicitações/autorizações de fraldas, registro de beneficiários, registro de entregas, previsões de demanda, geração automática de documentos (autorização, termo de doação, nota de entrega), relatórios e integrações com a aba Farmácia.
+
+Integração bi-direcional entre ambos: quando Assistência autoriza/entrega, estoque da Farmácia é debitado; quando Farmácia recebe remessa, Assistência é notificada.
+
+Não altere fluxos existentes — estenda com novas rotas, tabelas e front-end modular.
+
+2) Restrições importantes
+
+Não apagar ou modificar tabelas, APIs públicas, rotas ou endpoints existentes que não sejam explicitamente estendidos. Se precisar alterar algo, crie versão nova ou flag de migração.
+
+Todas as mudanças devem ser reversíveis (migrations com rollback).
+
+Trate dados pessoais com cuidado: cumpra boas práticas de segurança/privacidade (cripto em trânsito e repouso, logs minimizados).
+
+Sistema multiusuário com roles (Farmácia, Assistência Social, Saúde, Admin, Auditor).
+
+3) Pesquisa necessária (execute e documente)
+
+Pesquise e anexe no relatório:
+
+Melhores práticas de controle de estoque hospitalar / farmácia (FIFO/LIFO, lotes, validade).
+
+Como prefeituras costumam registrar autorizações de benefícios eventuais (formatos CSV/Excel comuns, campos obrigatórios).
+
+Modelos de documentos necessários: termo de doação, recibo/nota de entrega, autorização médica (exemplos e campos).
+
+Padrões para previsão de consumo de insumos assistenciais (modelos simples: média móvel, seasonality, Prophet ou XGBoost).
+
+Requisitos legais e normas municipais comuns sobre benefícios eventuais (breve resumo genérico; não obrigatório citar legislação local específica sem consulta adicional).
+Inclua links e resumos curtos das fontes pesquisadas no final da entrega técnica.
+
+4) Requisitos funcionais (detalhados)
+4.1 Farmácia — Controle de Estoque (Fraldas)
+
+Entidade fralda_items (ou estender items existente) com campos: item_id, sku, nome, tamanho (RN, P, M, G, XG, geriátrica), unidades_por_caixa, lote, data_validade, quantidade_total, quantidade_disponivel, localizacao (almoxarifado), fornecedor, custo_unitario.
+
+Endpoint REST: POST /farmacia/entrada — payload com lote, quantidade, nota fiscal, fornecedor, data_recebimento.
+
+Endpoint REST: POST /farmacia/saida — para uso interno (transferência para Assistência) ou entrega direta ao paciente; deve registrar motivo (doação, venda, descarte), destino_id (p.ex. id_solicitacao_assistencia), responsavel.
+
+Histórico de movimentações: farmacia_movements com movement_id, item_id, tipo (entrada|saida|transferencia|ajuste), quantidade, timestamp, user_id, referencia.
+
+Validações: não permitir saída que gere estoque negativo sem autorização admin; alertas para validade próxima (<60 dias) e estoque baixo por reorder_point.
+
+UI: tela de inventário com filtro por tamanho, lote, validade; ações rápidas: entrada, saída, transferência, ajuste.
+
+4.2 Assistência Social — Gestão de Fraldas
+
+Entidades: beneficiarios (id, nome, cpf/nis opcional, nascimento, endereco, contato, documento_medico_url), solicitacoes_fraldas (id, beneficiario_id, tipo_fralda, quantidade_mensal_solicitada, justificativa, laudo_medico, status [pendente|autorizado|negado|entregue|cancelado], data_solicitacao, responsavel_cras), autorizacoes (vinculada à solicitacao ou lista mensal).
+
+Suportar dois modos de autorização:
+
+Individual: autorizar por solicitacao. Gera documento de autorização PDF e reduz estoque quando entregue.
+
+Lista mensal: upload CSV/Excel com linhas (beneficiario_id, tipo, quantidade, periodo), validação automática, aprovação em batch e geração de guias/ordens de retirada.
+
+Integração com Farmácia: quando autorização vira entrega, chama POST /farmacia/saida (ou queue) para debitar estoque; registrar referencia_solicitacao.
+
+Previsão: implementar endpoint GET /assistencia/previsao?mes=YYYY-MM que retorna demanda esperada por tamanho e quantidade para o período considerando histórico (mínimo 6 meses) e sazonalidade.
+
+Relatórios e dashboards: totais mensais, entregas por CRAS, beneficiários atendidos, estoques previstos vs reais, KPi: tempo médio para autorização → entrega.
+
+Geração automática de documentos: autorização, termo de doação/recebimento, nota de entrega; templates dinâmicos (merge fields) e geração em PDF; assinar digitalmente opcionalmente.
+
+Auditoria: todas as autorizações, alterações e entregas com user_id e timestamp.
+
+5) Requisitos não-funcionais
+
+API RESTful com documentação (OpenAPI/Swagger atualizado).
+
+Jobs assíncronos para: processamento de uploads CSV, geração de PDFs em lote, sincronização de estoque (fila/RabbitMQ/Redis queue).
+
+Testes: unitários + integração + e2e para fluxos críticos.
+
+Monitoramento: métricas sobre jobs falhos, divergências de estoque (>5%), tempo de fila para autorizações.
+
+Segurança: RBAC, CSRF, rate-limiting, criptografia de PII (AES-256), logs com máscara de dados sensíveis.
+
+Performance: endpoints de consulta de inventário com paginação e índices DB apropriados.
+
+6) Integrações e formatos de entrada/saída
+
+Upload CSV/Excel para listas mensais (template entregue): colunas mínimas: cpf|nis|beneficiario_id|nome|tipo_fralda|quantidade_mensal|periodo_inicio|periodo_fim|laudo_url.
+
+Export CSV/Excel para prestações de contas (colunas com data_entrega, lote, nota_fiscal, quantidade, beneficiario).
+
+Webhooks: quando estoque crítico ou quando processamento de lista estiver concluído enviar evento para POST /webhooks/assistencia.
+
+API para serviços de saúde (opcional): permitir ingestão de laudos via integração com unidades de saúde (upload via SFTP ou endpoint seguro).
+
+Integrar com sistemas de geração de documento (ex.: wkhtmltopdf ou serviço interno) e com armazenamento de arquivos (S3-compatible).
+
+7) Regras de negócio e modelos de previsão
+
+Política de alocação: preferir lotes com menor validade (FIFO por validade).
+
+Quantidade padrão sugerida (exemplo configurável por município): bebês: 8-12 fraldas/dia? (NÃO hardcode — deixar configurável por perfil); idosos: 6-10 unidades/dia dependendo do grau — o agente deve pesquisar e propor defaults baseados em fontes confiáveis, mas deixar os parâmetros editáveis no sistema.
+
+Previsão: primeiro implementar método simples (média móvel ponderada 3 meses) e depois um job opcional com Prophet/XGBoost; entregar notebook/prova de conceito e endpoint de previsão.
+
+Reservas: permitir reservar estoque para autorizações previstas (reserva temporária por X dias).
+
+8) UX / telas mínimas a implementar
+
+Farmácia > Inventário (lista, filtros, busca por lote)
+
+Farmácia > Entrada rápida (form)
+
+Farmácia > Saída / Transferência (com link para solicitação_assistencia)
+
+Assistência > Painel (visão mensal: autorizados, pendentes, entregues, previsão)
+
+Assistência > Nova Solicitação (form com upload de laudo)
+
+Assistência > Upload Lista Mensal (CSV/Excel) com validação prévia
+
+Relatórios > Export CSV/PDF
+
+Logs/Auditoria > histórico por beneficiário/por lote
+
+9) Backlog técnico e entregáveis (priorizados)
+
+Modelagem DB + migrations não destrutivas.
+
+Endpoints Farmácia (entrada/saida/movements) + UI básica.
+
+Endpoints Assistência (solicitacao/autorizacao) + UI de solicitações.
+
+Integração básica (quando autorizar→criar saída farmácia) via fila.
+
+Upload CSV/validação/batch approval e geração de documentos.
+
+Previsão simples e endpoint.
+
+Templates PDF e geração automática de documentos.
+
+Testes, monitoramento, documentação OpenAPI.
+
+Relatórios e dashboards finais.
+
+Entrega de relatório de pesquisa com links e recomendações (parâmetros editáveis).
+
+Cada item deve ser entregue com:
+
+código PR com descrição e checklist de revisão,
+
+migrations SQL,
+
+documentação técnica (README + OpenAPI),
+
+scripts de seed para teste,
+
+instruções de deploy (Docker / CI),
+
+lista de testes automatizados e cobertura.
+
+10) Exemplos de payloads / CSV templates (use isto no desenvolvimento)
+
+Exemplo JSON — Saída Farmácia
+
+{
+  "item_id": "FRD-0001",
+  "lote": "L20251201",
+  "quantidade": 200,
+  "tipo": "saida",
+  "motivo": "doacao_assistencia",
+  "referencia": "SOL-2025-045",
+  "responsavel_id": "user-123",
+  "data": "2025-12-01T10:20:00Z"
+}
+
+
+CSV template (lista mensal)
+
+beneficiario_id,cpf,nis,nome,tipo_fralda,quantidade_mensal,periodo_inicio,periodo_fim,laudo_url
+123,01234567890,00011122233,Joao Silva,P/0,120,2025-12-01,2026-02-28,https://...
+
+11) Critérios de aceitação (QA)
+
+Fluxo completo: criar solicitação → autorizar (individual ou batch) → gerar documento → efetuar entrega → debitar estoque, com registro em audit log.
+
+Não permitir débito de estoque sem registro de movimento.
+
+CSV import converte 95% dos registros válidos e gera relatório de erros.
+
+Endpoint de previsão retorna JSON com breakdown por tamanho.
+
+Documentos gerados em PDF respeitam template e são baixáveis.
+
+Testes unitários cobrindo >= 80% dos novos módulos; integração do fluxo end-to-end.
+
+12) Observações finais ao desenvolvedor/implementador
+
+Use tudo que já existe na base de dados e front-end: favor mapear schemas existentes, reusar models, serviços e componentes UI. Se não for possível, crie adaptadores que façam bridge entre o velho e o novo.
+
+Priorize entregas pequenas e iterativas: comece por endpoints e UI mínimos que comprovem integração sem grandes mudanças.
+
+Inclua documento técnico final com decisões arquiteturais, endpoints, exemplos de payload, documentação OpenAPI e instruções de rollback.
+
+Ao final, gere um checklist operacional para a Secretaria (como usar o upload, como autorizar, checklist de documentos necessários, modelo de termo de doação e quem assina).
+
+Gere também scripts de migração de dados de teste e uma planilha de validação para homologação.
+
+13) Tarefas imediatas que você deve executar agora (passos mínimos obrigatórios)
+
+Mapear models/tabelas existentes que PRÉ-CANDIDATEM a extensão (listar nomes e colunas).
+
+Propor o esquema novo de DB (DDL) e apresentar migrations (up/down).
+
+Implementar API endpoints básicos de entrada e saida na Farmácia e a solicitacao na Assistência para teste.
+
+Criar um POC (prova de conceito) de integração: autorizar → criar saída → reduzir estoque (simulado em ambiente dev).
+
+Produzir um documento de pesquisa (1–2 páginas) com referências sobre quantidades médias e templates de documentos.
+
+14) Formato de entrega para cada sprint
+
+Branch Git com nome feature/assistencia-fraldas
+
+PR com checklist: migrations, testes, OpenAPI, demo video curto (2–5 min) mostrando fluxo.
+
+Artefatos: SQL migrations, CSV templates, PDF templates, script de seed, documentação.
+
+FIM DO PROMPT
+
+Cole este prompt no Replit agent e diga ao agente: “Execute: pesquisa, proponha a modelagem, gere migrations e implemente o POC mínimo (endpoints + UI mínimo) conforme o backlog; depois me entregue o relatório de pesquisa e o PR para revisão.”
