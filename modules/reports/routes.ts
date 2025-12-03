@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { strategicReportEngine, STRATEGIC_REPORTS } from "./strategic-reports";
-import { requireAuth, getEffectiveUnitId } from "../../server/auth";
+import { requireAuth, getEffectiveUnitId, enforceUnitScope } from "../../server/auth";
 
 const router = Router();
 

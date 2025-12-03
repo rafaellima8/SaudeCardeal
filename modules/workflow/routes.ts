@@ -8,7 +8,7 @@ import {
   DEFAULT_PRESCRIPTION_WORKFLOW,
   DEFAULT_DIAPER_REQUEST_WORKFLOW 
 } from "./workflow-engine";
-import { requireAuth, getEffectiveUnitId } from "../../server/auth";
+import { requireAuth, getEffectiveUnitId, enforceUnitScope } from "../../server/auth";
 
 const router = Router();
 

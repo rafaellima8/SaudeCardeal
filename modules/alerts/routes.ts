@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { alertScheduler, DEFAULT_ALERTS } from "./alert-scheduler";
-import { requireAuth, getEffectiveUnitId } from "../../server/auth";
+import { requireAuth, getEffectiveUnitId, enforceUnitScope } from "../../server/auth";
 
 const router = Router();
 
@@ -39,7 +39,7 @@ router.get("/rules/:slug", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
-router.get("/active", requireAuth, async (req: Request, res: Response) => {
+router.get("/active", enforceUnitScope({ requireUnitId: false }), async (req: Request, res: Response) => {
   try {
     const effectiveUnitId = getEffectiveUnitId(req);
     

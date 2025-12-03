@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { formEngine, SINAN_TEMPLATES, BPA_TEMPLATE, APAC_TEMPLATE, SINAN_AGRAVOS, CATEGORIAS_SINAN } from "./form-engine";
-import { requireAuth, getEffectiveUnitId } from "../../server/auth";
+import { requireAuth, getEffectiveUnitId, enforceUnitScope } from "../../server/auth";
 
 const router = Router();
 
@@ -210,15 +210,28 @@ router.post("/validate", requireAuth, async (req: Request, res: Response) => {
 });
 
 router.get("/categories", requireAuth, async (_req: Request, res: Response) => {
-  res.json([
-    { value: "sinan", label: "SINAN - Notificações", count: Object.keys(SINAN_TEMPLATES).length },
+  const sinanCount = SINAN_AGRAVOS.length;
+  const subcategoryCounts: Record<string, number> = {};
+  
+  SINAN_AGRAVOS.forEach(a => {
+    subcategoryCounts[a.categoria] = (subcategoryCounts[a.categoria] || 0) + 1;
+  });
+  
+  const categories = [
+    { value: "sinan", label: "SINAN - Notificações", count: sinanCount },
     { value: "bpa", label: "BPA - Produção Ambulatorial", count: 1 },
     { value: "apac", label: "APAC - Autorização Procedimentos", count: 1 },
-    { value: "vigilancia", label: "Vigilância Ambiental", count: 0 },
-    { value: "tfd", label: "TFD - Tratamento Fora Domicílio", count: 0 },
-    { value: "aih", label: "AIH - Internação Hospitalar", count: 0 },
-    { value: "mortalidade", label: "Mortalidade", count: 0 },
-  ]);
+  ];
+  
+  CATEGORIAS_SINAN.forEach(cat => {
+    categories.push({
+      value: cat.id,
+      label: cat.nome,
+      count: subcategoryCounts[cat.id] || 0,
+    });
+  });
+  
+  res.json(categories);
 });
 
 export default router;
