@@ -805,6 +805,7 @@ export const diaperMonthlyLists = sqliteTable("diaper_monthly_lists", {
   fileName: text("file_name"),
   fileUrl: text("file_url"),
   fileType: text("file_type", { enum: ["csv", "xlsx", "xls"] }),
+  csvContent: text("csv_content"),
   
   totalRecords: integer("total_records").default(0),
   validRecords: integer("valid_records").default(0),

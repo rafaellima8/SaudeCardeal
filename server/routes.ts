@@ -28,6 +28,7 @@ import { generateBpaIPDF, generateApacPDF, generateTripReportPDF } from "./servi
 import { generateBpaIExport, generateApacExport, generateTfdCsvExport, generateTfdSummaryReport } from "./services/tfd-export-service";
 import { validateTfdRequestForSUS, validateCNS, validateCPF, validateCID10, validateIBGECode } from "./services/sus-validators";
 import { SIGTAP_TFD_CATALOG, searchSigtapProcedures, calculateTFDValue, getProcedureByCodigo, validateProcedureForPatient } from "./services/sigtap-tfd";
+import { parseCsvContent, processMonthlyList, generateAuthorizationPDF, generateDeliveryReceiptPDF, generateDonationTermPDF } from "./services/social-assistance-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
@@ -1201,6 +1202,257 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const forecast = await storage.getDiaperDemandForecast(effectiveUnitId);
       res.json(forecast);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // CSV Upload and Processing
+  app.post("/api/social-assistance/monthly-lists/upload", enforceUnitScope(), async (req, res) => {
+    try {
+      const sessionUnitId = req.session?.user?.unitId;
+      if (!sessionUnitId) {
+        return res.status(401).json({ error: "Unidade não identificada" });
+      }
+
+      const { csvContent, fileName, referenceMonth, referenceYear } = req.body;
+      
+      if (!csvContent) {
+        return res.status(400).json({ error: "Conteúdo CSV é obrigatório" });
+      }
+
+      const parseResult = parseCsvContent(csvContent);
+      
+      const now = new Date();
+      const month = referenceMonth || now.getMonth() + 1;
+      const year = referenceYear || now.getFullYear();
+      const periodStart = new Date(year, month - 1, 1);
+      const periodEnd = new Date(year, month, 0);
+
+      const listNumber = await storage.generateDiaperMonthlyListNumber();
+      const list = await storage.createDiaperMonthlyList({
+        unitId: sessionUnitId,
+        listNumber,
+        referenceMonth: month,
+        referenceYear: year,
+        periodStart,
+        periodEnd,
+        fileName: fileName || `lista_mensal_${month}_${year}.csv`,
+        fileType: 'csv',
+        csvContent,
+        totalRecords: parseResult.totalRows,
+        validRecords: parseResult.validRows.length,
+        invalidRecords: parseResult.invalidRows.length,
+        validationErrors: parseResult.invalidRows,
+        processingStatus: parseResult.invalidRows.length === 0 ? 'validado' : 'pendente',
+        uploadedById: req.session.user!.id,
+        uploadedAt: new Date(),
+      });
+
+      res.status(201).json({
+        list,
+        parseResult: {
+          totalRows: parseResult.totalRows,
+          validRows: parseResult.validRows.length,
+          invalidRows: parseResult.invalidRows.length,
+          errors: parseResult.invalidRows,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/social-assistance/monthly-lists/:id/process", enforceUnitScope(), async (req, res) => {
+    try {
+      const sessionUnitId = req.session?.user?.unitId;
+      if (!sessionUnitId) {
+        return res.status(401).json({ error: "Unidade não identificada" });
+      }
+
+      const list = await storage.getDiaperMonthlyListById(req.params.id);
+      if (!list) {
+        return res.status(404).json({ error: "Lista mensal não encontrada" });
+      }
+
+      if (list.processingStatus !== 'validado' && list.processingStatus !== 'pendente') {
+        return res.status(400).json({ error: "Lista já foi processada ou está em processamento" });
+      }
+
+      await storage.updateDiaperMonthlyList(req.params.id, {
+        processingStatus: 'processando',
+        processingStartedAt: new Date(),
+      });
+
+      const result = await processMonthlyList(req.params.id, sessionUnitId, req.session.user!.id);
+
+      res.json({
+        success: true,
+        requestsCreated: result.requestsCreated,
+        authorizationsCreated: result.authorizationsCreated,
+        errors: result.errors,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PDF Generation
+  app.get("/api/social-assistance/authorizations/:id/pdf", enforceUnitScope(), async (req, res) => {
+    try {
+      const pdf = await generateAuthorizationPDF(req.params.id);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename=autorizacao_${req.params.id}.pdf`);
+      res.send(pdf);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/social-assistance/authorizations/:id/donation-term", enforceUnitScope(), async (req, res) => {
+    try {
+      const pdf = await generateDonationTermPDF(req.params.id);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename=termo_doacao_${req.params.id}.pdf`);
+      res.send(pdf);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/social-assistance/deliveries/:id/receipt", enforceUnitScope(), async (req, res) => {
+    try {
+      const pdf = await generateDeliveryReceiptPDF(req.params.id);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename=comprovante_entrega_${req.params.id}.pdf`);
+      res.send(pdf);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Dashboard Reports
+  app.get("/api/social-assistance/reports/monthly", enforceUnitScope(), async (req, res) => {
+    try {
+      const effectiveUnitId = getEffectiveUnitId(req);
+      if (!effectiveUnitId) {
+        return res.status(400).json({ error: "Unidade não identificada" });
+      }
+      
+      const { month, year } = req.query;
+      const refMonth = month ? parseInt(month as string) : new Date().getMonth() + 1;
+      const refYear = year ? parseInt(year as string) : new Date().getFullYear();
+      
+      const startDate = new Date(refYear, refMonth - 1, 1);
+      const endDate = new Date(refYear, refMonth, 0, 23, 59, 59);
+
+      const deliveries = await storage.getDiaperDeliveries({ unitId: effectiveUnitId });
+      const authorizations = await storage.getDiaperAuthorizations({ unitId: effectiveUnitId });
+      const requests = await storage.getDiaperRequests({ unitId: effectiveUnitId });
+      
+      const monthlyDeliveries = deliveries.filter(d => {
+        const date = new Date(d.deliveredAt);
+        return date >= startDate && date <= endDate;
+      });
+      
+      const monthlyAuths = authorizations.filter(a => {
+        const date = new Date(a.issuedAt);
+        return date >= startDate && date <= endDate;
+      });
+      
+      const monthlyRequests = requests.filter(r => {
+        const date = new Date(r.createdAt);
+        return date >= startDate && date <= endDate;
+      });
+
+      const bySize: Record<string, { delivered: number; authorized: number; requested: number }> = {};
+      
+      for (const d of monthlyDeliveries) {
+        if (!bySize[d.diaperSize]) bySize[d.diaperSize] = { delivered: 0, authorized: 0, requested: 0 };
+        bySize[d.diaperSize].delivered += d.quantityDelivered;
+      }
+      
+      for (const a of monthlyAuths) {
+        if (!bySize[a.diaperSize]) bySize[a.diaperSize] = { delivered: 0, authorized: 0, requested: 0 };
+        bySize[a.diaperSize].authorized += a.quantityAuthorized;
+      }
+      
+      for (const r of monthlyRequests) {
+        if (!bySize[r.diaperSize]) bySize[r.diaperSize] = { delivered: 0, authorized: 0, requested: 0 };
+        bySize[r.diaperSize].requested += r.quantityRequested;
+      }
+
+      res.json({
+        period: { month: refMonth, year: refYear },
+        totals: {
+          deliveries: monthlyDeliveries.length,
+          authorizations: monthlyAuths.length,
+          requests: monthlyRequests.length,
+          unitsDelivered: monthlyDeliveries.reduce((sum, d) => sum + d.quantityDelivered, 0),
+          unitsAuthorized: monthlyAuths.reduce((sum, a) => sum + a.quantityAuthorized, 0),
+          unitsRequested: monthlyRequests.reduce((sum, r) => sum + r.quantityRequested, 0),
+        },
+        bySize,
+        beneficiariesServed: new Set(monthlyDeliveries.map(d => d.beneficiaryId)).size,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/social-assistance/reports/kpis", enforceUnitScope(), async (req, res) => {
+    try {
+      const effectiveUnitId = getEffectiveUnitId(req);
+      if (!effectiveUnitId) {
+        return res.status(400).json({ error: "Unidade não identificada" });
+      }
+      
+      const now = new Date();
+      const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+      const deliveries = await storage.getDiaperDeliveries({ unitId: effectiveUnitId });
+      const authorizations = await storage.getDiaperAuthorizations({ unitId: effectiveUnitId });
+      const beneficiaries = await storage.getSaBeneficiaries({ unitId: effectiveUnitId });
+      const stock = await storage.getDiaperStock({ unitId: effectiveUnitId });
+
+      const thisMonthDeliveries = deliveries.filter(d => new Date(d.deliveredAt) >= thisMonthStart);
+      const lastMonthDeliveries = deliveries.filter(d => {
+        const date = new Date(d.deliveredAt);
+        return date >= lastMonthStart && date <= lastMonthEnd;
+      });
+
+      const activeAuths = authorizations.filter(a => a.status === 'ativa' || a.status === 'parcialmente_utilizada');
+      
+      const totalStock = stock.reduce((sum, s) => sum + s.currentQuantity, 0);
+      const avgMonthlyUsage = deliveries.length > 0 
+        ? deliveries.reduce((sum, d) => sum + d.quantityDelivered, 0) / 6 
+        : 0;
+
+      res.json({
+        beneficiaries: {
+          total: beneficiaries.length,
+          active: beneficiaries.filter(b => b.status === 'ativo').length,
+        },
+        authorizations: {
+          active: activeAuths.length,
+          pending: authorizations.filter(a => a.status === 'ativa').length,
+        },
+        deliveries: {
+          thisMonth: thisMonthDeliveries.length,
+          lastMonth: lastMonthDeliveries.length,
+          trend: lastMonthDeliveries.length > 0 
+            ? ((thisMonthDeliveries.length - lastMonthDeliveries.length) / lastMonthDeliveries.length * 100).toFixed(1)
+            : 0,
+          unitsThisMonth: thisMonthDeliveries.reduce((sum, d) => sum + d.quantityDelivered, 0),
+        },
+        stock: {
+          totalUnits: totalStock,
+          monthsRemaining: avgMonthlyUsage > 0 ? (totalStock / avgMonthlyUsage).toFixed(1) : 'N/A',
+          lowStockSizes: stock.filter(s => s.currentQuantity < s.minimumQuantity).length,
+        },
+      });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

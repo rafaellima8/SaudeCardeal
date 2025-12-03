@@ -64,7 +64,7 @@ MuniSaúde Integrado is a streamlined municipal health management system designe
 
 ### Backend
 - `server/index.ts` - Application entry point
-- `server/routes.ts` - API endpoints (auth, citizens, prescriptions, pharmacy, TFD)
+- `server/routes.ts` - API endpoints (auth, citizens, prescriptions, pharmacy, TFD, social assistance)
 - `server/storage.ts` - Data access layer with IStorage interface
 - `server/auth.ts` - Authentication and multi-tenant security
 - `server/services/pdf-generator.ts` - Prescription PDF generation
@@ -72,6 +72,7 @@ MuniSaúde Integrado is a streamlined municipal health management system designe
 - `server/services/sigtap-tfd.ts` - SIGTAP TFD catalog and value calculation
 - `server/services/tfd-pdf-generator.ts` - BPA-I and APAC PDF generation
 - `server/services/tfd-export-service.ts` - BPA/APAC TXT export for SIA/SUS
+- `server/services/social-assistance-service.ts` - CSV parsing, PDF generation, monthly list processing
 
 ### Frontend
 - `client/src/App.tsx` - Main routing and layout
@@ -129,7 +130,17 @@ MuniSaúde Integrado is a streamlined municipal health management system designe
 - `GET /api/social-assistance/deliveries/:id` - Get delivery details
 - `GET/POST /api/social-assistance/monthly-lists` - Monthly list upload
 - `GET/PATCH /api/social-assistance/monthly-lists/:id` - CRUD operations
+- `POST /api/social-assistance/monthly-lists/upload` - Upload and parse CSV file
+- `POST /api/social-assistance/monthly-lists/:id/process` - Process validated CSV into requests/authorizations
 - `GET /api/social-assistance/stats` - Module statistics
+- `GET /api/social-assistance/forecast` - Demand forecasting (3-month moving average)
+- `GET /api/social-assistance/reports/monthly` - Monthly report with totals by size
+- `GET /api/social-assistance/reports/kpis` - Dashboard KPIs (beneficiaries, authorizations, deliveries, stock)
+
+### Social Assistance PDF Generation
+- `GET /api/social-assistance/authorizations/:id/pdf` - Authorization document PDF
+- `GET /api/social-assistance/authorizations/:id/donation-term` - Donation term PDF
+- `GET /api/social-assistance/deliveries/:id/receipt` - Delivery receipt PDF
 
 ### TFD
 - `GET/POST /api/tfd/requests` - Transport requests
@@ -162,12 +173,32 @@ The application runs on port 5000 with Express backend and Vite frontend.
 ### Database
 SQLite database with automatic seeding of:
 - Default health unit (UBS Centro - Cardeal da Silva)
-- Admin user (admin@munisaude.com / admin123)
-- ACS user (acs@munisaude.com / acs123)
+- Admin user (admin@saude.gov.br / Admin@2025)
+- ACS user (acs@saude.gov.br / Acs@2025)
+- Assistência Social user (assistente@saude.gov.br / Assistente@2025)
+- Farmacêutico user (farmaceutico@saude.gov.br / Farmaceutico@2025)
+- Diaper stock with 10 sizes (200-800 units per size)
+- Sample beneficiaries (5 test records)
 
 ## Recent Changes (December 2025)
 
-### Diaper Stock and Social Assistance Modules (Latest)
+### Social Assistance Services and PDF Generation (Latest)
+- Created `social-assistance-service.ts` with:
+  - CSV parsing with field validation (CPF, NIS, diaper size, quantity)
+  - Monthly list processing to auto-generate requests and authorizations
+  - PDF generation for authorization documents, donation terms, and delivery receipts
+  - Brazilian date/number formatting utilities
+- Added API endpoints for:
+  - CSV upload with validation (`/upload`)
+  - Batch processing of validated lists (`/:id/process`)
+  - PDF generation for authorizations, donation terms, and receipts
+  - Dashboard KPIs and monthly reports
+- Updated seed data with:
+  - Diaper stock for all 10 sizes (RN, P, M, G, XG, XXG, geriatrica_P/M/G/XG)
+  - 5 sample beneficiaries for testing
+  - Social Assistance and Pharmacist user accounts
+
+### Diaper Stock and Social Assistance Modules
 - Added "assistencia_social" role to users table enum for new module access control
 - Created 9 new database tables:
   - diaper_stock: Diaper inventory with 10 sizes (RN, P, M, G, XG, XXG, geriatrica_P/M/G/XG)
