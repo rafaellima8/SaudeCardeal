@@ -2,6 +2,7 @@ import { db } from "./db";
 import * as schema from "@shared/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcrypt";
+import { seedAllAutomation } from "./seed-automation";
 
 export async function seed() {
   console.log("🌱 Iniciando seed mínimo do banco de dados...");
@@ -184,6 +185,8 @@ export async function seed() {
     } else {
       console.log("✓ Beneficiários já existem");
     }
+
+    await seedAllAutomation();
 
     console.log("\n✅ Seed mínimo concluído com sucesso!");
     console.log("\n📋 Credenciais de acesso:");
