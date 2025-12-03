@@ -104,6 +104,23 @@ Isolated modular architecture in `/modules/` directory:
 - Built-in data arrays: `SINAN_TEMPLATES`, `WORKFLOW_DEFINITIONS`, `DEFAULT_ALERTS`, `STRATEGIC_REPORTS`
 - Helper methods added: `getTemplateBySlug`, `getWorkflowBySlug`, `getAlertBySlug`, `getReportsByCategory`, `getAllCategories`
 
+### Sidebar Reorganization (Dec 2025)
+- Collapsible "Farmácia" group using shadcn Collapsible component with sub-navigation:
+  - Prescrições, Dispensação, Estoque de Medicamentos, Fraldas
+- Permission-based conditional rendering (farmaciaItems.length > 0 guard)
+- Active state highlighting for parent and child items
+
+### Reports API (Dec 2025)
+- `getReports()` returns complete ReportData structure with period metadata
+- Summary metrics: totalPatients, newPatients, totalConsultations, totalPrescriptions, totalExams, tfdRequests, sinanNotifications
+- Breakdowns: consultationsByType, topDiagnoses, medicationUsage, ageDistribution
+- Empty array handling when no data exists
+
+### Permission System (Dec 2025)
+- Added missing permission keys: sinan, formularios, workflows, alertas, relatorios_estrategicos
+- `filterMenuByRole` normalizes titles to lowercase without accents for matching
+- Console warnings eliminated for missing permission keys
+
 ### Test Infrastructure (Dec 2025)
 - **Vitest Configuration**: `vitest.config.ts` with jsdom environment for frontend tests
 - **Unit Tests** (64 passing): 
