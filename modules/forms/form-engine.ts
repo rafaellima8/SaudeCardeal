@@ -206,4 +206,50 @@ export const APAC_TEMPLATE: Partial<TemplateDefinition> = {
   ],
 };
 
-export const formEngine = new FormEngine();
+class ExtendedFormEngine extends FormEngine {
+  validatePayloadFlat(template: any, payload: Record<string, any>): ValidationResult {
+    const errors: Array<{ field: string; message: string }> = [];
+    const warnings: Array<{ field: string; message: string }> = [];
+
+    const fields = template.fields || [];
+    
+    const flatFields: any[] = [];
+    for (const item of fields) {
+      if (item.group && item.fields) {
+        flatFields.push(...item.fields);
+      } else if (item.name || item.id) {
+        flatFields.push(item);
+      }
+    }
+
+    for (const field of flatFields) {
+      const fieldId = field.name || field.id;
+      const value = payload[fieldId];
+
+      if (field.required && (value === undefined || value === null || value === "")) {
+        errors.push({ field: fieldId, message: `Campo obrigatório: ${field.label || fieldId}` });
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      warnings,
+    };
+  }
+
+  getTemplateBySlug(slug: string): any | null {
+    if (SINAN_TEMPLATES[slug]) {
+      return { slug, ...SINAN_TEMPLATES[slug] };
+    }
+    if (slug === "bpa-i") {
+      return { slug: "bpa-i", ...BPA_TEMPLATE };
+    }
+    if (slug === "apac") {
+      return { slug: "apac", ...APAC_TEMPLATE };
+    }
+    return null;
+  }
+}
+
+export const formEngine = new ExtendedFormEngine();

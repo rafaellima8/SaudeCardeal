@@ -168,4 +168,74 @@ export const DEFAULT_DIAPER_REQUEST_WORKFLOW: WorkflowStep[] = [
   },
 ];
 
-export const workflowEngine = new WorkflowEngine();
+export const WORKFLOW_DEFINITIONS = [
+  {
+    id: "builtin-sinan",
+    slug: "sinan",
+    name: "Fluxo SINAN",
+    entityType: "sinan_notification",
+    description: "Fluxo de aprovação para notificações SINAN: Unidade → Vigilância → CPD",
+    isBuiltIn: true,
+    steps: DEFAULT_SINAN_WORKFLOW,
+  },
+  {
+    id: "builtin-tfd",
+    slug: "tfd",
+    name: "Fluxo TFD",
+    entityType: "tfd_request",
+    description: "Fluxo de aprovação para solicitações TFD: Unidade → Gestor → Agendamento",
+    isBuiltIn: true,
+    steps: DEFAULT_TFD_WORKFLOW,
+  },
+  {
+    id: "builtin-prescription",
+    slug: "prescription",
+    name: "Fluxo Prescrição",
+    entityType: "prescription",
+    description: "Fluxo de prescrição: Profissional → Farmácia",
+    isBuiltIn: true,
+    steps: DEFAULT_PRESCRIPTION_WORKFLOW,
+  },
+  {
+    id: "builtin-diaper",
+    slug: "diaper",
+    name: "Fluxo Fraldas",
+    entityType: "diaper_request",
+    description: "Fluxo de solicitação de fraldas: Assistência Social → Autorização → Entrega",
+    isBuiltIn: true,
+    steps: DEFAULT_DIAPER_REQUEST_WORKFLOW,
+  },
+];
+
+class ExtendedWorkflowEngine extends WorkflowEngine {
+  getWorkflowBySlug(slug: string) {
+    return WORKFLOW_DEFINITIONS.find(w => w.slug === slug) || null;
+  }
+
+  getAvailableActionsForWorkflow(workflowSlug: string, status: string, role: string): string[] {
+    const workflow = WORKFLOW_DEFINITIONS.find(w => w.slug === workflowSlug);
+    if (!workflow) return [];
+    return this.getAvailableActions(status, role);
+  }
+
+  validateWorkflowTransition(workflowSlug: string, fromStatus: string, toStatus: string, role: string) {
+    const workflow = WORKFLOW_DEFINITIONS.find(w => w.slug === workflowSlug);
+    if (!workflow) {
+      return { isValid: false, reason: "Workflow não encontrado" };
+    }
+    
+    const availableActions = this.getAvailableActions(fromStatus, role);
+    if (availableActions.length === 0) {
+      return { isValid: false, reason: "Nenhuma ação disponível para este status e papel" };
+    }
+    
+    const nextStatus = this.getNextStatus(fromStatus, availableActions[0]);
+    if (nextStatus !== toStatus && toStatus !== "approved" && toStatus !== "in_progress") {
+      return { isValid: false, reason: "Transição de status inválida" };
+    }
+    
+    return { isValid: true };
+  }
+}
+
+export const workflowEngine = new ExtendedWorkflowEngine();

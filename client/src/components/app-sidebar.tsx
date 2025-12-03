@@ -12,6 +12,10 @@ import {
   Baby,
   Heart,
   AlertTriangle,
+  ClipboardList,
+  GitBranch,
+  Bell,
+  BarChart3,
 } from "lucide-react";
 import {
   Sidebar,
@@ -47,6 +51,13 @@ const allMenuItems = [
   { title: "Assistência Social", icon: Heart, url: "/assistencia-social" },
   { title: "SINAN", icon: AlertTriangle, url: "/sinan" },
   { title: "Relatórios", icon: FileText, url: "/relatorios" },
+];
+
+const automationMenuItems = [
+  { title: "Formulários", icon: ClipboardList, url: "/formularios" },
+  { title: "Workflows", icon: GitBranch, url: "/workflows" },
+  { title: "Alertas", icon: Bell, url: "/alertas" },
+  { title: "Relatórios Estratégicos", icon: BarChart3, url: "/relatorios-estrategicos" },
 ];
 
 const allConfigItems = [
@@ -111,6 +122,7 @@ export function AppSidebar() {
   }
 
   const menuItems = filterMenuByRole(allMenuItems, user.role);
+  const automationItems = filterMenuByRole(automationMenuItems, user.role);
   const configItems = filterMenuByRole(allConfigItems, user.role);
 
   const initials = user.name
@@ -135,6 +147,26 @@ export function AppSidebar() {
                 {menuItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild data-testid={`nav-${item.title.toLowerCase()}`}>
+                      <a href={item.url} className="hover-elevate active-elevate-2">
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {automationItems.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Automação</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {automationItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}>
                       <a href={item.url} className="hover-elevate active-elevate-2">
                         <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>

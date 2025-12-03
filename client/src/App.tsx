@@ -29,6 +29,10 @@ import LoginPage from "@/pages/login";
 import Profile from "@/pages/profile";
 import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
+import FormsPage from "@/pages/automation/forms";
+import WorkflowPage from "@/pages/automation/workflow";
+import AlertsPage from "@/pages/automation/alerts";
+import StrategicReportsPage from "@/pages/automation/strategic-reports";
 import { useEffect } from "react";
 
 function ProtectedRoutes() {
@@ -46,6 +50,10 @@ function ProtectedRoutes() {
       <Route path="/assistencia-social" component={SocialAssistance} />
       <Route path="/sinan" component={Sinan} />
       <Route path="/relatorios" component={Reports} />
+      <Route path="/formularios" component={FormsPage} />
+      <Route path="/workflows" component={WorkflowPage} />
+      <Route path="/alertas" component={AlertsPage} />
+      <Route path="/relatorios-estrategicos" component={StrategicReportsPage} />
       <Route path="/unidades" component={Units} />
       <Route path="/profissionais" component={Professionals} />
       <Route path="/perfil" component={Profile} />

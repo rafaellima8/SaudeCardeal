@@ -346,4 +346,14 @@ export class StrategicReportEngine {
   }
 }
 
-export const strategicReportEngine = new StrategicReportEngine();
+class ExtendedStrategicReportEngine extends StrategicReportEngine {
+  getReportOrNull(slug: string): ReportDefinitionConfig | null {
+    return this.getReport(slug) || null;
+  }
+
+  getAllCategories(): string[] {
+    return [...new Set(STRATEGIC_REPORTS.map(r => r.category))];
+  }
+}
+
+export const strategicReportEngine = new ExtendedStrategicReportEngine();

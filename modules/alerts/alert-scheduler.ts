@@ -282,6 +282,31 @@ export const DEFAULT_ALERTS: AlertDefinition[] = [
   },
 ];
 
-export const alertScheduler = new AlertScheduler();
+class ExtendedAlertScheduler extends AlertScheduler {
+  constructor() {
+    super();
+    DEFAULT_ALERTS.forEach(alert => this.registerAlert(alert));
+  }
 
-DEFAULT_ALERTS.forEach(alert => alertScheduler.registerAlert(alert));
+  getAlertBySlug(slug: string) {
+    return DEFAULT_ALERTS.find(a => a.slug === slug) || null;
+  }
+
+  getAlertsByCategory(category: string) {
+    return DEFAULT_ALERTS.filter(a => a.category === category);
+  }
+
+  getAlertsBySeverity(severity: string) {
+    return DEFAULT_ALERTS.filter(a => a.severity === severity);
+  }
+
+  getAllCategories() {
+    return [...new Set(DEFAULT_ALERTS.map(a => a.category))];
+  }
+
+  getAllAlerts() {
+    return DEFAULT_ALERTS;
+  }
+}
+
+export const alertScheduler = new ExtendedAlertScheduler();
