@@ -39,184 +39,58 @@ router.get("/rules/:slug", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
-router.get("/active", enforceUnitScope({ requireUnitId: false }), async (req: Request, res: Response) => {
-  try {
-    const effectiveUnitId = getEffectiveUnitId(req);
-    
-    const sampleAlerts = [
-      {
-        id: "alert-1",
-        title: "Estoque baixo de Losartana 50mg",
-        message: "O estoque está abaixo do mínimo. Quantidade atual: 120 unidades (mínimo: 150)",
-        severity: "high",
-        category: "estoque",
-        status: "active",
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: "alert-2", 
-        title: "Prazo SINAN expirando",
-        message: "3 notificações SINAN com prazo expirando em 48 horas",
-        severity: "medium",
-        category: "prazo",
-        status: "active",
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: "alert-3",
-        title: "Estoque crítico de fraldas G",
-        message: "Estoque de fraldas tamanho G está crítico. Apenas 45 unidades disponíveis.",
-        severity: "critical",
-        category: "estoque",
-        status: "active",
-        createdAt: new Date().toISOString(),
-      },
-    ];
-
-    res.json(sampleAlerts);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
+router.get("/active", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
+  // Feature flag: Alerts data persistence not yet implemented
+  // Return empty array until storage-backed queries are ready
+  // This prevents cross-tenant data exposure through mock data
+  res.json([]);
 });
 
-router.get("/all", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const effectiveUnitId = getEffectiveUnitId(req);
-    const { severity, category, status } = req.query;
-
-    const sampleAlerts = [
-      {
-        id: "alert-1",
-        title: "Estoque baixo de Losartana 50mg",
-        message: "O estoque está abaixo do mínimo. Quantidade atual: 120 unidades (mínimo: 150)",
-        severity: "high",
-        category: "estoque",
-        status: "active",
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: "alert-2", 
-        title: "Prazo SINAN expirando",
-        message: "3 notificações SINAN com prazo expirando em 48 horas",
-        severity: "medium",
-        category: "prazo",
-        status: "active",
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: "alert-3",
-        title: "Estoque crítico de fraldas G",
-        message: "Estoque de fraldas tamanho G está crítico. Apenas 45 unidades disponíveis.",
-        severity: "critical",
-        category: "estoque",
-        status: "active",
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: "alert-4",
-        title: "TFD pendente de aprovação",
-        message: "5 solicitações de TFD aguardando aprovação há mais de 48h",
-        severity: "medium",
-        category: "pendencia",
-        status: "acknowledged",
-        acknowledgedAt: new Date().toISOString(),
-        createdAt: new Date(Date.now() - 86400000).toISOString(),
-      },
-    ];
-
-    let filtered = sampleAlerts;
-    if (severity) filtered = filtered.filter(a => a.severity === severity);
-    if (category) filtered = filtered.filter(a => a.category === category);
-    if (status) filtered = filtered.filter(a => a.status === status);
-
-    res.json(filtered);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
+router.get("/all", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
+  // Feature flag: Alerts data persistence not yet implemented
+  // Return empty array until storage-backed queries are ready
+  // This prevents cross-tenant data exposure through mock data
+  res.json([]);
 });
 
-router.post("/:id/acknowledge", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const userId = req.session?.user?.id;
-    
-    if (!userId) {
-      return res.status(401).json({ error: "Não autorizado" });
-    }
-
-    res.json({
-      id,
-      status: "acknowledged",
-      acknowledgedAt: new Date().toISOString(),
-      acknowledgedBy: userId,
-    });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
+router.post("/:id/acknowledge", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
+  // Feature flag: Alerts persistence not yet implemented
+  // Return 503 until storage-backed operations are ready
+  // This prevents fabricated responses without verifying tenant-bound records
+  res.status(503).json({ 
+    error: "Funcionalidade em desenvolvimento",
+    message: "O sistema de alertas ainda está sendo implementado"
+  });
 });
 
-router.post("/:id/resolve", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const userId = req.session?.user?.id;
-    
-    if (!userId) {
-      return res.status(401).json({ error: "Não autorizado" });
-    }
-
-    res.json({
-      id,
-      status: "resolved",
-      resolvedAt: new Date().toISOString(),
-      resolvedBy: userId,
-    });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
+router.post("/:id/resolve", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
+  // Feature flag: Alerts persistence not yet implemented
+  // Return 503 until storage-backed operations are ready
+  res.status(503).json({ 
+    error: "Funcionalidade em desenvolvimento",
+    message: "O sistema de alertas ainda está sendo implementado"
+  });
 });
 
-router.post("/:id/dismiss", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const userId = req.session?.user?.id;
-    
-    if (!userId) {
-      return res.status(401).json({ error: "Não autorizado" });
-    }
-
-    res.json({
-      id,
-      status: "dismissed",
-    });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
+router.post("/:id/dismiss", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
+  // Feature flag: Alerts persistence not yet implemented
+  res.status(503).json({ 
+    error: "Funcionalidade em desenvolvimento",
+    message: "O sistema de alertas ainda está sendo implementado"
+  });
 });
 
-router.get("/stats", requireAuth, async (req: Request, res: Response) => {
-  try {
-    res.json({
-      total: 12,
-      active: 3,
-      acknowledged: 5,
-      resolved: 3,
-      dismissed: 1,
-      byCategory: {
-        estoque: 4,
-        prazo: 3,
-        pendencia: 3,
-        epidemiologico: 2,
-      },
-      bySeverity: {
-        critical: 2,
-        high: 4,
-        medium: 5,
-        low: 1,
-      },
-    });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
+router.get("/stats", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
+  // Feature flag: Return empty stats until storage-backed queries are ready
+  res.json({
+    total: 0,
+    active: 0,
+    acknowledged: 0,
+    resolved: 0,
+    dismissed: 0,
+    byCategory: {},
+    bySeverity: {},
+  });
 });
 
 router.get("/categories", requireAuth, async (_req: Request, res: Response) => {

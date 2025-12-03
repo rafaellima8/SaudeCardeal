@@ -29,7 +29,7 @@ import { generateBpaIPDF, generateApacPDF, generateTripReportPDF } from "./servi
 import { generateBpaIExport, generateApacExport, generateTfdCsvExport, generateTfdSummaryReport } from "./services/tfd-export-service";
 import { validateTfdRequestForSUS, validateCNS, validateCPF, validateCID10, validateIBGECode } from "./services/sus-validators";
 import { SIGTAP_TFD_CATALOG, searchSigtapProcedures, calculateTFDValue, getProcedureByCodigo, validateProcedureForPatient } from "./services/sigtap-tfd";
-import { parseCsvContent, processMonthlyList, generateAuthorizationPDF, generateDeliveryReceiptPDF, generateDonationTermPDF } from "./services/social-assistance-service";
+import { parseCsvContent, processMonthlyList, generateAuthorizationPDF, generateDeliveryReceiptPDF, generateDonationTermPDF, validateCsvFormat } from "./services/social-assistance-service";
 
 import formsRoutes from "../modules/forms/routes";
 import workflowRoutes from "../modules/workflow/routes";
@@ -1210,6 +1210,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(forecast);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // CSV Validation (preview before upload - doesn't require unitId since it's just validating format)
+  app.post("/api/social-assistance/csv/validate", requireAuth, async (req, res) => {
+    try {
+      const { csvContent } = req.body;
+      
+      if (!csvContent) {
+        return res.status(400).json({ 
+          valid: false, 
+          errors: ['Conteúdo CSV é obrigatório'] 
+        });
+      }
+
+      const formatValidation = validateCsvFormat(csvContent);
+      if (!formatValidation.valid) {
+        return res.json({
+          valid: false,
+          formatErrors: formatValidation.errors,
+          parseResult: null,
+        });
+      }
+
+      const parseResult = parseCsvContent(csvContent);
+      
+      res.json({
+        valid: parseResult.invalidRows.length === 0,
+        formatErrors: [],
+        parseResult: {
+          totalRows: parseResult.totalRows,
+          validRows: parseResult.validRows.length,
+          invalidRows: parseResult.invalidRows.length,
+          errors: parseResult.invalidRows,
+          preview: parseResult.validRows.slice(0, 5),
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ valid: false, error: error.message });
     }
   });
 

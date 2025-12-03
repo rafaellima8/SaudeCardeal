@@ -99,12 +99,55 @@ function validateNIS(nis: string): boolean {
   return checkDigit === parseInt(cleaned[10]);
 }
 
-export function parseCsvContent(csvContent: string): ParseResult {
-  const lines = csvContent.trim().split('\n');
-  if (lines.length < 2) {
-    return { validRows: [], invalidRows: [], totalRows: 0 };
+export function validateCsvFormat(csvContent: string): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  
+  if (!csvContent || csvContent.trim().length === 0) {
+    errors.push('Arquivo CSV vazio');
+    return { valid: false, errors };
   }
 
+  const lines = csvContent.trim().split('\n');
+  if (lines.length < 2) {
+    errors.push('CSV deve conter pelo menos cabeçalho e uma linha de dados');
+    return { valid: false, errors };
+  }
+
+  const header = lines[0].toLowerCase().split(/[,;]/).map(h => h.trim().replace(/"/g, ''));
+  
+  const hasNomeColumn = header.some(h => h.includes('nome') || h.includes('beneficiario'));
+  const hasTamanhoColumn = header.some(h => h.includes('tamanho') || h.includes('tam'));
+  const hasQtdColumn = header.some(h => h.includes('qtd') || h.includes('quantidade'));
+
+  if (!hasNomeColumn) {
+    errors.push('Coluna "nome" ou "beneficiario" é obrigatória no cabeçalho');
+  }
+  if (!hasTamanhoColumn) {
+    errors.push('Coluna "tamanho" ou "tam" é obrigatória no cabeçalho');
+  }
+  if (!hasQtdColumn) {
+    errors.push('Coluna "quantidade" ou "qtd" é obrigatória no cabeçalho');
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+export function parseCsvContent(csvContent: string): ParseResult {
+  const formatValidation = validateCsvFormat(csvContent);
+  if (!formatValidation.valid) {
+    return { 
+      validRows: [], 
+      invalidRows: formatValidation.errors.map((error, i) => ({
+        row: 0,
+        field: 'formato',
+        value: '',
+        error
+      })), 
+      totalRows: 0 
+    };
+  }
+
+  const lines = csvContent.trim().split('\n');
   const header = lines[0].toLowerCase().split(/[,;]/).map(h => h.trim().replace(/"/g, ''));
   
   const cpfIdx = header.findIndex(h => h.includes('cpf'));

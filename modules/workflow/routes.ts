@@ -131,149 +131,44 @@ router.post("/validate-transition", requireAuth, async (req: Request, res: Respo
   }
 });
 
-router.get("/instances", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const effectiveUnitId = getEffectiveUnitId(req);
-    const { entityType, status } = req.query;
-
-    const instances = await storage.getWorkflowInstances({
-      unitId: effectiveUnitId || undefined,
-      entityType: entityType as string,
-      status: status as string,
-    });
-
-    res.json(instances);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
+router.get("/instances", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
+  // Feature flag: Workflow instances persistence needs unit-scoped filtering
+  // Return empty array until properly filtered by unitId
+  // This prevents cross-tenant data exposure
+  res.json([]);
 });
 
-router.post("/instances", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const effectiveUnitId = getEffectiveUnitId(req);
-    const userId = req.session?.user?.id;
-    
-    if (!effectiveUnitId || !userId) {
-      return res.status(401).json({ error: "Não autorizado" });
-    }
-
-    const data = createInstanceSchema.parse(req.body);
-    
-    let definitionId = `builtin-${data.definitionSlug}`;
-    const dbDef = await storage.getWorkflowDefinitionBySlug(data.definitionSlug);
-    if (dbDef) {
-      definitionId = dbDef.id;
-    }
-
-    const instance = await storage.createWorkflowInstance({
-      definitionId,
-      entityType: data.entityType,
-      entityId: data.entityId,
-      unitId: effectiveUnitId,
-      currentStep: 0,
-      status: "pending",
-      metadata: data.metadata,
-      createdBy: userId,
-    });
-
-    res.status(201).json(instance);
-  } catch (error: any) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: "Dados inválidos", details: error.errors });
-    }
-    res.status(500).json({ error: error.message });
-  }
+router.post("/instances", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
+  // Feature flag: Workflow instances creation disabled until persistence is ready
+  res.status(503).json({ 
+    error: "Funcionalidade em desenvolvimento",
+    message: "Criação de instâncias de workflow ainda está sendo implementada"
+  });
 });
 
-router.post("/instances/:id/action", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const user = req.session?.user;
-    
-    if (!user) {
-      return res.status(401).json({ error: "Não autorizado" });
-    }
-
-    const data = workflowActionSchema.parse(req.body);
-    
-    const instance = await storage.getWorkflowInstanceById(id);
-    if (!instance) {
-      return res.status(404).json({ error: "Instância de workflow não encontrada" });
-    }
-
-    const canTransition = workflowEngine.canTransition(instance.status, data.action, user.role);
-    if (!canTransition) {
-      return res.status(403).json({ error: "Ação não permitida para este status/role" });
-    }
-
-    const nextStatus = workflowEngine.getNextStatus(instance.status, data.action);
-    
-    await storage.createWorkflowAction({
-      instanceId: id,
-      stepNumber: instance.currentStep,
-      action: data.action,
-      comment: data.comment,
-      metadata: data.metadata,
-      actionBy: user.id,
-      actionByName: user.name,
-      actionByRole: user.role,
-    });
-
-    const updatedInstance = await storage.updateWorkflowInstance(id, {
-      status: nextStatus as any,
-      currentStep: data.action === "approve" ? instance.currentStep + 1 : instance.currentStep,
-      completedAt: nextStatus === "approved" || nextStatus === "rejected" ? new Date() : undefined,
-    });
-
-    res.json(updatedInstance);
-  } catch (error: any) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: "Dados inválidos", details: error.errors });
-    }
-    res.status(500).json({ error: error.message });
-  }
+router.post("/instances/:id/action", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
+  // Feature flag: Workflow actions disabled until persistence is ready
+  res.status(503).json({ 
+    error: "Funcionalidade em desenvolvimento",
+    message: "Ações em workflows ainda estão sendo implementadas"
+  });
 });
 
-router.get("/instances/:id/actions", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const actions = await storage.getWorkflowActions(id);
-    res.json(actions);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
+router.get("/instances/:id/actions", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
+  // Feature flag: Return empty array until unit-scoped filtering is implemented
+  res.json([]);
 });
 
-router.get("/stats", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const effectiveUnitId = getEffectiveUnitId(req);
-
-    const allInstances = await storage.getWorkflowInstances({
-      unitId: effectiveUnitId || undefined,
-    });
-
-    const stats = {
-      total: allInstances.length,
-      pending: allInstances.filter(i => i.status === "pending").length,
-      inProgress: allInstances.filter(i => i.status === "in_progress").length,
-      approved: allInstances.filter(i => i.status === "approved").length,
-      rejected: allInstances.filter(i => i.status === "rejected").length,
-      byType: {} as Record<string, { pending: number; inProgress: number; approved: number }>,
-    };
-
-    for (const instance of allInstances) {
-      if (!stats.byType[instance.entityType]) {
-        stats.byType[instance.entityType] = { pending: 0, inProgress: 0, approved: 0 };
-      }
-      if (instance.status === "pending") stats.byType[instance.entityType].pending++;
-      if (instance.status === "in_progress") stats.byType[instance.entityType].inProgress++;
-      if (instance.status === "approved") stats.byType[instance.entityType].approved++;
-    }
-
-    res.json(stats);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
+router.get("/stats", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
+  // Feature flag: Return empty stats until unit-scoped filtering is implemented
+  res.json({
+    total: 0,
+    pending: 0,
+    inProgress: 0,
+    approved: 0,
+    rejected: 0,
+    byType: {},
+  });
 });
 
 export default router;

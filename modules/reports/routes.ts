@@ -60,45 +60,14 @@ router.get("/categories", requireAuth, async (_req: Request, res: Response) => {
   ]);
 });
 
-router.post("/execute/:slug", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const { slug } = req.params;
-    const effectiveUnitId = getEffectiveUnitId(req);
-    const userId = req.session?.user?.id;
-
-    if (!userId) {
-      return res.status(401).json({ error: "Não autorizado" });
-    }
-
-    const data = executeReportSchema.parse(req.body);
-
-    const report = strategicReportEngine.getReport(slug);
-    if (!report) {
-      return res.status(404).json({ error: "Relatório não encontrado" });
-    }
-
-    const startTime = Date.now();
-    const mockData = generateReportData(report);
-    const executionTime = Date.now() - startTime;
-
-    res.json({
-      executionId: crypto.randomUUID(),
-      reportSlug: slug,
-      reportName: report.name,
-      parameters: data.parameters,
-      executedAt: new Date().toISOString(),
-      executedBy: userId,
-      data: mockData.data,
-      aggregations: mockData.aggregations,
-      totalRows: mockData.data?.length || 0,
-      executionTime,
-    });
-  } catch (error: any) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: "Dados inválidos", details: error.errors });
-    }
-    res.status(500).json({ error: error.message });
-  }
+router.post("/execute/:slug", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
+  // Feature flag: Report execution with mock data disabled for multi-tenant security
+  // Return 503 until unit-filtered persistence is implemented
+  // This prevents cross-tenant data exposure through shared mock datasets
+  res.status(503).json({ 
+    error: "Funcionalidade em desenvolvimento",
+    message: "Execução de relatórios estratégicos ainda está sendo implementada. Os relatórios estarão disponíveis em breve."
+  });
 });
 
 function generateReportData(report: any): { data: any[]; aggregations: Record<string, any> } {
@@ -179,35 +148,11 @@ function generateReportData(report: any): { data: any[]; aggregations: Record<st
   return { data, aggregations };
 }
 
-router.get("/executions", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const sampleExecutions = [
-      {
-        id: "exec-1",
-        reportSlug: "previne-brasil",
-        reportName: "Relatório Previne Brasil",
-        status: "completed",
-        executedAt: new Date(Date.now() - 3600000).toISOString(),
-        completedAt: new Date(Date.now() - 3595000).toISOString(),
-        executionTime: 5000,
-        rowCount: 6,
-      },
-      {
-        id: "exec-2",
-        reportSlug: "farmacia-completo",
-        reportName: "Relatório Farmácia Completo",
-        status: "completed",
-        executedAt: new Date(Date.now() - 86400000).toISOString(),
-        completedAt: new Date(Date.now() - 86395000).toISOString(),
-        executionTime: 3200,
-        rowCount: 45,
-      },
-    ];
-
-    res.json(sampleExecutions);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
+router.get("/executions", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
+  // Feature flag: Report executions persistence not yet implemented
+  // Return empty array until storage-backed queries are ready
+  // This prevents cross-tenant data exposure through mock data
+  res.json([]);
 });
 
 export default router;

@@ -137,3 +137,24 @@ Isolated modular architecture in `/modules/` directory:
   - `tests/unit/alert-scheduler.test.ts`: Alert rules, categories, severities, notification channels
   - `tests/unit/strategic-reports.test.ts`: Report definitions, KPIs, export formats, categories
 - **API Integration Tests**: `tests/api/automation.test.ts` with endpoint coverage for all automation modules
+
+### Multi-Tenant Security Hardening (Dec 2025)
+- **enforceUnitScope middleware**: Added to all automation module routes (alerts, workflow, reports)
+- **Data isolation**: Automation endpoints with mock data now return empty arrays until storage-backed persistence is implemented
+- **CSV Validation**: New endpoint `/api/social-assistance/csv/validate` with format and content validation (CPF, NIS, sizes)
+- **validateCsvFormat function**: Validates required columns (nome/tamanho/quantidade) before parsing
+- **Security decision**: Mock data endpoints disabled to prevent cross-tenant data leakage until real persistence is ready
+
+### Known Limitations (Dec 2025)
+- **Automation modules**: Alerts, Workflows, and Strategic Reports return empty data arrays; need storage-backed queries filtered by unitId
+- **Tables without seeds**: formTemplates, formSubmissions, workflowDefinitions, workflowInstances, alertRules, alertInstances, reportDefinitions, reportExecutions
+- **Pending implementation**: Real-time alert generation from stock levels, SINAN deadlines, and TFD pendencies
+
+### Disabled Endpoints (Multi-Tenant Security - Dec 2025)
+The following endpoints are disabled (return 503 or empty arrays) until unit-scoped persistence is implemented:
+- **Alerts**: POST /api/alerts/:id/acknowledge, /resolve, /dismiss → 503
+- **Alerts Data**: GET /api/alerts/active, /all → empty array; GET /stats → zeroed metrics
+- **Workflows**: POST /api/workflow/instances → 503; POST /instances/:id/action → 503
+- **Workflows Data**: GET /api/workflow/instances, /instances/:id/actions → empty arrays; GET /stats → zeroed
+- **Reports**: POST /api/strategic-reports/execute/:slug → 503; GET /executions → empty array
+- **Reason**: Mock data payloads exposed cross-tenant data through shared datasets
