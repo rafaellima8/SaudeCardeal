@@ -43,6 +43,11 @@ export const menuPermissions = {
   "protocolos clinicos": ["admin", "gestor"] as UserRole[],
   "formularios dinamicos": ["admin", "gestor"] as UserRole[],
   "exportacao e-sus": ["admin", "gestor"] as UserRole[],
+  sinan: ["admin", "medico", "enfermeiro", "gestor"] as UserRole[],
+  formularios: ["admin", "gestor"] as UserRole[],
+  workflows: ["admin", "gestor"] as UserRole[],
+  alertas: ["admin", "gestor", "farmaceutico", "assistencia_social"] as UserRole[],
+  "relatorios estrategicos": ["admin", "gestor"] as UserRole[],
 };
 
 /**

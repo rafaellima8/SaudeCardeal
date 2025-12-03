@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Home,
   Users,
@@ -7,6 +8,7 @@ import {
   Building2,
   UserCog,
   ChevronDown,
+  ChevronRight,
   LogOut,
   FileCheck,
   Baby,
@@ -16,6 +18,8 @@ import {
   GitBranch,
   Bell,
   BarChart3,
+  Package,
+  Boxes,
 } from "lucide-react";
 import {
   Sidebar,
@@ -26,11 +30,15 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Logo } from "@/components/Logo";
 import { filterMenuByRole } from "@/lib/permissions";
@@ -39,14 +47,19 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
-const allMenuItems = [
+const mainMenuItems = [
   { title: "Dashboard", icon: Home, url: "/" },
   { title: "Pacientes", icon: Users, url: "/pacientes" },
+];
+
+const farmaciaSubItems = [
   { title: "Prescrições", icon: FileCheck, url: "/prescricoes" },
-  { title: "Farmácia", icon: Pill, url: "/farmacia" },
-  { title: "Dispensação", icon: Pill, url: "/farmacia/dispensacao" },
-  { title: "Estoque", icon: Pill, url: "/farmacia/estoque" },
+  { title: "Dispensação", icon: Package, url: "/farmacia/dispensacao" },
+  { title: "Estoque", icon: Boxes, url: "/farmacia/estoque" },
   { title: "Fraldas", icon: Baby, url: "/farmacia/fraldas" },
+];
+
+const operationalMenuItems = [
   { title: "TFD", icon: Truck, url: "/tfd" },
   { title: "Assistência Social", icon: Heart, url: "/assistencia-social" },
   { title: "SINAN", icon: AlertTriangle, url: "/sinan" },
@@ -79,7 +92,8 @@ const roleLabels: Record<string, string> = {
 export function AppSidebar() {
   const { user, isLoading } = useCurrentUser();
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+  const [isFarmaciaOpen, setIsFarmaciaOpen] = useState(true);
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
@@ -121,9 +135,13 @@ export function AppSidebar() {
     );
   }
 
-  const menuItems = filterMenuByRole(allMenuItems, user.role);
+  const menuItems = filterMenuByRole(mainMenuItems, user.role);
+  const farmaciaItems = filterMenuByRole(farmaciaSubItems, user.role);
+  const operationalItems = filterMenuByRole(operationalMenuItems, user.role);
   const automationItems = filterMenuByRole(automationMenuItems, user.role);
   const configItems = filterMenuByRole(allConfigItems, user.role);
+
+  const isFarmaciaActive = location.startsWith("/farmacia") || location === "/prescricoes";
 
   const initials = user.name
     .split(" ")
@@ -139,14 +157,73 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        {menuItems.length > 0 && (
+        {(menuItems.length > 0 || farmaciaItems.length > 0 || operationalItems.length > 0) && (
           <SidebarGroup>
             <SidebarGroupLabel>Principal</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {menuItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild data-testid={`nav-${item.title.toLowerCase()}`}>
+                    <SidebarMenuButton 
+                      asChild 
+                      isActive={location === item.url}
+                      data-testid={`nav-${item.title.toLowerCase()}`}
+                    >
+                      <a href={item.url} className="hover-elevate active-elevate-2">
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+
+                {farmaciaItems.length > 0 && (
+                  <Collapsible
+                    open={isFarmaciaOpen || isFarmaciaActive}
+                    onOpenChange={setIsFarmaciaOpen}
+                    className="group/collapsible"
+                  >
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton 
+                          className="hover-elevate active-elevate-2"
+                          isActive={isFarmaciaActive}
+                          data-testid="nav-farmacia"
+                        >
+                          <Pill className="h-4 w-4" />
+                          <span>Farmácia</span>
+                          <ChevronRight className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-90" />
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub>
+                          {farmaciaItems.map((item) => (
+                            <SidebarMenuSubItem key={item.title}>
+                              <SidebarMenuSubButton 
+                                asChild
+                                isActive={location === item.url}
+                                data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}
+                              >
+                                <a href={item.url} className="hover-elevate active-elevate-2">
+                                  <item.icon className="h-4 w-4" />
+                                  <span>{item.title}</span>
+                                </a>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          ))}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                )}
+
+                {operationalItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton 
+                      asChild 
+                      isActive={location === item.url}
+                      data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}
+                    >
                       <a href={item.url} className="hover-elevate active-elevate-2">
                         <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
@@ -166,7 +243,11 @@ export function AppSidebar() {
               <SidebarMenu>
                 {automationItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}>
+                    <SidebarMenuButton 
+                      asChild 
+                      isActive={location === item.url}
+                      data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}
+                    >
                       <a href={item.url} className="hover-elevate active-elevate-2">
                         <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
@@ -186,7 +267,11 @@ export function AppSidebar() {
               <SidebarMenu>
                 {configItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild data-testid={`nav-${item.title.toLowerCase()}`}>
+                    <SidebarMenuButton 
+                      asChild 
+                      isActive={location === item.url}
+                      data-testid={`nav-${item.title.toLowerCase()}`}
+                    >
                       <a href={item.url} className="hover-elevate active-elevate-2">
                         <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
