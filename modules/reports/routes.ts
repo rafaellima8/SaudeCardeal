@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { strategicReportEngine, STRATEGIC_REPORTS } from "./strategic-reports";
+import { storage } from "../../server/storage";
 import { requireAuth, getEffectiveUnitId, enforceUnitScope } from "../../server/auth";
 
 const router = Router();
@@ -61,13 +62,37 @@ router.get("/categories", requireAuth, async (_req: Request, res: Response) => {
 });
 
 router.post("/execute/:slug", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
-  // Feature flag: Report execution with mock data disabled for multi-tenant security
-  // Return 503 until unit-filtered persistence is implemented
-  // This prevents cross-tenant data exposure through shared mock datasets
-  res.status(503).json({ 
-    error: "Funcionalidade em desenvolvimento",
-    message: "Execução de relatórios estratégicos ainda está sendo implementada. Os relatórios estarão disponíveis em breve."
-  });
+  try {
+    const { slug } = req.params;
+    const unitId = getEffectiveUnitId(req);
+    const user = req.user as any;
+    const { parameters } = req.body;
+    
+    const builtInReport = strategicReportEngine.getReport(slug);
+    if (!builtInReport) {
+      return res.status(404).json({ error: "Relatório não encontrado" });
+    }
+    
+    const { data, aggregations } = generateReportData(builtInReport);
+    
+    const execution = await storage.createReportExecution({
+      definitionId: builtInReport.id,
+      unitId: unitId!,
+      status: "completed",
+      parameters: parameters || {},
+      resultData: { data, aggregations },
+      executedBy: user?.id,
+    });
+    
+    res.json({
+      execution,
+      report: builtInReport,
+      data,
+      aggregations,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 function generateReportData(report: any): { data: any[]; aggregations: Record<string, any> } {
@@ -149,10 +174,20 @@ function generateReportData(report: any): { data: any[]; aggregations: Record<st
 }
 
 router.get("/executions", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
-  // Feature flag: Report executions persistence not yet implemented
-  // Return empty array until storage-backed queries are ready
-  // This prevents cross-tenant data exposure through mock data
-  res.json([]);
+  try {
+    const unitId = getEffectiveUnitId(req);
+    const { definitionId, limit } = req.query;
+    
+    const executions = await storage.getReportExecutions({
+      unitId: unitId!,
+      definitionId: definitionId as string | undefined,
+      limit: limit ? parseInt(limit as string) : 50,
+    });
+    
+    res.json(executions);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 export default router;

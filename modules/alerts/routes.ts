@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { alertScheduler, DEFAULT_ALERTS } from "./alert-scheduler";
+import { storage } from "../../server/storage";
 import { requireAuth, getEffectiveUnitId, enforceUnitScope } from "../../server/auth";
 
 const router = Router();
@@ -9,15 +10,22 @@ router.get("/rules", requireAuth, async (req: Request, res: Response) => {
   try {
     const { category } = req.query;
     
+    const dbRules = await storage.getAlertRules({ 
+      category: category as string | undefined,
+      isActive: true 
+    });
+    
     const builtInRules = DEFAULT_ALERTS.map(rule => ({
       ...rule,
       isBuiltIn: true,
     }));
     
+    const allRules = [...builtInRules, ...dbRules.map(r => ({ ...r, isBuiltIn: false }))];
+    
     if (category) {
-      res.json(builtInRules.filter(r => r.category === category));
+      res.json(allRules.filter(r => r.category === category));
     } else {
-      res.json(builtInRules);
+      res.json(allRules);
     }
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -27,6 +35,11 @@ router.get("/rules", requireAuth, async (req: Request, res: Response) => {
 router.get("/rules/:slug", requireAuth, async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;
+    
+    const dbRule = await storage.getAlertRuleBySlug(slug);
+    if (dbRule) {
+      return res.json({ ...dbRule, isBuiltIn: false });
+    }
     
     const builtInRule = DEFAULT_ALERTS.find(a => a.slug === slug);
     if (builtInRule) {
@@ -40,57 +53,148 @@ router.get("/rules/:slug", requireAuth, async (req: Request, res: Response) => {
 });
 
 router.get("/active", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
-  // Feature flag: Alerts data persistence not yet implemented
-  // Return empty array until storage-backed queries are ready
-  // This prevents cross-tenant data exposure through mock data
-  res.json([]);
+  try {
+    const unitId = getEffectiveUnitId(req);
+    const { severity, category } = req.query;
+    
+    const alerts = await storage.getAlertInstances({
+      unitId: unitId!,
+      severity: severity as string | undefined,
+      category: category as string | undefined,
+      status: "active",
+    });
+    
+    res.json(alerts);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 router.get("/all", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
-  // Feature flag: Alerts data persistence not yet implemented
-  // Return empty array until storage-backed queries are ready
-  // This prevents cross-tenant data exposure through mock data
-  res.json([]);
+  try {
+    const unitId = getEffectiveUnitId(req);
+    const { severity, category, status } = req.query;
+    
+    const alerts = await storage.getAlertInstances({
+      unitId: unitId!,
+      severity: severity as string | undefined,
+      category: category as string | undefined,
+      status: status as string | undefined,
+    });
+    
+    res.json(alerts);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 router.post("/:id/acknowledge", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
-  // Feature flag: Alerts persistence not yet implemented
-  // Return 503 until storage-backed operations are ready
-  // This prevents fabricated responses without verifying tenant-bound records
-  res.status(503).json({ 
-    error: "Funcionalidade em desenvolvimento",
-    message: "O sistema de alertas ainda está sendo implementado"
-  });
+  try {
+    const { id } = req.params;
+    const unitId = getEffectiveUnitId(req);
+    const user = req.user as any;
+    
+    const alert = await storage.getAlertInstanceById(id);
+    if (!alert) {
+      return res.status(404).json({ error: "Alerta não encontrado" });
+    }
+    
+    if (alert.unitId !== unitId) {
+      return res.status(403).json({ error: "Acesso negado a este alerta" });
+    }
+    
+    const updated = await storage.updateAlertInstance(id, {
+      status: "acknowledged",
+      acknowledgedAt: new Date(),
+      acknowledgedBy: user?.id,
+    });
+    
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 router.post("/:id/resolve", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
-  // Feature flag: Alerts persistence not yet implemented
-  // Return 503 until storage-backed operations are ready
-  res.status(503).json({ 
-    error: "Funcionalidade em desenvolvimento",
-    message: "O sistema de alertas ainda está sendo implementado"
-  });
+  try {
+    const { id } = req.params;
+    const unitId = getEffectiveUnitId(req);
+    const user = req.user as any;
+    
+    const alert = await storage.getAlertInstanceById(id);
+    if (!alert) {
+      return res.status(404).json({ error: "Alerta não encontrado" });
+    }
+    
+    if (alert.unitId !== unitId) {
+      return res.status(403).json({ error: "Acesso negado a este alerta" });
+    }
+    
+    const updated = await storage.updateAlertInstance(id, {
+      status: "resolved",
+      resolvedAt: new Date(),
+      resolvedBy: user?.id,
+    });
+    
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 router.post("/:id/dismiss", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
-  // Feature flag: Alerts persistence not yet implemented
-  res.status(503).json({ 
-    error: "Funcionalidade em desenvolvimento",
-    message: "O sistema de alertas ainda está sendo implementado"
-  });
+  try {
+    const { id } = req.params;
+    const unitId = getEffectiveUnitId(req);
+    
+    const alert = await storage.getAlertInstanceById(id);
+    if (!alert) {
+      return res.status(404).json({ error: "Alerta não encontrado" });
+    }
+    
+    if (alert.unitId !== unitId) {
+      return res.status(403).json({ error: "Acesso negado a este alerta" });
+    }
+    
+    const updated = await storage.updateAlertInstance(id, {
+      status: "dismissed",
+    });
+    
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 router.get("/stats", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
-  // Feature flag: Return empty stats until storage-backed queries are ready
-  res.json({
-    total: 0,
-    active: 0,
-    acknowledged: 0,
-    resolved: 0,
-    dismissed: 0,
-    byCategory: {},
-    bySeverity: {},
-  });
+  try {
+    const unitId = getEffectiveUnitId(req);
+    
+    const allAlerts = await storage.getAlertInstances({ unitId: unitId! });
+    
+    const stats = {
+      total: allAlerts.length,
+      active: allAlerts.filter(a => a.status === "active").length,
+      acknowledged: allAlerts.filter(a => a.status === "acknowledged").length,
+      resolved: allAlerts.filter(a => a.status === "resolved").length,
+      dismissed: allAlerts.filter(a => a.status === "dismissed").length,
+      byCategory: {} as Record<string, number>,
+      bySeverity: {} as Record<string, number>,
+    };
+    
+    allAlerts.forEach(alert => {
+      if (alert.category) {
+        stats.byCategory[alert.category] = (stats.byCategory[alert.category] || 0) + 1;
+      }
+      if (alert.severity) {
+        stats.bySeverity[alert.severity] = (stats.bySeverity[alert.severity] || 0) + 1;
+      }
+    });
+    
+    res.json(stats);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 router.get("/categories", requireAuth, async (_req: Request, res: Response) => {

@@ -132,43 +132,155 @@ router.post("/validate-transition", requireAuth, async (req: Request, res: Respo
 });
 
 router.get("/instances", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
-  // Feature flag: Workflow instances persistence needs unit-scoped filtering
-  // Return empty array until properly filtered by unitId
-  // This prevents cross-tenant data exposure
-  res.json([]);
+  try {
+    const unitId = getEffectiveUnitId(req);
+    const { entityType, status } = req.query;
+    
+    const instances = await storage.getWorkflowInstances({
+      unitId: unitId!,
+      entityType: entityType as string | undefined,
+      status: status as string | undefined,
+    });
+    
+    res.json(instances);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 router.post("/instances", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
-  // Feature flag: Workflow instances creation disabled until persistence is ready
-  res.status(503).json({ 
-    error: "Funcionalidade em desenvolvimento",
-    message: "Criação de instâncias de workflow ainda está sendo implementada"
-  });
+  try {
+    const unitId = getEffectiveUnitId(req);
+    const user = req.user as any;
+    const validation = createInstanceSchema.safeParse(req.body);
+    
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error.errors });
+    }
+    
+    const { definitionSlug, entityType, entityId, metadata } = validation.data;
+    
+    const definition = await storage.getWorkflowDefinitionBySlug(definitionSlug);
+    const builtInDef = DEFAULT_WORKFLOWS[definitionSlug as keyof typeof DEFAULT_WORKFLOWS];
+    
+    if (!definition && !builtInDef) {
+      return res.status(404).json({ error: "Workflow não encontrado" });
+    }
+    
+    const instance = await storage.createWorkflowInstance({
+      definitionId: definition?.id || `builtin-${definitionSlug}`,
+      entityType,
+      entityId,
+      unitId: unitId!,
+      status: "pending",
+      currentStep: 0,
+      metadata: metadata || {},
+      createdBy: user?.id,
+    });
+    
+    res.status(201).json(instance);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 router.post("/instances/:id/action", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
-  // Feature flag: Workflow actions disabled until persistence is ready
-  res.status(503).json({ 
-    error: "Funcionalidade em desenvolvimento",
-    message: "Ações em workflows ainda estão sendo implementadas"
-  });
+  try {
+    const { id } = req.params;
+    const unitId = getEffectiveUnitId(req);
+    const user = req.user as any;
+    
+    const validation = workflowActionSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error.errors });
+    }
+    
+    const { action, comment, metadata } = validation.data;
+    
+    const instance = await storage.getWorkflowInstanceById(id);
+    if (!instance) {
+      return res.status(404).json({ error: "Instância de workflow não encontrada" });
+    }
+    
+    if (instance.unitId !== unitId) {
+      return res.status(403).json({ error: "Acesso negado a esta instância" });
+    }
+    
+    const canTransition = workflowEngine.canTransition(instance.status, action, user?.role);
+    if (!canTransition) {
+      return res.status(400).json({ error: "Transição não permitida para seu perfil" });
+    }
+    
+    const nextStatus = workflowEngine.getNextStatus(instance.status, action);
+    
+    await storage.createWorkflowAction({
+      instanceId: id,
+      stepNumber: (instance.currentStep || 0) + 1,
+      action,
+      actionBy: user?.id,
+      actionByName: user?.name || "Sistema",
+      actionByRole: user?.role || "admin",
+      comment: comment || null,
+      metadata: metadata || {},
+    });
+    
+    const updated = await storage.updateWorkflowInstance(id, {
+      status: (nextStatus || instance.status) as any,
+      currentStep: (instance.currentStep || 0) + 1,
+    });
+    
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 router.get("/instances/:id/actions", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
-  // Feature flag: Return empty array until unit-scoped filtering is implemented
-  res.json([]);
+  try {
+    const { id } = req.params;
+    const unitId = getEffectiveUnitId(req);
+    
+    const instance = await storage.getWorkflowInstanceById(id);
+    if (!instance) {
+      return res.status(404).json({ error: "Instância não encontrada" });
+    }
+    
+    if (instance.unitId !== unitId) {
+      return res.status(403).json({ error: "Acesso negado" });
+    }
+    
+    const actions = await storage.getWorkflowActions(id);
+    res.json(actions);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 router.get("/stats", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
-  // Feature flag: Return empty stats until unit-scoped filtering is implemented
-  res.json({
-    total: 0,
-    pending: 0,
-    inProgress: 0,
-    approved: 0,
-    rejected: 0,
-    byType: {},
-  });
+  try {
+    const unitId = getEffectiveUnitId(req);
+    
+    const instances = await storage.getWorkflowInstances({ unitId: unitId! });
+    
+    const stats = {
+      total: instances.length,
+      pending: instances.filter(i => i.status === "pending").length,
+      inProgress: instances.filter(i => i.status === "in_progress").length,
+      approved: instances.filter(i => i.status === "approved").length,
+      rejected: instances.filter(i => i.status === "rejected").length,
+      byType: {} as Record<string, number>,
+    };
+    
+    instances.forEach(instance => {
+      if (instance.entityType) {
+        stats.byType[instance.entityType] = (stats.byType[instance.entityType] || 0) + 1;
+      }
+    });
+    
+    res.json(stats);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 export default router;
