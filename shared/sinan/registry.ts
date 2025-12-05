@@ -1,5 +1,5 @@
 import { SINAN_AGRAVOS_COMPLETOS, type AgravoDefinition } from "./agravos";
-import { SINAN_TEMPLATES, SINAN_TEMPLATES_BY_AGRAVO, SINAN_TEMPLATE_BY_AGRAVO } from "./templates";
+import { SINAN_TEMPLATES, SINAN_TEMPLATES_BY_AGRAVO } from "./templates";
 import { SinanFormTemplate } from "./template-types";
 
 export interface RegistryCoverageReport {
