@@ -145,16 +145,21 @@ Isolated modular architecture in `/modules/` directory:
 - **validateCsvFormat function**: Validates required columns (nome/tamanho/quantidade) before parsing
 - **Security decision**: Mock data endpoints disabled to prevent cross-tenant data leakage until real persistence is ready
 
-### Known Limitations (Dec 2025)
-- **Automation modules**: Alerts, Workflows, and Strategic Reports return empty data arrays; need storage-backed queries filtered by unitId
-- **Tables without seeds**: formTemplates, formSubmissions, workflowDefinitions, workflowInstances, alertRules, alertInstances, reportDefinitions, reportExecutions
-- **Pending implementation**: Real-time alert generation from stock levels, SINAN deadlines, and TFD pendencies
+### Automation Storage Integration (Dec 2025)
+- **Storage-backed persistence**: All automation endpoints now use storage methods with unit-scoped filtering
+- **Schema alignment**: Routes use correct database field names (status, actionBy, acknowledgedAt, resolvedAt)
+- **Multi-tenant isolation**: enforceUnitScope middleware applied to all instance-bearing endpoints
+- **Idempotent seeds**: Automation seeds check for existing records before insertion
 
-### Disabled Endpoints (Multi-Tenant Security - Dec 2025)
-The following endpoints are disabled (return 503 or empty arrays) until unit-scoped persistence is implemented:
-- **Alerts**: POST /api/alerts/:id/acknowledge, /resolve, /dismiss → 503
-- **Alerts Data**: GET /api/alerts/active, /all → empty array; GET /stats → zeroed metrics
-- **Workflows**: POST /api/workflow/instances → 503; POST /instances/:id/action → 503
-- **Workflows Data**: GET /api/workflow/instances, /instances/:id/actions → empty arrays; GET /stats → zeroed
-- **Reports**: POST /api/strategic-reports/execute/:slug → 503; GET /executions → empty array
-- **Reason**: Mock data payloads exposed cross-tenant data through shared datasets
+### Re-enabled Endpoints (Dec 2025)
+All automation endpoints now use real persistence with unit-scoped queries:
+- **Alerts**: POST /api/alerts/:id/acknowledge, /resolve, /dismiss → storage.updateAlertInstance
+- **Alerts Data**: GET /api/alerts/active, /all → storage.getAlertInstances with unitId filter
+- **Workflows**: POST /api/workflow/instances → storage.createWorkflowInstance
+- **Workflows Data**: GET /api/workflow/instances → storage.getWorkflowInstances with unitId filter
+- **Reports**: POST /api/strategic-reports/execute/:slug → storage.createReportExecution + data generation
+- **Reports Data**: GET /api/strategic-reports/executions → storage.getReportExecutions with unitId filter
+
+### Known Limitations (Dec 2025)
+- **Tables with seeds**: formTemplates (35), workflowDefinitions (4), alertRules (6), reportDefinitions (8) - seeded via server/seed-automation.ts
+- **Pending implementation**: Real-time alert generation from stock levels, SINAN deadlines, and TFD pendencies
