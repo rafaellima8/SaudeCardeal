@@ -1525,13 +1525,13 @@ export class DbStorage implements IStorage {
       conditions.push(eq(schema.sinanNotifications.unitId, params.unitId));
     }
     if (params.agravo) {
-      conditions.push(eq(schema.sinanNotifications.agravo, params.agravo as any));
+      conditions.push(eq(schema.sinanNotifications.agravoCode, params.agravo));
     }
     if (params.status) {
       conditions.push(eq(schema.sinanNotifications.status, params.status as any));
     }
     if (params.classification) {
-      conditions.push(eq(schema.sinanNotifications.classification, params.classification as any));
+      conditions.push(eq(schema.sinanNotifications.classificacaoFinal, params.classification));
     }
 
     let query = db.select().from(schema.sinanNotifications);

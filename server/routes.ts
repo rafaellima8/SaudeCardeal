@@ -178,9 +178,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const body = { ...req.body };
       if (body.birthDate && typeof body.birthDate === 'string') {
-        const dateStr = body.birthDate.split('T')[0];
-        const [year, month, day] = dateStr.split('-').map(Number);
-        body.birthDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+        let dateStr = body.birthDate;
+        let year: number, month: number, day: number;
+        
+        if (dateStr.includes('/')) {
+          const parts = dateStr.split('/');
+          day = parseInt(parts[0], 10);
+          month = parseInt(parts[1], 10);
+          year = parseInt(parts[2], 10);
+        } else {
+          dateStr = dateStr.split('T')[0];
+          const parts = dateStr.split('-');
+          year = parseInt(parts[0], 10);
+          month = parseInt(parts[1], 10);
+          day = parseInt(parts[2], 10);
+        }
+        
+        if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+          body.birthDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+        } else {
+          return res.status(400).json({ error: "Data de nascimento inválida", details: [{ path: ["birthDate"], message: "Formato esperado: DD/MM/YYYY ou YYYY-MM-DD" }] });
+        }
       }
       
       const data = insertCitizenSchema.parse(body);
@@ -223,9 +241,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const body = { ...req.body };
       if (body.birthDate && typeof body.birthDate === 'string') {
-        const dateStr = body.birthDate.split('T')[0];
-        const [year, month, day] = dateStr.split('-').map(Number);
-        body.birthDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+        let dateStr = body.birthDate;
+        let year: number, month: number, day: number;
+        
+        if (dateStr.includes('/')) {
+          const parts = dateStr.split('/');
+          day = parseInt(parts[0], 10);
+          month = parseInt(parts[1], 10);
+          year = parseInt(parts[2], 10);
+        } else {
+          dateStr = dateStr.split('T')[0];
+          const parts = dateStr.split('-');
+          year = parseInt(parts[0], 10);
+          month = parseInt(parts[1], 10);
+          day = parseInt(parts[2], 10);
+        }
+        
+        if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+          body.birthDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+        }
       }
       
       const citizen = await storage.updateCitizen(req.params.id, body);
@@ -2640,8 +2674,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (const n of notifications) {
         const status = n.status || 'rascunho';
-        const agravo = n.agravo;
-        const classification = n.classification || 'em_investigacao';
+        const agravo = n.agravoCode || n.agravoName || 'outros';
+        const classification = n.classificacaoFinal || 'em_investigacao';
         
         byStatus[status] = (byStatus[status] || 0) + 1;
         byAgravo[agravo] = (byAgravo[agravo] || 0) + 1;

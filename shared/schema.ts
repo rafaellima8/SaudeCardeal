@@ -954,104 +954,185 @@ export const documentSignatures = sqliteTable("document_signatures", {
 // SINAN - SISTEMA DE INFORMAÇÃO DE AGRAVOS DE NOTIFICAÇÃO
 // ============================================================================
 
+// Mapeamento CID-10 oficial por agravo SINAN
+export const SINAN_CID10_MAP: Record<string, { code: string; name: string; codes?: string[] }> = {
+  // Arboviroses
+  "dengue": { code: "A90", name: "Dengue", codes: ["A90", "A91"] },
+  "dengue_grave": { code: "A91", name: "Dengue Hemorrágica" },
+  "chikungunya": { code: "A92.0", name: "Febre de Chikungunya" },
+  "zika": { code: "A92.8", name: "Doença por vírus Zika" },
+  "febre_amarela": { code: "A95", name: "Febre Amarela", codes: ["A95.0", "A95.1", "A95.9"] },
+  
+  // Tuberculose
+  "tuberculose": { code: "A16.9", name: "Tuberculose", codes: ["A15", "A16", "A17", "A18", "A19"] },
+  
+  // Hanseníase
+  "hanseniase": { code: "A30", name: "Hanseníase", codes: ["A30.0", "A30.1", "A30.2", "A30.3", "A30.4", "A30.5", "A30.8", "A30.9"] },
+  
+  // Leishmanioses
+  "leishmaniose_visceral": { code: "B55.0", name: "Leishmaniose Visceral (Calazar)" },
+  "leishmaniose_tegumentar": { code: "B55.1", name: "Leishmaniose Tegumentar", codes: ["B55.1", "B55.2"] },
+  
+  // Meningites
+  "meningite": { code: "G03.9", name: "Meningite", codes: ["A39.0", "G00", "G01", "G02", "G03"] },
+  "meningite_meningococica": { code: "A39.0", name: "Meningite Meningocócica" },
+  
+  // Hepatites Virais
+  "hepatite_a": { code: "B15", name: "Hepatite A", codes: ["B15.0", "B15.9"] },
+  "hepatite_b": { code: "B16", name: "Hepatite B", codes: ["B16.0", "B16.1", "B16.2", "B16.9", "B18.0", "B18.1"] },
+  "hepatite_c": { code: "B17.1", name: "Hepatite C", codes: ["B17.1", "B18.2"] },
+  "hepatite_d": { code: "B17.0", name: "Hepatite D" },
+  "hepatite_e": { code: "B17.2", name: "Hepatite E" },
+  
+  // IST
+  "sifilis_adquirida": { code: "A53.9", name: "Sífilis Adquirida", codes: ["A51", "A52", "A53"] },
+  "sifilis_congenita": { code: "A50", name: "Sífilis Congênita", codes: ["A50.0", "A50.1", "A50.2", "A50.9"] },
+  "sifilis_gestante": { code: "O98.1", name: "Sífilis na Gestação" },
+  "hiv_aids": { code: "B24", name: "HIV/AIDS", codes: ["B20", "B21", "B22", "B23", "B24"] },
+  "hiv_gestante": { code: "O98.7", name: "HIV na Gestação" },
+  
+  // Doenças Respiratórias
+  "covid19": { code: "U07.1", name: "COVID-19", codes: ["U07.1", "U07.2"] },
+  "influenza": { code: "J10", name: "Influenza/SRAG", codes: ["J09", "J10", "J11"] },
+  "srag": { code: "J80", name: "Síndrome Respiratória Aguda Grave" },
+  "coqueluche": { code: "A37", name: "Coqueluche", codes: ["A37.0", "A37.1", "A37.8", "A37.9"] },
+  "difteria": { code: "A36", name: "Difteria", codes: ["A36.0", "A36.1", "A36.2", "A36.3", "A36.8", "A36.9"] },
+  
+  // Doenças Imunopreveníveis
+  "sarampo": { code: "B05", name: "Sarampo", codes: ["B05.0", "B05.1", "B05.2", "B05.3", "B05.4", "B05.8", "B05.9"] },
+  "rubeola": { code: "B06", name: "Rubéola", codes: ["B06.0", "B06.8", "B06.9"] },
+  "rubeola_congenita": { code: "P35.0", name: "Síndrome da Rubéola Congênita" },
+  "varicela": { code: "B01", name: "Varicela", codes: ["B01.0", "B01.1", "B01.2", "B01.8", "B01.9"] },
+  "tetano_acidental": { code: "A35", name: "Tétano Acidental" },
+  "tetano_neonatal": { code: "A33", name: "Tétano Neonatal" },
+  "poliomielite": { code: "A80", name: "Poliomielite/PFA", codes: ["A80.0", "A80.1", "A80.2", "A80.3", "A80.4", "A80.9"] },
+  
+  // Malária
+  "malaria": { code: "B50", name: "Malária", codes: ["B50", "B51", "B52", "B53", "B54"] },
+  
+  // Zoonoses
+  "raiva_humana": { code: "A82", name: "Raiva Humana", codes: ["A82.0", "A82.1", "A82.9"] },
+  "leptospirose": { code: "A27", name: "Leptospirose", codes: ["A27.0", "A27.8", "A27.9"] },
+  "hantavirose": { code: "A98.5", name: "Hantavirose" },
+  "febre_maculosa": { code: "A77.0", name: "Febre Maculosa Brasileira" },
+  "doenca_chagas": { code: "B57", name: "Doença de Chagas", codes: ["B57.0", "B57.1", "B57.2", "B57.3", "B57.4", "B57.5"] },
+  "esquistossomose": { code: "B65", name: "Esquistossomose", codes: ["B65.0", "B65.1", "B65.2", "B65.8", "B65.9"] },
+  
+  // Doenças Alimentares
+  "botulismo": { code: "A05.1", name: "Botulismo" },
+  "colera": { code: "A00", name: "Cólera", codes: ["A00.0", "A00.1", "A00.9"] },
+  "febre_tifoide": { code: "A01.0", name: "Febre Tifóide" },
+  "dta": { code: "A09", name: "Doenças Transmitidas por Alimentos" },
+  
+  // Outras Doenças Infecciosas
+  "antraz": { code: "A22", name: "Antraz/Carbúnculo", codes: ["A22.0", "A22.1", "A22.2", "A22.7", "A22.8", "A22.9"] },
+  "peste": { code: "A20", name: "Peste", codes: ["A20.0", "A20.1", "A20.2", "A20.3", "A20.7", "A20.8", "A20.9"] },
+  "tularemia": { code: "A21", name: "Tularemia" },
+  "mpox": { code: "B04", name: "Monkeypox/Mpox" },
+  "febre_nilo": { code: "A92.3", name: "Febre do Nilo Ocidental" },
+  
+  // Acidentes e Violências
+  "acidentes_animais": { code: "W54", name: "Acidentes por Animais Peçonhentos", codes: ["T63", "W54", "W57", "W59", "X20", "X21", "X22", "X23", "X27"] },
+  "acidente_ofidico": { code: "T63.0", name: "Acidente por Serpente" },
+  "acidente_escorpiao": { code: "T63.2", name: "Acidente por Escorpião" },
+  "acidente_aranha": { code: "T63.3", name: "Acidente por Aranha" },
+  "intoxicacao_exogena": { code: "T65", name: "Intoxicação Exógena", codes: ["T36-T65"] },
+  "violencia_domestica": { code: "Y07", name: "Violência Doméstica/Sexual", codes: ["Y04", "Y05", "Y06", "Y07", "T74"] },
+  "acidente_trabalho": { code: "Z56.0", name: "Acidente de Trabalho Grave", codes: ["Y96", "Z56", "Z57"] },
+  
+  // Doenças Crônicas de Notificação
+  "cancer_ocupacional": { code: "C80", name: "Câncer Relacionado ao Trabalho" },
+  "ler_dort": { code: "M70", name: "LER/DORT" },
+  "pair": { code: "H83.3", name: "PAIR - Perda Auditiva Induzida por Ruído" },
+  "pneumoconiose": { code: "J64", name: "Pneumoconiose" },
+  "dermatose_ocupacional": { code: "L23.9", name: "Dermatose Ocupacional" },
+  
+  // Outros
+  "outros": { code: "B99", name: "Outras doenças infecciosas" },
+};
+
+// Helper para obter CID-10 por código do agravo
+export function getCidByAgravo(agravoCode: string): { code: string; name: string } | null {
+  return SINAN_CID10_MAP[agravoCode] || null;
+}
+
+// Lista de agravos para select
+export const SINAN_AGRAVOS = Object.entries(SINAN_CID10_MAP).map(([code, info]) => ({
+  code,
+  name: info.name,
+  cid: info.code,
+}));
+
 export const sinanNotifications = sqliteTable("sinan_notifications", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   unitId: text("unit_id").notNull().references(() => healthUnits.id),
+  citizenId: text("citizen_id").references(() => citizens.id),
   
-  notificationNumber: text("notification_number").notNull().unique(),
+  notificationNumber: text("notification_number"),
+  agravoCode: text("agravo_code").notNull(),
+  agravoName: text("agravo_name").notNull(),
   notificationDate: integer("notification_date", { mode: "timestamp" }).notNull(),
-  notificationWeek: integer("notification_week").notNull(),
-  notificationYear: integer("notification_year").notNull(),
-  
-  agravo: text("agravo", {
-    enum: [
-      "dengue", "chikungunya", "zika", "leishmaniose_visceral", "leishmaniose_tegumentar",
-      "hanseniase", "tuberculose", "malaria", "covid19", "hepatite_a", "hepatite_b", 
-      "hepatite_c", "meningite", "tetano", "coqueluche", "difteria", "poliomielite",
-      "sarampo", "rubeola", "varicela", "febre_amarela", "raiva_humana", "leptospirose",
-      "esquistossomose", "doenca_chagas", "hantavirose", "febre_maculosa", "botulismo",
-      "colera", "febre_tifoide", "antraz", "peste", "tularemia", "acidentes_animais",
-      "intoxicacao_exogena", "violencia_domestica", "acidente_trabalho", "outros"
-    ]
-  }).notNull(),
-  
-  cidPrimary: text("cid_primary").notNull(),
-  cidSecondary: text("cid_secondary"),
-  
-  patientName: text("patient_name").notNull(),
-  patientBirthDate: integer("patient_birth_date", { mode: "timestamp" }),
-  patientAge: integer("patient_age"),
-  patientAgeUnit: text("patient_age_unit", { enum: ["anos", "meses", "dias"] }).default("anos"),
-  patientSex: text("patient_sex", { enum: ["M", "F", "I"] }).notNull(),
-  patientPregnant: text("patient_pregnant", { enum: ["sim", "nao", "nao_se_aplica", "ignorado"] }),
-  patientRace: text("patient_race", { 
-    enum: ["branca", "preta", "parda", "amarela", "indigena", "ignorado"] 
-  }),
-  patientSchooling: text("patient_schooling", {
-    enum: [
-      "analfabeto", "fundamental_incompleto", "fundamental_completo",
-      "medio_incompleto", "medio_completo", "superior_incompleto",
-      "superior_completo", "ignorado", "nao_se_aplica"
-    ]
-  }),
-  patientOccupation: text("patient_occupation"),
-  patientCpf: text("patient_cpf"),
-  patientCns: text("patient_cns"),
-  patientMotherName: text("patient_mother_name"),
-  
-  patientPhone: text("patient_phone"),
-  patientAddress: text("patient_address"),
-  patientAddressNumber: text("patient_address_number"),
-  patientComplement: text("patient_complement"),
-  patientNeighborhood: text("patient_neighborhood"),
-  patientMunicipalityIbge: text("patient_municipality_ibge"),
-  patientMunicipalityName: text("patient_municipality_name"),
-  patientState: text("patient_state"),
-  patientCep: text("patient_cep"),
-  patientZone: text("patient_zone", { enum: ["urbana", "rural", "periurbana", "ignorado"] }),
-  patientCountry: text("patient_country").default("Brasil"),
-  
-  symptomStartDate: integer("symptom_start_date", { mode: "timestamp" }),
-  hospitalization: integer("hospitalization", { mode: "boolean" }).default(false),
-  hospitalizationDate: integer("hospitalization_date", { mode: "timestamp" }),
-  hospitalizationUnit: text("hospitalization_unit"),
-  hospitalizationUnitCnes: text("hospitalization_unit_cnes"),
-  uti: integer("uti", { mode: "boolean" }).default(false),
-  
-  evolution: text("evolution", { 
-    enum: ["cura", "obito_agravo", "obito_outras_causas", "ignorado", "em_investigacao"] 
-  }),
-  evolutionDate: integer("evolution_date", { mode: "timestamp" }),
-  autopsyPerformed: integer("autopsy_performed", { mode: "boolean" }).default(false),
-  
-  classification: text("classification", {
-    enum: ["confirmado", "provavel", "descartado", "inconclusivo", "em_investigacao"]
-  }).default("em_investigacao"),
-  confirmationCriteria: text("confirmation_criteria", {
-    enum: ["laboratorial", "clinico_epidemiologico", "clinico", "ignorado"]
-  }),
-  
-  investigatorName: text("investigator_name"),
-  investigatorCns: text("investigator_cns"),
-  investigationDate: integer("investigation_date", { mode: "timestamp" }),
-  investigationStatus: text("investigation_status", {
-    enum: ["pendente", "em_andamento", "concluida", "encerrada"]
-  }).default("pendente"),
+  symptomsStartDate: integer("symptoms_start_date", { mode: "timestamp" }),
+  notificationType: text("notification_type").default("individual"),
+  cidCode: text("cid_code"),
   
   status: text("status", {
     enum: ["rascunho", "preenchida", "validada", "exportada", "cancelada"]
   }).default("rascunho"),
   
-  notifierId: text("notifier_id").references(() => professionals.id),
-  notifierName: text("notifier_name"),
+  investigationDate: integer("investigation_date", { mode: "timestamp" }),
+  encerramentoDate: integer("encerramento_date", { mode: "timestamp" }),
+  classificacaoFinal: text("classificacao_final"),
+  criterioConfirmacao: text("criterio_confirmacao"),
+  evolucaoCaso: text("evolucao_caso"),
   
-  additionalData: text("additional_data", { mode: "json" }),
-  labResults: text("lab_results", { mode: "json" }),
+  hospitalized: integer("hospitalized", { mode: "boolean" }).default(false),
+  hospitalEntryDate: integer("hospital_entry_date", { mode: "timestamp" }),
+  hospitalExitDate: integer("hospital_exit_date", { mode: "timestamp" }),
+  hospitalName: text("hospital_name"),
+  hospitalUf: text("hospital_uf"),
+  hospitalMunicipio: text("hospital_municipio"),
+  
+  occupationCode: text("occupation_code"),
+  educationLevel: text("education_level"),
+  ethnicity: text("ethnicity"),
+  
+  patientName: text("patient_name"),
+  patientBirthDate: integer("patient_birth_date", { mode: "timestamp" }),
+  patientAge: integer("patient_age"),
+  patientAgeType: text("patient_age_type"),
+  patientGender: text("patient_gender"),
+  patientPregnant: text("patient_pregnant"),
+  patientGestationalAge: text("patient_gestational_age"),
+  patientRace: text("patient_race"),
+  patientCns: text("patient_cns"),
+  patientCpf: text("patient_cpf"),
+  patientMotherName: text("patient_mother_name"),
+  
+  residenceCountry: text("residence_country").default("1"),
+  residenceUf: text("residence_uf"),
+  residenceUfCode: text("residence_uf_code"),
+  residenceMunicipio: text("residence_municipio"),
+  residenceMunicipioCode: text("residence_municipio_code"),
+  residenceDistrict: text("residence_district"),
+  residenceLogradouro: text("residence_logradouro"),
+  residenceNumber: text("residence_number"),
+  residenceComplement: text("residence_complement"),
+  residenceCep: text("residence_cep"),
+  residencePhone: text("residence_phone"),
+  residenceZone: text("residence_zone"),
+  
+  notificationUf: text("notification_uf"),
+  notificationMunicipio: text("notification_municipio"),
+  notificationUnitCode: text("notification_unit_code"),
+  notificationUnitName: text("notification_unit_name"),
+  notifierName: text("notifier_name"),
+  notifierFunction: text("notifier_function"),
+  
+  formData: text("form_data", { mode: "json" }),
   observations: text("observations"),
   
-  exportedAt: integer("exported_at", { mode: "timestamp" }),
-  exportBatch: text("export_batch"),
-  
+  createdBy: text("created_by").references(() => users.id),
   createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
 });
@@ -1569,23 +1650,25 @@ export const insertSinanNotificationSchema = createInsertSchema(sinanNotificatio
 });
 
 export const updateSinanNotificationSchema = z.object({
-  agravo: z.enum([
-    "dengue", "chikungunya", "zika", "leishmaniose_visceral", "leishmaniose_tegumentar",
-    "hanseniase", "tuberculose", "malaria", "covid19", "hepatite_a", "hepatite_b",
-    "hepatite_c", "meningite", "tetano", "coqueluche", "difteria", "poliomielite",
-    "sarampo", "rubeola", "varicela", "febre_amarela", "raiva_humana", "leptospirose",
-    "esquistossomose", "doenca_chagas", "hantavirose", "febre_maculosa", "botulismo",
-    "colera", "febre_tifoide", "antraz", "peste", "tularemia", "acidentes_animais",
-    "intoxicacao_exogena", "violencia_domestica", "acidente_trabalho", "outros"
-  ]).optional(),
-  cidPrimary: z.string().optional(),
-  cidSecondary: z.string().nullable().optional(),
+  agravoCode: z.string().optional(),
+  agravoName: z.string().optional(),
+  cidCode: z.string().nullable().optional(),
+  notificationDate: z.date().optional(),
+  symptomsStartDate: z.date().nullable().optional(),
   patientName: z.string().optional(),
-  patientSex: z.enum(["M", "F", "I"]).optional(),
-  classification: z.enum(["confirmado", "provavel", "descartado", "inconclusivo", "em_investigacao"]).optional(),
-  investigationStatus: z.enum(["pendente", "em_andamento", "concluida", "encerrada"]).optional(),
+  patientGender: z.string().optional(),
+  patientAge: z.number().nullable().optional(),
+  patientAgeType: z.string().nullable().optional(),
+  patientRace: z.string().nullable().optional(),
+  patientPregnant: z.string().nullable().optional(),
+  classificacaoFinal: z.string().nullable().optional(),
+  criterioConfirmacao: z.string().nullable().optional(),
+  evolucaoCaso: z.string().nullable().optional(),
   status: z.enum(["rascunho", "preenchida", "validada", "exportada", "cancelada"]).optional(),
+  hospitalized: z.boolean().optional(),
+  hospitalName: z.string().nullable().optional(),
   observations: z.string().nullable().optional(),
+  formData: z.any().optional(),
 });
 
 export const insertSinanLabExamSchema = createInsertSchema(sinanLabExams).omit({
