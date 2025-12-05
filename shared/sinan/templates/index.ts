@@ -52,13 +52,17 @@ export const SINAN_TEMPLATES: SinanFormTemplate[] = [
 ];
 
 export const SINAN_TEMPLATE_BY_ID: Record<string, SinanFormTemplate> = {};
-export const SINAN_TEMPLATE_BY_AGRAVO: Record<string, SinanFormTemplate> = {};
+export const SINAN_TEMPLATES_BY_AGRAVO: Record<string, SinanFormTemplate[]> = {};
 export const SINAN_TEMPLATE_BY_COMPOSITE_KEY: Record<string, SinanFormTemplate> = {};
 export const SINAN_TEMPLATES_BY_CID10: Record<string, SinanFormTemplate[]> = {};
 
 for (const template of SINAN_TEMPLATES) {
   SINAN_TEMPLATE_BY_ID[template.id] = template;
-  SINAN_TEMPLATE_BY_AGRAVO[template.agravoCode] = template;
+  
+  if (!SINAN_TEMPLATES_BY_AGRAVO[template.agravoCode]) {
+    SINAN_TEMPLATES_BY_AGRAVO[template.agravoCode] = [];
+  }
+  SINAN_TEMPLATES_BY_AGRAVO[template.agravoCode].push(template);
   
   const compositeKey = `${template.agravoCode}__${template.versaoFicha}`;
   SINAN_TEMPLATE_BY_COMPOSITE_KEY[compositeKey] = template;
@@ -71,14 +75,41 @@ for (const template of SINAN_TEMPLATES) {
   }
 }
 
+export const SINAN_TEMPLATE_BY_AGRAVO: Record<string, SinanFormTemplate> = {};
+for (const [agravoCode, templates] of Object.entries(SINAN_TEMPLATES_BY_AGRAVO)) {
+  if (templates.length === 1) {
+    SINAN_TEMPLATE_BY_AGRAVO[agravoCode] = templates[0];
+  }
+}
+
 export const SINAN_TEMPLATE_MAP: Record<string, SinanFormTemplate> = {
   ...SINAN_TEMPLATE_BY_ID,
   ...SINAN_TEMPLATE_BY_AGRAVO,
   ...SINAN_TEMPLATE_BY_COMPOSITE_KEY,
 };
 
+export interface AgravoLookupResult {
+  agravoCode: string;
+  templates: SinanFormTemplate[];
+  requiresSelection: boolean;
+}
+
+export function getTemplatesByAgravo(agravoCode: string): AgravoLookupResult {
+  const templates = SINAN_TEMPLATES_BY_AGRAVO[agravoCode] || [];
+  return {
+    agravoCode,
+    templates,
+    requiresSelection: templates.length > 1,
+  };
+}
+
 export function getTemplateByAgravo(agravoCode: string): SinanFormTemplate | undefined {
-  return SINAN_TEMPLATE_BY_AGRAVO[agravoCode];
+  const result = getTemplatesByAgravo(agravoCode);
+  if (result.requiresSelection) {
+    console.warn(`Agravo ${agravoCode} has ${result.templates.length} templates. Use getTemplatesByAgravo() and select by versaoFicha.`);
+    return undefined;
+  }
+  return result.templates[0];
 }
 
 export function getTemplateByCompositeKey(agravoCode: string, versaoFicha: string): SinanFormTemplate | undefined {

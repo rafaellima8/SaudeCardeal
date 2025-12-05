@@ -49,3 +49,30 @@ The system employs a client-server architecture with a clear separation of conce
 - **DATASUS BPA System**: For exporting BPA-I and APAC data in TXT format for submission.
 - **IBGE (Brazilian Institute of Geography and Statistics)**: Used for municipality codes in TFD.
 - **CID-10 (International Classification of Diseases, 10th Revision)**: Used for diagnosis coding.
+
+## SINAN Template System Architecture
+
+### Template Type System (`shared/sinan/template-types.ts`)
+- **SinanFormGroupId**: Literal union type for form group identifiers
+- **SinanField**: Type-safe field definitions with validated group assignment
+- **SinanFormTemplate**: Complete template interface with versioning support
+- **SINAN_FORM_GROUPS**: Standardized form sections (dados_gerais, notificacao, residencia, etc.)
+
+### Template Registry (`shared/sinan/templates/index.ts`)
+- **Composite Key Strategy**: Templates keyed by `${agravoCode}__${versaoFicha}` to prevent collisions
+- **CID-10 Array Lookup**: `getTemplatesByCid()` returns all matching templates when CID-10 is shared
+- **Disambiguation Support**: `requiresSelection` flag indicates when user must choose from multiple templates
+
+### Template Validation (`shared/sinan/template-validator.ts`)
+- **Mandatory Group Validation**: Ensures all templates include required SINAN sections
+- **Field Consistency Check**: Validates requiredFields array matches field definitions
+- **sinanCode Mapping Verification**: Warns when fields lack official SINAN codification
+
+### Registry Coverage (`shared/sinan/registry.ts`)
+- **Coverage Tracking**: Links SINAN_AGRAVOS_COMPLETOS (82 agravos) with implemented templates
+- **Category Statistics**: Reports template coverage by disease category
+- **Build-time Assertions**: `assertFullCoverage()` logs missing template warnings
+
+### Current Template Coverage
+- **23 Templates Implemented**: Dengue, Chikungunya, Zika, Febre Amarela, Tuberculose, Hanseníase, Hepatites, Sífilis Congênita, Sífilis Gestante, Violência, Intoxicação, Meningite, Leptospirose, Raiva Humana, Acidente Animal Peçonhento, Leishmaniose Visceral, Leishmaniose Tegumentar, Malária, Chagas Agudo, Sarampo, Coqueluche, Tétano Acidental, PFA/Poliomielite
+- **~28% Coverage**: 23/82 agravos have dedicated templates
