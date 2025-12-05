@@ -208,7 +208,7 @@ export default function Patients() {
       const year = d.getUTCFullYear();
       const month = String(d.getUTCMonth() + 1).padStart(2, '0');
       const day = String(d.getUTCDate()).padStart(2, '0');
-      birthDateStr = `${year}-${month}-${day}`;
+      birthDateStr = `${day}/${month}/${year}`;
     }
     
     setFormData({
@@ -237,11 +237,25 @@ export default function Patients() {
     let birthDateStr: string | null = null;
     if (formData.birthDate) {
       if (formData.birthDate.includes('/')) {
-        const [day, month, year] = formData.birthDate.split('/');
-        birthDateStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-      } else {
+        const parts = formData.birthDate.split('/');
+        if (parts.length === 3) {
+          const [day, month, year] = parts;
+          if (day && month && year && year.length === 4) {
+            birthDateStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          }
+        }
+      } else if (formData.birthDate.includes('-')) {
         birthDateStr = formData.birthDate.split('T')[0];
       }
+    }
+    
+    if (!birthDateStr) {
+      toast({
+        title: "Erro",
+        description: "Data de nascimento inválida. Use o formato DD/MM/AAAA",
+        variant: "destructive",
+      });
+      return;
     }
     
     const submitData = {
@@ -462,10 +476,18 @@ export default function Patients() {
                 <Label htmlFor="birthDate">Data de Nascimento *</Label>
                 <Input
                   id="birthDate"
-                  type="date"
+                  type="text"
                   required
+                  placeholder="DD/MM/AAAA"
                   value={formData.birthDate}
-                  onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+                  onChange={(e) => {
+                    let value = e.target.value.replace(/\D/g, '');
+                    if (value.length >= 2) value = value.slice(0, 2) + '/' + value.slice(2);
+                    if (value.length >= 5) value = value.slice(0, 5) + '/' + value.slice(5);
+                    if (value.length > 10) value = value.slice(0, 10);
+                    setFormData({ ...formData, birthDate: value });
+                  }}
+                  data-testid="input-birthdate"
                 />
               </div>
               <div>

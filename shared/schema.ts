@@ -1586,7 +1586,32 @@ export const insertProfessionalSchema = createInsertSchema(professionals).omit({
   createdAt: true,
 });
 
-export const insertCitizenSchema = createInsertSchema(citizens).omit({
+const birthDatePreprocess = z.preprocess((val) => {
+  if (val === null || val === undefined) return null;
+  if (typeof val === 'number') return val;
+  if (val instanceof Date) return Math.floor(val.getTime() / 1000);
+  if (typeof val === 'string' && val) {
+    let date: Date | null = null;
+    if (val.includes('/')) {
+      const parts = val.split('/');
+      if (parts.length === 3) {
+        const [day, month, year] = parts;
+        date = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day), 12, 0, 0));
+      }
+    } else if (val.includes('-')) {
+      const [year, month, day] = val.split('T')[0].split('-');
+      date = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day), 12, 0, 0));
+    }
+    if (date && !isNaN(date.getTime())) {
+      return Math.floor(date.getTime() / 1000);
+    }
+  }
+  return null;
+}, z.number().nullable().optional());
+
+export const insertCitizenSchema = createInsertSchema(citizens, {
+  birthDate: birthDatePreprocess,
+}).omit({
   id: true,
   createdAt: true,
   updatedAt: true,

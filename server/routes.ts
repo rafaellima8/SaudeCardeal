@@ -176,32 +176,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const sessionUnitId = req.session?.user?.unitId;
       
-      const body = { ...req.body };
-      if (body.birthDate && typeof body.birthDate === 'string') {
-        let dateStr = body.birthDate;
-        let year: number, month: number, day: number;
-        
-        if (dateStr.includes('/')) {
-          const parts = dateStr.split('/');
-          day = parseInt(parts[0], 10);
-          month = parseInt(parts[1], 10);
-          year = parseInt(parts[2], 10);
-        } else {
-          dateStr = dateStr.split('T')[0];
-          const parts = dateStr.split('-');
-          year = parseInt(parts[0], 10);
-          month = parseInt(parts[1], 10);
-          day = parseInt(parts[2], 10);
-        }
-        
-        if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
-          body.birthDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
-        } else {
-          return res.status(400).json({ error: "Data de nascimento inválida", details: [{ path: ["birthDate"], message: "Formato esperado: DD/MM/YYYY ou YYYY-MM-DD" }] });
-        }
-      }
-      
-      const data = insertCitizenSchema.parse(body);
+      const data = insertCitizenSchema.parse(req.body);
       
       if (sessionUnitId && !CROSS_UNIT_ROLES.includes(req.session?.user?.role as any)) {
         data.unitId = sessionUnitId;
@@ -239,30 +214,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Acesso negado: cidadão de outra unidade" });
       }
       
-      const body = { ...req.body };
-      if (body.birthDate && typeof body.birthDate === 'string') {
-        let dateStr = body.birthDate;
-        let year: number, month: number, day: number;
-        
-        if (dateStr.includes('/')) {
-          const parts = dateStr.split('/');
-          day = parseInt(parts[0], 10);
-          month = parseInt(parts[1], 10);
-          year = parseInt(parts[2], 10);
-        } else {
-          dateStr = dateStr.split('T')[0];
-          const parts = dateStr.split('-');
-          year = parseInt(parts[0], 10);
-          month = parseInt(parts[1], 10);
-          day = parseInt(parts[2], 10);
-        }
-        
-        if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
-          body.birthDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
-        }
-      }
+      const updateData = insertCitizenSchema.partial().parse(req.body);
       
-      const citizen = await storage.updateCitizen(req.params.id, body);
+      const citizen = await storage.updateCitizen(req.params.id, updateData);
       res.json(citizen);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

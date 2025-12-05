@@ -106,13 +106,13 @@ const STATUS_LABELS: Record<string, { label: string; icon: any; color: string }>
 };
 
 const notificationSchema = z.object({
-  agravo: z.string().min(1, "Selecione o agravo"),
-  cidPrimary: z.string().min(1, "CID obrigatório"),
-  cidSecondary: z.string().optional(),
+  agravoCode: z.string().min(1, "Selecione o agravo"),
+  agravoName: z.string().optional(),
+  cidCode: z.string().min(1, "CID obrigatório"),
   citizenId: z.string().optional(),
   patientName: z.string().min(2, "Nome obrigatório"),
   patientBirthDate: z.date().optional(),
-  patientSex: z.enum(["M", "F", "I"]),
+  patientGender: z.enum(["M", "F", "I"]),
   patientPregnant: z.string().optional(),
   patientRace: z.string().optional(),
   patientCpf: z.string().optional(),
@@ -128,6 +128,7 @@ const notificationSchema = z.object({
   symptomStartDate: z.date().optional(),
   hospitalization: z.boolean().optional(),
   observations: z.string().optional(),
+  classificacaoFinal: z.string().optional(),
 });
 
 type NotificationFormData = z.infer<typeof notificationSchema>;
@@ -161,10 +162,10 @@ export default function Sinan() {
   const form = useForm<NotificationFormData>({
     resolver: zodResolver(notificationSchema),
     defaultValues: {
-      agravo: "",
-      cidPrimary: "",
+      agravoCode: "",
+      cidCode: "",
       patientName: "",
-      patientSex: "M",
+      patientGender: "M",
       hospitalization: false,
     },
   });
@@ -204,12 +205,14 @@ export default function Sinan() {
   };
 
   const filteredNotifications = notifications.filter((n) => {
+    const patientName = n.patientName || "";
+    const notificationNumber = n.notificationNumber || "";
     const matchesSearch =
-      n.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      n.notificationNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      notificationNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (n.patientCpf && n.patientCpf.includes(searchTerm));
 
-    const matchesAgravo = filterAgravo === "all" || n.agravo === filterAgravo;
+    const matchesAgravo = filterAgravo === "all" || n.agravoCode === filterAgravo;
     const matchesStatus = filterStatus === "all" || n.status === filterStatus;
 
     return matchesSearch && matchesAgravo && matchesStatus;
@@ -221,7 +224,7 @@ export default function Sinan() {
     form.setValue("patientCns", citizen.cns || "");
     form.setValue("patientBirthDate", citizen.birthDate ? new Date(citizen.birthDate) : undefined);
     const sex = citizen.gender === "M" ? "M" : citizen.gender === "F" ? "F" : "I";
-    form.setValue("patientSex", sex);
+    form.setValue("patientGender", sex);
     form.setValue("patientMotherName", citizen.motherName || "");
     form.setValue("patientPhone", citizen.phone || "");
     form.setValue("patientAddress", citizen.address || "");
@@ -283,7 +286,7 @@ export default function Sinan() {
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
-                        name="agravo"
+                        name="agravoCode"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Agravo/Doença *</FormLabel>
@@ -309,7 +312,7 @@ export default function Sinan() {
                       />
                       <FormField
                         control={form.control}
-                        name="cidPrimary"
+                        name="cidCode"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>CID-10 Principal *</FormLabel>
@@ -329,34 +332,31 @@ export default function Sinan() {
                       control={form.control}
                       name="symptomStartDate"
                       render={({ field }) => (
-                        <FormItem className="flex flex-col">
+                        <FormItem>
                           <FormLabel>Data Início dos Sintomas</FormLabel>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button
-                                  variant="outline"
-                                  className={cn(
-                                    "w-[240px] pl-3 text-left font-normal",
-                                    !field.value && "text-muted-foreground"
-                                  )}
-                                >
-                                  {field.value
-                                    ? format(field.value, "dd/MM/yyyy", { locale: ptBR })
-                                    : "Selecione a data"}
-                                  <CalendarIcon className="ml-auto h-4 w-4" />
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={field.value}
-                                onSelect={field.onChange}
-                                locale={ptBR}
-                              />
-                            </PopoverContent>
-                          </Popover>
+                          <FormControl>
+                            <Input
+                              type="text"
+                              placeholder="DD/MM/AAAA"
+                              value={field.value ? format(field.value, "dd/MM/yyyy", { locale: ptBR }) : ""}
+                              onChange={(e) => {
+                                let value = e.target.value.replace(/\D/g, '');
+                                if (value.length >= 2) value = value.slice(0, 2) + '/' + value.slice(2);
+                                if (value.length >= 5) value = value.slice(0, 5) + '/' + value.slice(5);
+                                if (value.length > 10) value = value.slice(0, 10);
+                                
+                                if (value.length === 10) {
+                                  const [day, month, year] = value.split('/').map(Number);
+                                  if (day && month && year && year >= 1900 && year <= 2100) {
+                                    field.onChange(new Date(Date.UTC(year, month - 1, day, 12, 0, 0)));
+                                  }
+                                } else if (value.length === 0) {
+                                  field.onChange(undefined);
+                                }
+                              }}
+                              data-testid="input-symptom-start-date"
+                            />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -417,7 +417,7 @@ export default function Sinan() {
                       />
                       <FormField
                         control={form.control}
-                        name="patientSex"
+                        name="patientGender"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Sexo *</FormLabel>
@@ -470,34 +470,31 @@ export default function Sinan() {
                         control={form.control}
                         name="patientBirthDate"
                         render={({ field }) => (
-                          <FormItem className="flex flex-col">
+                          <FormItem>
                             <FormLabel>Data de Nascimento</FormLabel>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <FormControl>
-                                  <Button
-                                    variant="outline"
-                                    className={cn(
-                                      "w-full pl-3 text-left font-normal",
-                                      !field.value && "text-muted-foreground"
-                                    )}
-                                  >
-                                    {field.value
-                                      ? format(field.value, "dd/MM/yyyy", { locale: ptBR })
-                                      : "Selecione"}
-                                    <CalendarIcon className="ml-auto h-4 w-4" />
-                                  </Button>
-                                </FormControl>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                  mode="single"
-                                  selected={field.value}
-                                  onSelect={field.onChange}
-                                  locale={ptBR}
-                                />
-                              </PopoverContent>
-                            </Popover>
+                            <FormControl>
+                              <Input
+                                type="text"
+                                placeholder="DD/MM/AAAA"
+                                value={field.value ? format(field.value, "dd/MM/yyyy", { locale: ptBR }) : ""}
+                                onChange={(e) => {
+                                  let value = e.target.value.replace(/\D/g, '');
+                                  if (value.length >= 2) value = value.slice(0, 2) + '/' + value.slice(2);
+                                  if (value.length >= 5) value = value.slice(0, 5) + '/' + value.slice(5);
+                                  if (value.length > 10) value = value.slice(0, 10);
+                                  
+                                  if (value.length === 10) {
+                                    const [day, month, year] = value.split('/').map(Number);
+                                    if (day && month && year && year >= 1900 && year <= 2100) {
+                                      field.onChange(new Date(Date.UTC(year, month - 1, day, 12, 0, 0)));
+                                    }
+                                  } else if (value.length === 0) {
+                                    field.onChange(undefined);
+                                  }
+                                }}
+                                data-testid="input-patient-birth-date"
+                              />
+                            </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -828,7 +825,7 @@ export default function Sinan() {
               <TableBody>
                 {filteredNotifications.map((notification) => {
                   const statusKey = notification.status || "rascunho";
-                  const classKey = notification.classification || "em_investigacao";
+                  const classKey = notification.classificacaoFinal || "em_investigacao";
                   const StatusIcon = STATUS_LABELS[statusKey]?.icon || Clock;
                   const classInfo = CLASSIFICATION_LABELS[classKey] || CLASSIFICATION_LABELS.em_investigacao;
                   
@@ -850,10 +847,10 @@ export default function Sinan() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">
-                          {AGRAVO_LABELS[notification.agravo] || notification.agravo}
+                          {AGRAVO_LABELS[notification.agravoCode] || notification.agravoName || notification.agravoCode}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-mono">{notification.cidPrimary}</TableCell>
+                      <TableCell className="font-mono">{notification.cidCode}</TableCell>
                       <TableCell>
                         <Badge className={classInfo.color}>{classInfo.label}</Badge>
                       </TableCell>
@@ -910,12 +907,12 @@ export default function Sinan() {
                 <div>
                   <Label className="text-muted-foreground">Agravo</Label>
                   <p className="font-medium">
-                    {AGRAVO_LABELS[selectedNotification.agravo] || selectedNotification.agravo}
+                    {AGRAVO_LABELS[selectedNotification.agravoCode] || selectedNotification.agravoName || selectedNotification.agravoCode}
                   </p>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">CID-10</Label>
-                  <p className="font-medium font-mono">{selectedNotification.cidPrimary}</p>
+                  <p className="font-medium font-mono">{selectedNotification.cidCode}</p>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Paciente</Label>
@@ -924,9 +921,9 @@ export default function Sinan() {
                 <div>
                   <Label className="text-muted-foreground">Sexo</Label>
                   <p className="font-medium">
-                    {selectedNotification.patientSex === "M"
+                    {selectedNotification.patientGender === "M"
                       ? "Masculino"
-                      : selectedNotification.patientSex === "F"
+                      : selectedNotification.patientGender === "F"
                       ? "Feminino"
                       : "Ignorado"}
                   </p>
@@ -943,11 +940,11 @@ export default function Sinan() {
                   <Label className="text-muted-foreground">Classificação</Label>
                   <Badge
                     className={
-                      CLASSIFICATION_LABELS[selectedNotification.classification || "em_investigacao"]
+                      CLASSIFICATION_LABELS[selectedNotification.classificacaoFinal || "em_investigacao"]
                         .color
                     }
                   >
-                    {CLASSIFICATION_LABELS[selectedNotification.classification || "em_investigacao"].label}
+                    {CLASSIFICATION_LABELS[selectedNotification.classificacaoFinal || "em_investigacao"].label}
                   </Badge>
                 </div>
                 <div>
