@@ -48,46 +48,56 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import type { SinanNotification, Citizen } from "@shared/schema";
 
-const AGRAVO_LABELS: Record<string, string> = {
-  dengue: "Dengue",
-  chikungunya: "Chikungunya",
-  zika: "Zika",
-  leishmaniose_visceral: "Leishmaniose Visceral",
-  leishmaniose_tegumentar: "Leishmaniose Tegumentar",
-  hanseniase: "Hanseníase",
-  tuberculose: "Tuberculose",
-  malaria: "Malária",
-  covid19: "COVID-19",
-  hepatite_a: "Hepatite A",
-  hepatite_b: "Hepatite B",
-  hepatite_c: "Hepatite C",
-  meningite: "Meningite",
-  tetano: "Tétano",
-  coqueluche: "Coqueluche",
-  difteria: "Difteria",
-  poliomielite: "Poliomielite",
-  sarampo: "Sarampo",
-  rubeola: "Rubéola",
-  varicela: "Varicela",
-  febre_amarela: "Febre Amarela",
-  raiva_humana: "Raiva Humana",
-  leptospirose: "Leptospirose",
-  esquistossomose: "Esquistossomose",
-  doenca_chagas: "Doença de Chagas",
-  hantavirose: "Hantavirose",
-  febre_maculosa: "Febre Maculosa",
-  botulismo: "Botulismo",
-  colera: "Cólera",
-  febre_tifoide: "Febre Tifoide",
-  antraz: "Antraz",
-  peste: "Peste",
-  tularemia: "Tularemia",
-  acidentes_animais: "Acidentes por Animais Peçonhentos",
-  intoxicacao_exogena: "Intoxicação Exógena",
-  violencia_domestica: "Violência Doméstica",
-  acidente_trabalho: "Acidente de Trabalho",
-  outros: "Outros Agravos",
+const AGRAVO_CID_MAP: Record<string, { cid: string; name: string }> = {
+  dengue: { cid: "A90", name: "Dengue" },
+  chikungunya: { cid: "A92.0", name: "Febre de Chikungunya" },
+  zika: { cid: "A92.8", name: "Doença pelo vírus Zika" },
+  leishmaniose_visceral: { cid: "B55.0", name: "Leishmaniose Visceral" },
+  leishmaniose_tegumentar: { cid: "B55.1", name: "Leishmaniose Tegumentar" },
+  hanseniase: { cid: "A30", name: "Hanseníase" },
+  tuberculose: { cid: "A15", name: "Tuberculose" },
+  malaria: { cid: "B50", name: "Malária" },
+  covid19: { cid: "U07.1", name: "COVID-19" },
+  hepatite_a: { cid: "B15", name: "Hepatite A" },
+  hepatite_b: { cid: "B16", name: "Hepatite B" },
+  hepatite_c: { cid: "B17.1", name: "Hepatite C" },
+  meningite: { cid: "G03.9", name: "Meningite" },
+  tetano: { cid: "A35", name: "Tétano" },
+  coqueluche: { cid: "A37", name: "Coqueluche" },
+  difteria: { cid: "A36", name: "Difteria" },
+  poliomielite: { cid: "A80", name: "Poliomielite" },
+  sarampo: { cid: "B05", name: "Sarampo" },
+  rubeola: { cid: "B06", name: "Rubéola" },
+  varicela: { cid: "B01", name: "Varicela" },
+  febre_amarela: { cid: "A95", name: "Febre Amarela" },
+  raiva_humana: { cid: "A82", name: "Raiva Humana" },
+  leptospirose: { cid: "A27", name: "Leptospirose" },
+  esquistossomose: { cid: "B65", name: "Esquistossomose" },
+  doenca_chagas: { cid: "B57", name: "Doença de Chagas" },
+  hantavirose: { cid: "A98.5", name: "Hantavirose" },
+  febre_maculosa: { cid: "A77", name: "Febre Maculosa" },
+  botulismo: { cid: "A05.1", name: "Botulismo" },
+  colera: { cid: "A00", name: "Cólera" },
+  febre_tifoide: { cid: "A01.0", name: "Febre Tifoide" },
+  antraz: { cid: "A22", name: "Antraz" },
+  peste: { cid: "A20", name: "Peste" },
+  tularemia: { cid: "A21", name: "Tularemia" },
+  acidentes_animais: { cid: "T63", name: "Acidentes por Animais Peçonhentos" },
+  intoxicacao_exogena: { cid: "T65.9", name: "Intoxicação Exógena" },
+  violencia_domestica: { cid: "Y07", name: "Violência Doméstica" },
+  acidente_trabalho: { cid: "Y96", name: "Acidente de Trabalho" },
+  sifilis_congenita: { cid: "A50", name: "Sífilis Congênita" },
+  sifilis_gestante: { cid: "O98.1", name: "Sífilis em Gestante" },
+  sifilis_adquirida: { cid: "A51", name: "Sífilis Adquirida" },
+  hiv_aids: { cid: "B24", name: "HIV/AIDS" },
+  influenza: { cid: "J09", name: "Influenza" },
+  monkeypox: { cid: "B04", name: "Varíola dos Macacos" },
+  outros: { cid: "", name: "Outros Agravos" },
 };
+
+const AGRAVO_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(AGRAVO_CID_MAP).map(([key, val]) => [key, val.name])
+);
 
 const CLASSIFICATION_LABELS: Record<string, { label: string; color: string }> = {
   confirmado: { label: "Confirmado", color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100" },
@@ -290,7 +300,17 @@ export default function Sinan() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Agravo/Doença *</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
+                            <Select 
+                              onValueChange={(value) => {
+                                field.onChange(value);
+                                const cidInfo = AGRAVO_CID_MAP[value];
+                                if (cidInfo && cidInfo.cid) {
+                                  form.setValue("cidCode", cidInfo.cid);
+                                  form.setValue("agravoName", cidInfo.name);
+                                }
+                              }} 
+                              value={field.value}
+                            >
                               <FormControl>
                                 <SelectTrigger data-testid="select-agravo">
                                   <SelectValue placeholder="Selecione o agravo" />
@@ -319,7 +339,9 @@ export default function Sinan() {
                             <FormControl>
                               <Input
                                 {...field}
-                                placeholder="Ex: A90"
+                                placeholder="Preenchido automaticamente"
+                                readOnly
+                                className="bg-muted"
                                 data-testid="input-cid-primary"
                               />
                             </FormControl>

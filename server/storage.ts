@@ -304,9 +304,16 @@ export class DbStorage implements IStorage {
   }
 
   async updateCitizen(id: string, citizen: Partial<InsertCitizen>): Promise<Citizen | undefined> {
+    const updateData: any = { ...citizen };
+    if (updateData.birthDate && typeof updateData.birthDate === 'string') {
+      const parts = updateData.birthDate.includes('/') 
+        ? updateData.birthDate.split('/').reverse().join('-')
+        : updateData.birthDate;
+      updateData.birthDate = Math.floor(new Date(parts).getTime() / 1000);
+    }
     const [updated] = await db
       .update(schema.citizens)
-      .set({ ...citizen, updatedAt: new Date() })
+      .set(updateData)
       .where(eq(schema.citizens.id, id))
       .returning();
     return updated;

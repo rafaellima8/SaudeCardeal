@@ -2477,22 +2477,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const sinanCreateSchema = z.object({
-    agravo: z.enum([
-      "dengue", "chikungunya", "zika", "leishmaniose_visceral", "leishmaniose_tegumentar",
-      "hanseniase", "tuberculose", "malaria", "covid19", "hepatite_a", "hepatite_b",
-      "hepatite_c", "meningite", "tetano", "coqueluche", "difteria", "poliomielite",
-      "sarampo", "rubeola", "varicela", "febre_amarela", "raiva_humana", "leptospirose",
-      "esquistossomose", "doenca_chagas", "hantavirose", "febre_maculosa", "botulismo",
-      "colera", "febre_tifoide", "antraz", "peste", "tularemia", "acidentes_animais",
-      "intoxicacao_exogena", "violencia_domestica", "acidente_trabalho", "outros"
-    ]),
-    cidPrimary: z.string().min(3, "CID-10 obrigatório"),
-    cidSecondary: z.string().nullable().optional(),
+    agravoCode: z.string().min(1, "Agravo obrigatório"),
+    agravoName: z.string().optional(),
+    cidCode: z.string().min(1, "CID-10 obrigatório"),
+    citizenId: z.string().nullable().optional(),
     patientName: z.string().min(2, "Nome do paciente obrigatório"),
-    patientSex: z.enum(["M", "F", "I"]),
-    patientBirthDate: z.string().nullable().optional(),
+    patientGender: z.enum(["M", "F", "I"]),
+    patientBirthDate: z.any().optional(),
     patientAge: z.number().nullable().optional(),
-    patientAgeUnit: z.enum(["anos", "meses", "dias"]).optional(),
+    patientAgeType: z.string().nullable().optional(),
     patientCpf: z.string().nullable().optional(),
     patientCns: z.string().nullable().optional(),
     patientMotherName: z.string().nullable().optional(),
@@ -2502,23 +2495,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     patientMunicipalityName: z.string().nullable().optional(),
     patientState: z.string().nullable().optional(),
     patientCep: z.string().nullable().optional(),
-    patientZone: z.enum(["urbana", "rural", "periurbana", "ignorado"]).nullable().optional(),
-    patientRace: z.enum(["branca", "preta", "parda", "amarela", "indigena", "ignorado"]).nullable().optional(),
-    patientSchooling: z.enum([
-      "analfabeto", "fundamental_incompleto", "fundamental_completo",
-      "medio_incompleto", "medio_completo", "superior_incompleto",
-      "superior_completo", "ignorado", "nao_se_aplica"
-    ]).nullable().optional(),
-    patientPregnant: z.enum(["sim", "nao", "nao_se_aplica", "ignorado"]).nullable().optional(),
-    symptomStartDate: z.string().nullable().optional(),
+    patientZone: z.string().nullable().optional(),
+    patientRace: z.string().nullable().optional(),
+    patientPregnant: z.string().nullable().optional(),
+    symptomStartDate: z.any().optional(),
     hospitalization: z.boolean().optional(),
-    hospitalizationDate: z.string().nullable().optional(),
-    hospitalizationUnit: z.string().nullable().optional(),
-    uti: z.boolean().optional(),
-    evolution: z.enum(["cura", "obito_agravo", "obito_outras_causas", "ignorado", "em_investigacao"]).nullable().optional(),
-    evolutionDate: z.string().nullable().optional(),
-    classification: z.enum(["confirmado", "provavel", "descartado", "inconclusivo", "em_investigacao"]).optional(),
-    confirmationCriteria: z.enum(["laboratorial", "clinico_epidemiologico", "clinico", "ignorado"]).nullable().optional(),
+    classificacaoFinal: z.string().nullable().optional(),
     observations: z.string().nullable().optional(),
   });
 
@@ -2539,30 +2521,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startOfYear = new Date(year, 0, 1);
       const weekNumber = Math.ceil((now.getTime() - startOfYear.getTime()) / (7 * 24 * 60 * 60 * 1000));
 
+      const parseDateToTimestamp = (val: any): number | null => {
+        if (!val) return null;
+        if (typeof val === 'number') return val;
+        if (val instanceof Date) return Math.floor(val.getTime() / 1000);
+        if (typeof val === 'string') {
+          let date: Date | null = null;
+          if (val.includes('/')) {
+            const parts = val.split('/');
+            if (parts.length === 3) {
+              const [day, month, yearPart] = parts;
+              date = new Date(Date.UTC(parseInt(yearPart), parseInt(month) - 1, parseInt(day), 12, 0, 0));
+            }
+          } else if (val.includes('-')) {
+            const [yearPart, month, day] = val.split('T')[0].split('-');
+            date = new Date(Date.UTC(parseInt(yearPart), parseInt(month) - 1, parseInt(day), 12, 0, 0));
+          }
+          if (date && !isNaN(date.getTime())) {
+            return Math.floor(date.getTime() / 1000);
+          }
+        }
+        return null;
+      };
+
       const data = {
-        ...validatedData,
         unitId: sessionUnitId,
+        citizenId: validatedData.citizenId || null,
         notificationNumber,
-        notificationDate: now,
+        agravoCode: validatedData.agravoCode,
+        agravoName: validatedData.agravoName || validatedData.agravoCode,
+        notificationDate: Math.floor(now.getTime() / 1000),
+        symptomsStartDate: parseDateToTimestamp(validatedData.symptomStartDate),
+        cidCode: validatedData.cidCode,
         notificationWeek: weekNumber,
         notificationYear: year,
+        status: 'rascunho' as const,
+        classificacaoFinal: validatedData.classificacaoFinal || 'em_investigacao',
+        patientName: validatedData.patientName,
+        patientBirthDate: parseDateToTimestamp(validatedData.patientBirthDate),
+        patientAge: validatedData.patientAge,
+        patientAgeType: validatedData.patientAgeType,
+        patientGender: validatedData.patientGender,
+        patientPregnant: validatedData.patientPregnant,
+        patientRace: validatedData.patientRace,
+        patientCns: validatedData.patientCns,
+        patientCpf: validatedData.patientCpf,
+        patientMotherName: validatedData.patientMotherName,
+        residencePhone: validatedData.patientPhone,
+        residenceLogradouro: validatedData.patientAddress,
+        residenceDistrict: validatedData.patientNeighborhood,
+        residenceMunicipio: validatedData.patientMunicipalityName,
+        residenceUf: validatedData.patientState,
+        residenceCep: validatedData.patientCep,
+        residenceZone: validatedData.patientZone,
+        hospitalized: validatedData.hospitalization || false,
+        observations: validatedData.observations,
         notifierId: req.session?.user?.id || null,
         notifierName: req.session?.user?.name || null,
-        status: 'rascunho' as const,
-        classification: validatedData.classification || 'em_investigacao',
-        investigationStatus: 'pendente' as const,
-        patientBirthDate: validatedData.patientBirthDate ? new Date(validatedData.patientBirthDate) : null,
-        symptomStartDate: validatedData.symptomStartDate ? new Date(validatedData.symptomStartDate) : null,
-        hospitalizationDate: validatedData.hospitalizationDate ? new Date(validatedData.hospitalizationDate) : null,
-        evolutionDate: validatedData.evolutionDate ? new Date(validatedData.evolutionDate) : null,
       };
 
       const notification = await storage.createSinanNotification(data as any);
       res.status(201).json(notification);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
+        console.log("SINAN Zod errors:", JSON.stringify(error.errors, null, 2));
         return res.status(400).json({ error: "Dados inválidos", details: error.errors });
       }
+      console.log("SINAN creation error:", error.message);
       res.status(500).json({ error: error.message });
     }
   });

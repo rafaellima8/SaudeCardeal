@@ -1,0 +1,436 @@
+1. O que é o SINAN e como o SinanNet funciona
+
+Objetivo – O Sistema de Informação de Agravos de Notificação (SINAN) coleta, transmite e dissemina dados das doenças e agravos de notificação compulsória e outros agravos de interesse nacional, estadual e municipal. 
+
+Manual SINAN_Normas_e_Rotinas_2…
+
+Base legal / lista de agravos – A lista nacional de notificação compulsória é definida em portaria do MS (atualmente Portaria GM/MS nº 5.201/2024, que atualiza a lista e inclui, por exemplo, agravos relacionados ao trabalho). 
+Biblioteca Virtual em Saúde MS
++2
+ANAMT
++2
+
+Níveis de gestão – União, estados e municípios têm atribuições claras:
+
+União (SVS/MS): define normas, versões do sistema e modelos de fichas, consolida dados nacionais. 
+
+Manual SINAN_Normas_e_Rotinas_2…
+
+Estados: apoiam municípios, consolidam dados e enviam ao nível federal. 
+
+Manual SINAN_Normas_e_Rotinas_2…
+
+Municípios: coletam dados nas unidades notificantes, digitam no SinanNet e enviam aos estados. 
+
+Manual SINAN_Normas_e_Rotinas_2…
+
+SinanNet – parte técnica que impacta o seu SaaS
+
+O SinanNet 5.0 é um sistema desktop, com banco PostgreSQL local (arquivo Sinannet.dat e tabelas internas).
+
+A instalação segue manual próprio (desativar Windows Defender, configurar PostgreSQL, aplicar patches 5.1.1.0, 5.2, 5.3).
+
+Não há API pública oficial. A alimentação é feita por digitação manual nas telas do SinanNet, a partir das fichas em papel ou relatórios.
+
+Cada atualização de ficha / agravo é distribuída em novas versões dos patchs e dicionário de dados. 
+SINAWEB
++1
+
+Para o seu SaaS, isso significa: ele será um pré-sistema de coleta e validação, e o fluxo final continua sendo uma pessoa digitando os dados no SinanNet.
+
+2. Fichas do SINAN – tipos, estrutura e regras
+
+O manual de Normas e Rotinas organiza tudo usando o conceito de instrumentos de coleta de dados: 
+
+Manual SINAN_Normas_e_Rotinas_2…
+
+Ficha de Notificação (Individual / genérica)
+
+Fichas de Investigação por agravo
+
+Fichas de Notificação/Investigação (casos notificados só após confirmação)
+
+Fichas e planilhas de surto
+
+Boletins de acompanhamento (TB / Hanseníase)
+
+Boletim de inquérito de tracoma
+
+Notificação negativa
+
+2.1 Ficha de Notificação Individual (NINDIV)
+
+É o cabeçalho padrão para qualquer agravo. Serve para: notificação individual, surto, inquérito de tracoma e notificação negativa. 
+SINAWEB
+
+Estrutura (segundo o PDF oficial “Notificação Individual v5” + manual): 
+SINAWEB
++1
+
+Dados gerais / da notificação
+
+Tipo de notificação (rotina, surto etc.)
+
+Número da notificação
+
+Data da notificação
+
+Unidade notificadora (nome + CNES)
+
+Município de notificação (código IBGE)
+
+Agravo/doença (relacionado à lista nacional / estadual; geralmente atrelado a CID-10)
+
+Dados do paciente
+
+Nome completo
+
+Nome da mãe
+
+Data de nascimento, idade, faixa etária
+
+Sexo
+
+Gestante / idade gestacional
+
+Raça/cor
+
+Escolaridade (códigos 0–8, conforme legenda) 
+SINAWEB
++1
+
+Ocupação/profissão, se aplicável
+
+Documentos (CPF, CNS), telefone de contato etc. (alguns campos só aparecem em versões mais novas de fichas específicas)
+
+Dados de residência
+
+Logradouro, número, complemento, bairro
+
+Município, UF, CEP, zona (urbana/rural/periurbana) 
+SINAWEB
+
+Outros campos gerais
+
+Local provável de infecção, se aplicável
+
+Procedência, país de residência (quando estrangeiro)
+
+Campos para notificação negativa / surto
+
+Campos-chave do sistema (primária do registro no SINAN):
+
+Número da notificação
+
+Data da notificação
+
+Município de notificação (IBGE)
+
+Agravo 
+
+Manual SINAN_Normas_e_Rotinas_2…
+
+Campos obrigatórios para a notificação entrar no SINAN (trecho crítico do manual): número, data da notificação, município de notificação, unidade de saúde, agravo, data dos primeiros sintomas, nome do paciente, data de nascimento ou idade, sexo e, em doenças exantemáticas, o campo “suspeita”. 
+
+Manual SINAN_Normas_e_Rotinas_2…
+
+No seu SaaS, esses campos precisam ser sempre preenchidos antes de marcar a ficha como “Pronta para SINAN”.
+
+2.2 Fichas de Investigação por agravo
+
+Cada agravo (dengue, meningite, hepatites, TB, hanseníase, sífilis etc.) tem uma ficha de investigação própria, com campos clínicos, laboratoriais e de fatores de risco. 
+Centro Estadual de Vigilância em Saúde
++2
+SINAWEB
++2
+
+A numeração da ficha de investigação deve ser a mesma da ficha de notificação que originou o caso – o número é transcrito manualmente.
+
+Exemplos de seções típicas numa ficha de investigação (usando dengue/chikungunya como referência): 
+SINAWEB
+
+Dados do agravo (tipo de caso, critério de confirmação)
+
+Dados clínicos (data de início dos sintomas, sinais e sintomas, evolução, hospitalização)
+
+Dados laboratoriais (tipo de exame, datas, resultados)
+
+Fatores de risco / exposição
+
+Encerramento do caso (classificação final, critério, data de encerramento)
+
+O manual deixa claro que campos obrigatórios específicos de cada agravo estão no instrucional de preenchimento e no dicionário de dados; sem esses campos preenchidos, o SINAN não aceita a investigação.
+
+2.3 Fichas de Notificação/Investigação
+
+São usadas para agravos que são notificados somente após confirmação (não há “suspeito” no SINAN):
+
+aids (adulto e criança)
+
+esquistossomose em área não endêmica
+
+hanseníase
+
+gestante HIV+
+
+leishmaniose tegumentar americana
+
+tuberculose
+
+sífilis congênita e sífilis em gestante
+
+diversas doenças relacionadas ao trabalho
+
+Regras importantes:
+
+Utiliza-se uma Ficha de Notificação/Investigação específica, já com todos os campos de notificação + investigação.
+
+O número da notificação vem de uma ficha de notificação pré-numerada, cujo papel é inutilizado – aproveita-se apenas o número, para evitar duplicidade.
+
+2.4 Surtos, boletins e inquéritos
+
+Ficha de Notificação de Surto
+
+Usa a mesma ficha de notificação padrão (NINDIV), mas preenchida para agregados de casos / epidemias.
+
+Deve registrar agravos inusitados, surtos de doenças não listadas na notificação compulsória ou situações em que o volume de casos torna inviável registrar caso a caso (com exigência de investigar pelo menos 10% dos casos individualmente).
+
+Ficha de Investigação de Surto + Planilha de Acompanhamento de Surto
+
+Complementam os dados do surto e consolidam casos; a planilha usa o mesmo número da notificação do surto.
+
+Boletins de acompanhamento de hanseníase e tuberculose
+
+Relatórios usados para atualizar periodicamente as informações de acompanhamento (tipo de alta, situação de tratamento etc.).
+
+Emitidos pelo sistema e depois digitados novamente, atualizando o banco. 
+
+Manual SINAN_Normas_e_Rotinas_2…
+
+Boletim de inquérito de tracoma
+
+Cada linha = um caso positivo detectado em inquérito escolar/domiciliar, com dados de residência, sexo, idade.
+
+2.5 Notificação negativa
+
+Quando não houve casos de determinada doença, a unidade deve registrar isso por meio de ficha de notificação pré-numerada, seguindo o mesmo fluxo das demais. 
+
+Manual SINAN_Normas_e_Rotinas_2…
+
+3. Como trazer tudo isso para dentro do seu SaaS (modelo prático)
+
+Agora o que interessa: como desenhar o MuniSaúde / SaúdeCardeal para gerar fichas 100% fiéis, que cheguem “redondinhas” para quem vai digitar no SinanNet.
+
+3.1 Princípios que você precisa seguir
+
+Espelhar os campos oficiais
+
+Cada campo da ficha oficial deve existir no seu banco com o mesmo significado e códigos (ex.: sexo 1=Masculino, 2=Feminino, 9=Ignorado; escolaridade 0–8; zona 1/2/3/9 etc.). 
+SINAWEB
++2
+SINAWEB
++2
+
+Respeitar os campos obrigatórios
+
+Não permitir “Concluir / Marcar como pronto para SINAN” se algum campo obrigatório (geral e específico do agravo) estiver vazio.
+
+Manter a chave SINAN
+
+Gerar e guardar número da notificação, data, município de notificação (IBGE) e agravo de forma única – isso vira a referência para qualquer investigação, surto ou acompanhamento.
+
+Versionar as fichas
+
+Guarde um campo versao_ficha (ex.: NINDIV_v5, DENGCHIK_2015) porque o MS às vezes altera campos com novos patchs. 
+SINAWEB
++1
+
+3.2 Modelo de dados sugerido
+
+Você pode organizar assim (simplificando):
+
+Tabela sinan_notificacoes (cabeçalho NINDIV)
+
+id (interno SaaS)
+
+numero_notificacao (string)
+
+data_notificacao (date)
+
+tipo_notificacao (int)
+
+agravo_codigo (ex.: “DENGUE”, “MENINGITE”)
+
+agravo_cid10 (string)
+
+unidade_cnes (string)
+
+unidade_nome (string)
+
+municipio_notificacao_ibge (string)
+
+uf_notificacao (string)
+
+data_primeiros_sintomas (date)
+
+situacao_registro (rascunho / pronto_sinan / digitado)
+
+versao_ficha (NINDIV_v5)
+
+Tabela sinan_pacientes (você pode reutilizar o seu cadastro de cidadão)
+
+id
+
+nome
+
+nome_mae
+
+cpf, cns
+
+data_nascimento
+
+sexo_codigo
+
+gestante_codigo
+
+raca_cor_codigo
+
+escolaridade_codigo
+
+telefone, email etc.
+
+Tabela sinan_enderecos
+
+id
+
+paciente_id
+
+logradouro, numero, complemento, bairro
+
+municipio_ibge, uf, cep, zona_codigo
+
+Tabela sinan_investigacoes
+
+id
+
+notificacao_id
+
+agravo (chave para saber qual “modelo” usar)
+
+status (em_investigacao / encerrado)
+
+classificacao_final, criterio_confirmacao
+
+data_investigacao, data_encerramento
+
+E aqui você tem duas opções:
+
+Relacional: criar tabelas específicas por agravo (investigacao_dengue, investigacao_meningite etc.)
+
+Estrutura flexível: um campo JSON (dados_especificos) guardando chave-valor exatamente com os campos do dicionário daquele agravo.
+
+Pensando na rapidez de desenvolvimento, eu iria de JSON agora e, à medida que algum agravo virar “core” do município, migrar para tabela específica.
+
+Tabela sinan_surtos / sinan_surtos_planilha / sinan_boletins_tb_hans
+
+Mesma lógica: guardar tudo que existe na ficha oficial, com chave amarrada ao numero_notificacao ou ao paciente, conforme o manual.
+
+3.3 Fluxo dentro do seu SaaS
+
+Usando a tela que você já construiu (“Nova Ficha de Notificação Individual”):
+
+Escolha do agravo
+
+Drop-down com a lista atualizada de agravos da Portaria nacional + agravos estaduais cadastrados (Ex.: MG, BA etc.). 
+Biblioteca Virtual em Saúde MS
++2
+Vigilância em Saúde RR
++2
+
+Passo 1 – Dados do Agravo
+
+Agravo/doença
+
+CID-10 principal (você pode sugerir automaticamente com base no agravo, mas permitir edição)
+
+Data de início dos sintomas
+
+Tipo de notificação (rotina, surto etc.)
+
+Passo 2 – Dados do Paciente
+
+Campo de busca por CPF/CNS (como já aparece no print) que puxa o cadastro do paciente e preenche automaticamente os campos obrigatórios.
+
+Converter internamente data de nascimento em idade no formato que o SINAN usa.
+
+Passo 3 – Dados de Residência
+
+CEP com auto-completar endereço.
+
+Marcar zona (urbana/rural/periurbana) como código oficial.
+
+Passo 4 – Dados específicos do agravo (Investigação)
+
+Carregar dinamicamente o “subformulário” da ficha daquele agravo (por exemplo, dengue/chikungunya) com os campos na ordem da ficha oficial.
+
+Passo 5 – Validação “Modo SINAN”
+
+Rodar um “validador” que:
+
+Confere campos obrigatórios gerais (NINDIV).
+
+Confere campos obrigatórios específicos do agravo (usando uma tabela de metadados baseada no dicionário de dados e no instrucional de cada ficha). 
+SINAWEB
++2
+SINAWEB
++2
+
+Só depois disso permitir “Marcar como pronto para digitação no SINAN”.
+
+Saída para o digitador do SINAN
+
+Para a pessoa do setor de processamento de dados, você pode gerar:
+
+PDF da ficha oficial, com o layout o mais idêntico possível às fichas do MS, para quem prefere digitar “olhando a ficha”.
+
+Tela especial de digitação assistida, que segue a MESMA ordem de campos da tela do SinanNet.
+
+Planilha CSV com colunas na mesma ordem do dicionário de dados (opcional, mas pode ser útil para conferência).
+
+Como não há API, o ganho é: 100% dos dados já checam na lógica do SINAN, legíveis e sem rasura, economizando tempo do digitador e reduzindo erro.
+
+Controle de status
+
+Campos: digitado_no_sinan (sim/não), data_digitacao, responsavel_digitacao.
+
+Isso te permite gerar relatórios: “Notificações feitas na unidade, mas ainda não digitadas no SINAN”.
+
+3.4 Questões operacionais importantes
+
+Numeração das fichas
+
+No papel, as fichas são pré-numeradas e controladas pela SES/SMS para evitar duplicidade.
+
+No seu SaaS, crie um gerador de número de notificação sequencial por município/ano (por exemplo: AAAMM-SEQ ou outro padrão acordado com a vigilância).
+
+Quando a unidade ainda usar ficha física, você pode ter um campo para informar manualmente o número pré-impresso que foi usado.
+
+Notificação negativa
+
+Seu sistema deve permitir que a unidade registre “não houve casos” por semana, gerando uma ficha de notificação negativa virtual; depois o setor de dados imprime ou preenche no SINAN.
+
+Sigilo e LGPD
+
+O manual reforça a necessidade de sigilo e cópias de segurança dos dados; em SaaS isso vira: criptografia em repouso, acesso por perfil (unidade, município, estado), logs de acesso e backup automático.
+
+Diferenças estaduais
+
+Alguns estados têm agravos adicionais ou fichas ligeiramente customizadas (ver, por exemplo, sites de RS, GO, PR, DF, etc., com suas fichas próprias). 
+Saúde DF
++3
+Centro Estadual de Vigilância em Saúde
++3
+Portal Goiás
++3
+
+No banco, crie uma tabela sinan_agravos com colunas: nivel (nacional/estadual/municipal), uf, codigo_sinan, nome, tipo_ficha, versao_ficha. Isso te permite ativar/desativar campos por UF.

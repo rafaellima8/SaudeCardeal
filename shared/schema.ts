@@ -1611,7 +1611,6 @@ const birthDatePreprocess = z.preprocess((val) => {
 
 export const insertCitizenSchema = createInsertSchema(citizens, {
   birthDate: birthDatePreprocess,
-  unitId: z.string().optional().nullable(),
 }).omit({
   id: true,
   createdAt: true,
@@ -1669,7 +1668,83 @@ export const insertTfdTripPassengerSchema = createInsertSchema(tfdTripPassengers
   createdAt: true,
 });
 
-export const insertSinanNotificationSchema = createInsertSchema(sinanNotifications).omit({
+const sinanDatePreprocess = z.preprocess((val) => {
+  if (val === null || val === undefined || val === '') return null;
+  if (typeof val === 'number') return val;
+  if (val instanceof Date) return Math.floor(val.getTime() / 1000);
+  if (typeof val === 'string') {
+    let date: Date | null = null;
+    if (val.includes('/')) {
+      const parts = val.split('/');
+      if (parts.length === 3) {
+        const [day, month, year] = parts;
+        date = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day), 12, 0, 0));
+      }
+    } else if (val.includes('-')) {
+      const [year, month, day] = val.split('T')[0].split('-');
+      date = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day), 12, 0, 0));
+    }
+    if (date && !isNaN(date.getTime())) {
+      return Math.floor(date.getTime() / 1000);
+    }
+  }
+  return null;
+}, z.number().nullable().optional());
+
+export const AGRAVO_CID_MAP: Record<string, { cid: string; name: string }> = {
+  'DENGUE': { cid: 'A90', name: 'Dengue' },
+  'CHIKUNGUNYA': { cid: 'A92.0', name: 'Febre de Chikungunya' },
+  'ZIKA': { cid: 'A92.8', name: 'Doença pelo vírus Zika' },
+  'COVID19': { cid: 'U07.1', name: 'COVID-19' },
+  'INFLUENZA': { cid: 'J09', name: 'Influenza' },
+  'MENINGITE': { cid: 'G03.9', name: 'Meningite não especificada' },
+  'TUBERCULOSE': { cid: 'A15', name: 'Tuberculose respiratória' },
+  'HANSENIASE': { cid: 'A30', name: 'Hanseníase' },
+  'HEPATITE_A': { cid: 'B15', name: 'Hepatite A' },
+  'HEPATITE_B': { cid: 'B16', name: 'Hepatite B' },
+  'HEPATITE_C': { cid: 'B17.1', name: 'Hepatite C' },
+  'SIFILIS_CONGENITA': { cid: 'A50', name: 'Sífilis congênita' },
+  'SIFILIS_GESTANTE': { cid: 'O98.1', name: 'Sífilis em gestante' },
+  'SIFILIS_ADQUIRIDA': { cid: 'A51', name: 'Sífilis adquirida' },
+  'HIV_AIDS': { cid: 'B24', name: 'HIV/AIDS' },
+  'LEISHMANIOSE_VISCERAL': { cid: 'B55.0', name: 'Leishmaniose visceral' },
+  'LEISHMANIOSE_TEGUMENTAR': { cid: 'B55.1', name: 'Leishmaniose tegumentar' },
+  'LEPTOSPIROSE': { cid: 'A27', name: 'Leptospirose' },
+  'MALARIA': { cid: 'B50', name: 'Malária' },
+  'RAIVA': { cid: 'A82', name: 'Raiva' },
+  'TETANO': { cid: 'A35', name: 'Tétano' },
+  'COQUELUCHE': { cid: 'A37', name: 'Coqueluche' },
+  'DIFTERIA': { cid: 'A36', name: 'Difteria' },
+  'SARAMPO': { cid: 'B05', name: 'Sarampo' },
+  'RUBEOLA': { cid: 'B06', name: 'Rubéola' },
+  'POLIOMIELITE': { cid: 'A80', name: 'Poliomielite' },
+  'FEBRE_AMARELA': { cid: 'A95', name: 'Febre amarela' },
+  'COLERA': { cid: 'A00', name: 'Cólera' },
+  'FEBRE_TIFOIDE': { cid: 'A01.0', name: 'Febre tifoide' },
+  'ESQUISTOSSOMOSE': { cid: 'B65', name: 'Esquistossomose' },
+  'DOENCA_CHAGAS': { cid: 'B57', name: 'Doença de Chagas' },
+  'HANTAVIROSE': { cid: 'A98.5', name: 'Síndrome cardiopulmonar por hantavírus' },
+  'BOTULISMO': { cid: 'A05.1', name: 'Botulismo' },
+  'INTOXICACAO_EXOGENA': { cid: 'T65.9', name: 'Intoxicação exógena' },
+  'ACIDENTE_TRABALHO': { cid: 'Y96', name: 'Acidente de trabalho' },
+  'VIOLENCIA_DOMESTICA': { cid: 'Y07', name: 'Violência doméstica' },
+  'TENTATIVA_SUICIDIO': { cid: 'X84', name: 'Tentativa de suicídio' },
+  'TRACOMA': { cid: 'A71', name: 'Tracoma' },
+  'PESTE': { cid: 'A20', name: 'Peste' },
+  'VARICELA': { cid: 'B01', name: 'Varicela' },
+  'MONKEYPOX': { cid: 'B04', name: 'Varíola dos macacos' },
+};
+
+export const insertSinanNotificationSchema = createInsertSchema(sinanNotifications, {
+  notificationDate: sinanDatePreprocess,
+  symptomsStartDate: sinanDatePreprocess,
+  investigationDate: sinanDatePreprocess,
+  encerramentoDate: sinanDatePreprocess,
+  hospitalEntryDate: sinanDatePreprocess,
+  hospitalExitDate: sinanDatePreprocess,
+  patientBirthDate: sinanDatePreprocess,
+  notificationNumber: z.string().optional().nullable(),
+}).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
@@ -1679,8 +1754,8 @@ export const updateSinanNotificationSchema = z.object({
   agravoCode: z.string().optional(),
   agravoName: z.string().optional(),
   cidCode: z.string().nullable().optional(),
-  notificationDate: z.date().optional(),
-  symptomsStartDate: z.date().nullable().optional(),
+  notificationDate: sinanDatePreprocess,
+  symptomsStartDate: sinanDatePreprocess,
   patientName: z.string().optional(),
   patientGender: z.string().optional(),
   patientAge: z.number().nullable().optional(),
