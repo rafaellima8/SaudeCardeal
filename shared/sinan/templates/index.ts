@@ -137,7 +137,10 @@ export function getTemplatesByCid(cid10: string): CidLookupResult {
 
 export function getTemplateByCid(cid10: string): SinanFormTemplate | undefined {
   const result = getTemplatesByCid(cid10);
-  return result.templates[0];
+  if (result.requiresSelection) {
+    console.warn(`CID-10 ${cid10} maps to ${result.templates.length} templates. Use getTemplatesByCid() and select by agravoCode.`);
+  }
+  return result.templates.length === 1 ? result.templates[0] : undefined;
 }
 
 export function getAllTemplates(): SinanFormTemplate[] {
