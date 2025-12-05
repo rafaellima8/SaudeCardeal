@@ -176,15 +176,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const sessionUnitId = req.session?.user?.unitId;
       
-      const data = insertCitizenSchema.parse(req.body);
-      
-      if (!data.unitId && sessionUnitId) {
-        data.unitId = sessionUnitId;
-      }
-      
-      if (!data.unitId) {
+      if (!sessionUnitId) {
         return res.status(400).json({ error: "Unidade de saúde é obrigatória" });
       }
+      
+      const payload = { ...req.body, unitId: sessionUnitId };
+      const data = insertCitizenSchema.parse(payload);
       
       const existingCpf = await storage.getCitizenByCpf(data.cpf);
       if (existingCpf) {
