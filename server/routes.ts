@@ -176,7 +176,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const sessionUnitId = req.session?.user?.unitId;
       
+      console.log("POST /api/citizens - Request body:", JSON.stringify(req.body, null, 2));
+      
       const data = insertCitizenSchema.parse(req.body);
+      
+      console.log("POST /api/citizens - Parsed data:", JSON.stringify(data, null, 2));
       
       if (sessionUnitId && !CROSS_UNIT_ROLES.includes(req.session?.user?.role as any)) {
         data.unitId = sessionUnitId;
