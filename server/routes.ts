@@ -176,14 +176,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const sessionUnitId = req.session?.user?.unitId;
       
-      console.log("POST /api/citizens - Request body:", JSON.stringify(req.body, null, 2));
-      
       const data = insertCitizenSchema.parse(req.body);
       
-      console.log("POST /api/citizens - Parsed data:", JSON.stringify(data, null, 2));
-      
-      if (sessionUnitId && !CROSS_UNIT_ROLES.includes(req.session?.user?.role as any)) {
+      if (!data.unitId && sessionUnitId) {
         data.unitId = sessionUnitId;
+      }
+      
+      if (!data.unitId) {
+        return res.status(400).json({ error: "Unidade de saúde é obrigatória" });
       }
       
       const existingCpf = await storage.getCitizenByCpf(data.cpf);
@@ -202,8 +202,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(citizen);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
+        console.log("Zod validation errors:", JSON.stringify(error.errors, null, 2));
         return res.status(400).json({ error: "Dados inválidos", details: error.errors });
       }
+      console.log("Error creating citizen:", error.message);
       res.status(500).json({ error: error.message });
     }
   });

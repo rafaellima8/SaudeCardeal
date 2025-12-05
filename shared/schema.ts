@@ -1611,6 +1611,7 @@ const birthDatePreprocess = z.preprocess((val) => {
 
 export const insertCitizenSchema = createInsertSchema(citizens, {
   birthDate: birthDatePreprocess,
+  unitId: z.string().optional().nullable(),
 }).omit({
   id: true,
   createdAt: true,
