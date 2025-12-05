@@ -175,7 +175,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/citizens", enforceUnitScope({ requireUnitId: false }), async (req, res) => {
     try {
       const sessionUnitId = req.session?.user?.unitId;
-      const data = insertCitizenSchema.parse(req.body);
+      
+      const body = { ...req.body };
+      if (body.birthDate && typeof body.birthDate === 'string') {
+        const dateStr = body.birthDate.split('T')[0];
+        const [year, month, day] = dateStr.split('-').map(Number);
+        body.birthDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+      }
+      
+      const data = insertCitizenSchema.parse(body);
       
       if (sessionUnitId && !CROSS_UNIT_ROLES.includes(req.session?.user?.role as any)) {
         data.unitId = sessionUnitId;
@@ -213,7 +221,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Acesso negado: cidadão de outra unidade" });
       }
       
-      const citizen = await storage.updateCitizen(req.params.id, req.body);
+      const body = { ...req.body };
+      if (body.birthDate && typeof body.birthDate === 'string') {
+        const dateStr = body.birthDate.split('T')[0];
+        const [year, month, day] = dateStr.split('-').map(Number);
+        body.birthDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+      }
+      
+      const citizen = await storage.updateCitizen(req.params.id, body);
       res.json(citizen);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
