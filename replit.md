@@ -38,7 +38,9 @@ The system employs a client-server architecture with a clear separation of conce
 - **Modularity**: Organized into distinct modules (Patient, Prescriptions, Pharmacy, TFD, Social Assistance, SINAN) with dedicated routes and services. New automation modules are isolated.
 - **Validation**: Extensive use of Zod for data integrity on frontend and backend.
 - **PDF Generation**: Services for compliant PDF documents (prescriptions, TFD reports, Social Assistance documents).
-- **Date Input Standardization**: Manual date entry fields use DD/MM/YYYY input mask with Zod preprocessing for validation.
+- **Date Input Standardization**: Manual date entry fields use DD/MM/YYYY input mask with Zod preprocessing for validation. Dates are stored as Unix timestamps (seconds since epoch) in SQLite.
+- **SINAN CID-10 Auto-population**: When an agravo is selected in the SINAN notification form, the corresponding CID-10 code is automatically populated using the AGRAVO_CID_MAP mapping (45+ disease codes).
+- **Multi-tenant Unit Injection**: Routes automatically inject the user's unitId from session before Zod validation to ensure proper multi-tenant isolation.
 
 ## External Dependencies
 
