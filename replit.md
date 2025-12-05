@@ -77,3 +77,26 @@ The system employs a client-server architecture with a clear separation of conce
 - **100% Coverage Achieved**: All 81 official SINAN agravos have dedicated templates (108 unique agravoCode templates, 142 total templates including variants)
 - **Categories Covered**: Arboviroses, Respiratórias, IST/HIV/AIDS, Hepatites, Meningites, Zoonoses, Endêmicas, Crônicas, Imunopreveníveis, Intoxicações, Violências, Saúde do Trabalhador, Virais Emergentes, Alimentares, Vigilância, Farmacovigilância
 - **Template Architecture**: Multi-template support with composite keys, CID-10 range lookups, version disambiguation
+
+### SINAN Dynamic Form System (New)
+
+#### Backend Services
+- **sinan-template-service.ts**: Template lookup by agravo/CID-10/category, field validation engine, dependency resolution, metadata extraction
+- **sinan-pdf-generator.ts**: Official SINAN form layouts, field mapping, multi-page support, metadata headers, jsPDF-based generation
+
+#### API Endpoints
+- `GET /api/sinan/templates` - Template catalog with search/filter
+- `GET /api/sinan/templates/stats` - Template statistics
+- `GET /api/sinan/templates/categorias` - Available categories
+- `GET /api/sinan/templates/agravos` - Unique agravo codes
+- `GET /api/sinan/templates/by-agravo/:code` - Templates by agravo
+- `GET /api/sinan/templates/by-cid/:cid10` - Templates by CID-10
+- `GET /api/sinan/templates/:templateId` - Single template with grouped fields
+- `POST /api/sinan/templates/:templateId/validate` - Server-side validation
+- `GET /api/sinan/notifications/:id/pdf` - PDF export for notification
+- `GET /api/sinan/templates/:templateId/blank-form` - Blank PDF form
+
+#### Frontend Components
+- **SinanDynamicForm.tsx**: Dynamic field renderer with conditional logic, multi-step navigation, validation feedback
+- **SinanTemplateSelector.tsx**: Template catalog browser with search, category filtering, statistics display
+- **sinan.tsx**: Main page with tabs for "Notificações" (existing workflow) and "Fichas SinanNet" (new dynamic templates)

@@ -42,11 +42,15 @@ import {
   Thermometer,
   Activity,
   FileCheck,
+  Layers,
+  ArrowLeft,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import type { SinanNotification, Citizen } from "@shared/schema";
+import SinanDynamicForm from "@/components/sinan/SinanDynamicForm";
+import SinanTemplateSelector from "@/components/sinan/SinanTemplateSelector";
 
 const AGRAVO_CID_MAP: Record<string, { cid: string; name: string }> = {
   dengue: { cid: "A90", name: "Dengue" },
@@ -151,6 +155,9 @@ export default function Sinan() {
   const [isNewDialogOpen, setIsNewDialogOpen] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<SinanNotification | null>(null);
   const [citizenSearch, setCitizenSearch] = useState("");
+  const [activeTab, setActiveTab] = useState("notificacoes");
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [selectedTemplateName, setSelectedTemplateName] = useState<string>("");
 
   const { data: notifications = [], isLoading } = useQuery<SinanNotification[]>({
     queryKey: ["/api/sinan/notifications"],
@@ -256,6 +263,26 @@ export default function Sinan() {
         (c.cpf && c.cpf.includes(citizenSearch)))
   );
 
+  const handleTemplateSelect = (templateId: string, template: { nome: string }) => {
+    setSelectedTemplateId(templateId);
+    setSelectedTemplateName(template.nome);
+    setActiveTab("nova-ficha");
+  };
+
+  const handleDynamicFormSuccess = () => {
+    setSelectedTemplateId(null);
+    setSelectedTemplateName("");
+    setActiveTab("notificacoes");
+    queryClient.invalidateQueries({ queryKey: ["/api/sinan/notifications"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/sinan/stats"] });
+  };
+
+  const handleDynamicFormCancel = () => {
+    setSelectedTemplateId(null);
+    setSelectedTemplateName("");
+    setActiveTab("templates");
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -268,6 +295,55 @@ export default function Sinan() {
             Sistema de Informação de Agravos de Notificação
           </p>
         </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
+          <TabsList>
+            <TabsTrigger value="notificacoes" data-testid="tab-notificacoes">
+              <ClipboardList className="h-4 w-4 mr-2" />
+              Notificações
+            </TabsTrigger>
+            <TabsTrigger value="templates" data-testid="tab-templates">
+              <Layers className="h-4 w-4 mr-2" />
+              Fichas SinanNet
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {activeTab === "nova-ficha" && selectedTemplateId && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDynamicFormCancel}
+              data-testid="button-back-templates"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Voltar
+            </Button>
+            <Separator orientation="vertical" className="h-6" />
+            <span className="text-sm text-muted-foreground">
+              Preenchendo: <strong>{selectedTemplateName}</strong>
+            </span>
+          </div>
+          <SinanDynamicForm
+            templateId={selectedTemplateId}
+            mode="create"
+            onSuccess={handleDynamicFormSuccess}
+            onCancel={handleDynamicFormCancel}
+          />
+        </div>
+      )}
+
+      {activeTab === "templates" && !selectedTemplateId && (
+        <SinanTemplateSelector
+          onSelect={handleTemplateSelect}
+        />
+      )}
+
+      {activeTab === "notificacoes" && (
+        <>
         <Dialog open={isNewDialogOpen} onOpenChange={setIsNewDialogOpen}>
           <DialogTrigger asChild>
             <Button data-testid="button-new-notification">
@@ -700,7 +776,6 @@ export default function Sinan() {
             </ScrollArea>
           </DialogContent>
         </Dialog>
-      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -995,6 +1070,8 @@ export default function Sinan() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+        </>
+      )}
     </div>
   );
 }

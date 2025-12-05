@@ -30,6 +30,8 @@ import { generateBpaIExport, generateApacExport, generateTfdCsvExport, generateT
 import { validateTfdRequestForSUS, validateCNS, validateCPF, validateCID10, validateIBGECode } from "./services/sus-validators";
 import { SIGTAP_TFD_CATALOG, searchSigtapProcedures, calculateTFDValue, getProcedureByCodigo, validateProcedureForPatient } from "./services/sigtap-tfd";
 import { parseCsvContent, processMonthlyList, generateAuthorizationPDF, generateDeliveryReceiptPDF, generateDonationTermPDF, validateCsvFormat } from "./services/social-assistance-service";
+import { sinanTemplateService } from "./services/sinan-template-service";
+import { SinanPdfGenerator } from "./services/sinan-pdf-generator";
 
 import formsRoutes from "../modules/forms/routes";
 import workflowRoutes from "../modules/workflow/routes";
@@ -2661,6 +2663,166 @@ export async function registerRoutes(app: Express): Promise<Server> {
         byClassification,
       });
     } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // SINAN TEMPLATES API
+  // ============================================================================
+  app.get("/api/sinan/templates", async (req, res) => {
+    try {
+      const { search, categoria } = req.query;
+      
+      let templates;
+      if (search) {
+        templates = sinanTemplateService.searchTemplates(search as string);
+      } else if (categoria) {
+        templates = sinanTemplateService.getTemplatesByCategoria(categoria as string);
+      } else {
+        templates = sinanTemplateService.getAllTemplates();
+      }
+      
+      res.json(templates);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/sinan/templates/stats", async (req, res) => {
+    try {
+      const stats = sinanTemplateService.getStats();
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/sinan/templates/categorias", async (req, res) => {
+    try {
+      const categorias = sinanTemplateService.getCategorias();
+      res.json(categorias);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/sinan/templates/agravos", async (req, res) => {
+    try {
+      const agravos = sinanTemplateService.getUniqueAgravoCodes();
+      res.json(agravos);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/sinan/templates/by-agravo/:agravoCode", async (req, res) => {
+    try {
+      const result = sinanTemplateService.getTemplatesByAgravoCode(req.params.agravoCode);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/sinan/templates/by-cid/:cid10", async (req, res) => {
+    try {
+      const result = sinanTemplateService.getTemplatesByCid10(req.params.cid10);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/sinan/templates/:templateId", async (req, res) => {
+    try {
+      const template = sinanTemplateService.getTemplateById(req.params.templateId);
+      if (!template) {
+        return res.status(404).json({ error: "Template não encontrado" });
+      }
+      
+      const fieldsByGroup = sinanTemplateService.getFieldsByGroup(template);
+      res.json({ ...template, fieldsByGroup });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/sinan/templates/:templateId/validate", async (req, res) => {
+    try {
+      const result = sinanTemplateService.validateFormData(req.params.templateId, req.body);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // SINAN PDF EXPORT API
+  // ============================================================================
+  app.get("/api/sinan/notifications/:id/pdf", enforceUnitScope(), async (req, res) => {
+    try {
+      const notification = await storage.getSinanNotificationById(req.params.id);
+      if (!notification) {
+        return res.status(404).json({ error: "Notificação não encontrada" });
+      }
+      if (!validateEntityAccess(req, notification.unitId)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      const template = sinanTemplateService.getTemplatesByAgravoCode(notification.agravoCode);
+      if (!template.templates.length) {
+        return res.status(400).json({ error: "Template não encontrado para este agravo" });
+      }
+
+      const selectedTemplate = template.templates[0];
+      const unit = await storage.getHealthUnitById(notification.unitId);
+
+      const pdfGenerator = new SinanPdfGenerator();
+      const pdfBuffer = pdfGenerator.generateNotificationPdf(
+        {
+          id: notification.id,
+          notificationNumber: notification.notificationNumber || "",
+          agravoCode: notification.agravoCode,
+          formData: (notification.formData as Record<string, any>) || {},
+          createdAt: notification.createdAt,
+          status: notification.status || "rascunho",
+          unitName: unit?.name,
+          notifierName: notification.notifierName || undefined,
+        },
+        selectedTemplate
+      );
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="sinan_${notification.notificationNumber || notification.id}.pdf"`
+      );
+      res.send(pdfBuffer);
+    } catch (error: any) {
+      console.error("PDF generation error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/sinan/templates/:templateId/blank-form", async (req, res) => {
+    try {
+      const template = sinanTemplateService.getTemplateById(req.params.templateId);
+      if (!template) {
+        return res.status(404).json({ error: "Template não encontrado" });
+      }
+
+      const pdfGenerator = new SinanPdfGenerator();
+      const pdfBuffer = pdfGenerator.generateBlankForm(template);
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="ficha_${template.agravoCode}_em_branco.pdf"`
+      );
+      res.send(pdfBuffer);
+    } catch (error: any) {
+      console.error("Blank form generation error:", error);
       res.status(500).json({ error: error.message });
     }
   });

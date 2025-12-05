@@ -791,7 +791,7 @@ export const HIV_GESTANTE_PARTURIENTE_TEMPLATE: SinanFormTemplate = {
     SINAN_FORM_GROUPS.CONCLUSAO,
     SINAN_FORM_GROUPS.INVESTIGADOR,
   ],
-  fields: [...SINAN_COMMON_FIELDS, ...GESTANTE_HIV_FIELDS],
+  fields: [...SINAN_COMMON_FIELDS, ...HIV_AIDS_FIELDS],
   requiredFields: [
     "tipo_notificacao",
     "agravo_doenca",

@@ -1,4 +1,5 @@
-import { SinanFormTemplate } from "../template-types";
+import type { SinanFormTemplate, SinanField, SinanFormGroup } from "../template-types";
+export type { SinanFormTemplate, SinanField, SinanFormGroup } from "../template-types";
 import { DENGUE_TEMPLATE } from "./dengue";
 import { TUBERCULOSE_TEMPLATE } from "./tuberculose";
 import { HANSENIASE_TEMPLATE } from "./hanseniase";
