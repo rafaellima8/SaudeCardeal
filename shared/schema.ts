@@ -1077,7 +1077,7 @@ export const sinanNotifications = sqliteTable("sinan_notifications", {
   cidCode: text("cid_code"),
   
   status: text("status", {
-    enum: ["rascunho", "preenchida", "validada", "exportada", "cancelada"]
+    enum: ["rascunho", "preenchida", "validada", "exportada", "digitado_sinan", "cancelada"]
   }).default("rascunho"),
   
   investigationDate: integer("investigation_date", { mode: "timestamp" }),
@@ -1765,7 +1765,7 @@ export const updateSinanNotificationSchema = z.object({
   classificacaoFinal: z.string().nullable().optional(),
   criterioConfirmacao: z.string().nullable().optional(),
   evolucaoCaso: z.string().nullable().optional(),
-  status: z.enum(["rascunho", "preenchida", "validada", "exportada", "cancelada"]).optional(),
+  status: z.enum(["rascunho", "preenchida", "validada", "exportada", "digitado_sinan", "cancelada"]).optional(),
   hospitalized: z.boolean().optional(),
   hospitalName: z.string().nullable().optional(),
   observations: z.string().nullable().optional(),
