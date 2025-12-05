@@ -306,10 +306,17 @@ export class DbStorage implements IStorage {
   async updateCitizen(id: string, citizen: Partial<InsertCitizen>): Promise<Citizen | undefined> {
     const updateData: any = { ...citizen };
     if (updateData.birthDate && typeof updateData.birthDate === 'string') {
-      const parts = updateData.birthDate.includes('/') 
-        ? updateData.birthDate.split('/').reverse().join('-')
-        : updateData.birthDate;
-      updateData.birthDate = Math.floor(new Date(parts).getTime() / 1000);
+      let date: Date | null = null;
+      if (updateData.birthDate.includes('/')) {
+        const [day, month, year] = updateData.birthDate.split('/');
+        date = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day), 12, 0, 0));
+      } else if (updateData.birthDate.includes('-')) {
+        const [year, month, day] = updateData.birthDate.split('T')[0].split('-');
+        date = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day), 12, 0, 0));
+      }
+      if (date && !isNaN(date.getTime())) {
+        updateData.birthDate = date;
+      }
     }
     const [updated] = await db
       .update(schema.citizens)

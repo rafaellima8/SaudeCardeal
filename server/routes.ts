@@ -2518,10 +2518,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startOfYear = new Date(year, 0, 1);
       const weekNumber = Math.ceil((now.getTime() - startOfYear.getTime()) / (7 * 24 * 60 * 60 * 1000));
 
-      const parseDateToTimestamp = (val: any): number | null => {
+      const parseToDate = (val: any): Date | null => {
         if (!val) return null;
-        if (typeof val === 'number') return val;
-        if (val instanceof Date) return Math.floor(val.getTime() / 1000);
+        if (val instanceof Date) return val;
+        if (typeof val === 'number') return new Date(val * 1000);
         if (typeof val === 'string') {
           let date: Date | null = null;
           if (val.includes('/')) {
@@ -2535,7 +2535,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             date = new Date(Date.UTC(parseInt(yearPart), parseInt(month) - 1, parseInt(day), 12, 0, 0));
           }
           if (date && !isNaN(date.getTime())) {
-            return Math.floor(date.getTime() / 1000);
+            return date;
           }
         }
         return null;
@@ -2547,15 +2547,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         notificationNumber,
         agravoCode: validatedData.agravoCode,
         agravoName: validatedData.agravoName || validatedData.agravoCode,
-        notificationDate: Math.floor(now.getTime() / 1000),
-        symptomsStartDate: parseDateToTimestamp(validatedData.symptomStartDate),
+        notificationDate: now,
+        symptomsStartDate: parseToDate(validatedData.symptomStartDate),
         cidCode: validatedData.cidCode,
         notificationWeek: weekNumber,
         notificationYear: year,
         status: 'rascunho' as const,
         classificacaoFinal: validatedData.classificacaoFinal || 'em_investigacao',
         patientName: validatedData.patientName,
-        patientBirthDate: parseDateToTimestamp(validatedData.patientBirthDate),
+        patientBirthDate: parseToDate(validatedData.patientBirthDate),
         patientAge: validatedData.patientAge,
         patientAgeType: validatedData.patientAgeType,
         patientGender: validatedData.patientGender,
@@ -2605,16 +2605,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...validatedData,
         updatedAt: new Date(),
       };
-
-      if (req.body.patientBirthDate) {
-        updateData.patientBirthDate = new Date(req.body.patientBirthDate);
-      }
-      if (req.body.symptomStartDate) {
-        updateData.symptomStartDate = new Date(req.body.symptomStartDate);
-      }
-      if (req.body.evolutionDate) {
-        updateData.evolutionDate = new Date(req.body.evolutionDate);
-      }
 
       const notification = await storage.updateSinanNotification(req.params.id, updateData);
       res.json(notification);

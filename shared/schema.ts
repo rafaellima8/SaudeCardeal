@@ -1588,8 +1588,8 @@ export const insertProfessionalSchema = createInsertSchema(professionals).omit({
 
 const birthDatePreprocess = z.preprocess((val) => {
   if (val === null || val === undefined) return null;
-  if (typeof val === 'number') return val;
-  if (val instanceof Date) return Math.floor(val.getTime() / 1000);
+  if (val instanceof Date) return val;
+  if (typeof val === 'number') return new Date(val * 1000);
   if (typeof val === 'string' && val) {
     let date: Date | null = null;
     if (val.includes('/')) {
@@ -1603,11 +1603,11 @@ const birthDatePreprocess = z.preprocess((val) => {
       date = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day), 12, 0, 0));
     }
     if (date && !isNaN(date.getTime())) {
-      return Math.floor(date.getTime() / 1000);
+      return date;
     }
   }
   return null;
-}, z.number().nullable().optional());
+}, z.date().nullable().optional());
 
 export const insertCitizenSchema = createInsertSchema(citizens, {
   birthDate: birthDatePreprocess,
@@ -1670,8 +1670,8 @@ export const insertTfdTripPassengerSchema = createInsertSchema(tfdTripPassengers
 
 const sinanDatePreprocess = z.preprocess((val) => {
   if (val === null || val === undefined || val === '') return null;
-  if (typeof val === 'number') return val;
-  if (val instanceof Date) return Math.floor(val.getTime() / 1000);
+  if (val instanceof Date) return val;
+  if (typeof val === 'number') return new Date(val * 1000);
   if (typeof val === 'string') {
     let date: Date | null = null;
     if (val.includes('/')) {
@@ -1685,11 +1685,11 @@ const sinanDatePreprocess = z.preprocess((val) => {
       date = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day), 12, 0, 0));
     }
     if (date && !isNaN(date.getTime())) {
-      return Math.floor(date.getTime() / 1000);
+      return date;
     }
   }
   return null;
-}, z.number().nullable().optional());
+}, z.date().nullable().optional());
 
 export const AGRAVO_CID_MAP: Record<string, { cid: string; name: string }> = {
   'DENGUE': { cid: 'A90', name: 'Dengue' },
