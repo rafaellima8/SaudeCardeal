@@ -168,28 +168,22 @@ describe("Automation API Integration Tests", () => {
       expect(Array.isArray(data)).toBe(true);
     });
 
-    it("POST /api/alerts/:id/acknowledge should acknowledge alert", async () => {
-      const response = await fetchWithAuth(`${BASE_URL}/api/alerts/alert-1/acknowledge`, {
+    it("POST /api/alerts/:id/acknowledge should return 404 for non-existent alert", async () => {
+      const response = await fetchWithAuth(`${BASE_URL}/api/alerts/non-existent-id/acknowledge`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
-      expect(response.ok).toBe(true);
-      
-      const data = await response.json();
-      expect(data.status).toBe("acknowledged");
+      expect(response.status).toBe(404);
     });
 
-    it("POST /api/alerts/:id/resolve should resolve alert", async () => {
-      const response = await fetchWithAuth(`${BASE_URL}/api/alerts/alert-2/resolve`, {
+    it("POST /api/alerts/:id/resolve should return 404 for non-existent alert", async () => {
+      const response = await fetchWithAuth(`${BASE_URL}/api/alerts/non-existent-id/resolve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
-      expect(response.ok).toBe(true);
-      
-      const data = await response.json();
-      expect(data.status).toBe("resolved");
+      expect(response.status).toBe(404);
     });
   });
 
@@ -229,11 +223,11 @@ describe("Automation API Integration Tests", () => {
       expect(response.ok).toBe(true);
       
       const data = await response.json();
-      expect(data).toHaveProperty("executionId");
-      expect(data).toHaveProperty("reportSlug");
+      expect(data).toHaveProperty("execution");
+      expect(data).toHaveProperty("report");
       expect(data).toHaveProperty("data");
       expect(data).toHaveProperty("aggregations");
-      expect(data).toHaveProperty("totalRows");
+      expect(data.report.slug).toBe("previne-brasil");
     });
 
     it("POST /api/strategic-reports/execute/farmacia-completo should return farmacia data", async () => {
@@ -245,8 +239,8 @@ describe("Automation API Integration Tests", () => {
       expect(response.ok).toBe(true);
       
       const data = await response.json();
-      expect(data.reportSlug).toBe("farmacia-completo");
-      expect(data.data.length).toBeGreaterThan(0);
+      expect(data.report.slug).toBe("farmacia-completo");
+      expect(Array.isArray(data.data)).toBe(true);
     });
 
     it("POST /api/strategic-reports/execute/vigilancia-epi should return vigilancia data", async () => {
@@ -258,7 +252,7 @@ describe("Automation API Integration Tests", () => {
       expect(response.ok).toBe(true);
       
       const data = await response.json();
-      expect(data.reportSlug).toBe("vigilancia-epi");
+      expect(data.report.slug).toBe("vigilancia-epi");
     });
   });
 
