@@ -328,6 +328,7 @@ export function AppSidebar() {
             target="_blank" 
             rel="noopener noreferrer"
             className="block"
+            data-testid="link-argo-tech"
           >
             <ArgoTechLogo className="py-1" />
           </a>
