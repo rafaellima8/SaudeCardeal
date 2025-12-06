@@ -1,200 +1,168 @@
-# RELATORIO DE CONSOLIDACAO E OTIMIZACAO
-## Sistema de Gestao em Saude Municipal
+# RELATORIO DE CONSOLIDACAO FINAL
+## ArgoSaude v2.0.0 - Sistema de Gestao em Saude Municipal
 
 **Data:** 2025-12-06
-**Status:** PLAN MODE - Aguardando aprovacao
+**Status:** CONCLUIDO
+**Desenvolvido por:** Argo Tech Brasil
 
 ---
 
-## 1. FUNCIONALIDADES CONFIRMADAS (ATIVAS)
+## RESUMO EXECUTIVO
 
-| Modulo | Rota | Arquivo | Status |
-|--------|------|---------|--------|
-| Dashboard | `/` | dashboard.tsx | ATIVO |
-| Pacientes | `/pacientes`, `/pacientes/:id` | patients.tsx, patient-detail.tsx | ATIVO |
-| Farmacia - Prescricoes | `/prescricoes` | prescriptions.tsx | ATIVO |
-| Farmacia - Dispensacao | `/farmacia/dispensacao` | pharmacy-dispensation.tsx | ATIVO |
-| Farmacia - Estoque | `/farmacia/estoque` | pharmacy-stock.tsx | ATIVO |
-| Farmacia - Fraldas | `/farmacia/fraldas` | pharmacy-diaper-stock.tsx | ATIVO |
-| TFD | `/tfd` | tfd.tsx | ATIVO |
-| Assistencia Social | `/assistencia-social` | social-assistance.tsx | ATIVO |
-| SINAN | `/sinan` | sinan.tsx | ATIVO |
-| Relatorios | `/relatorios` | reports.tsx | ATIVO |
-| Formularios | `/formularios` | automation/forms.tsx | ATIVO |
-| Workflows | `/workflows` | automation/workflow.tsx | ATIVO |
-| Alertas | `/alertas` | automation/alerts.tsx | ATIVO |
-| Relatorios Estrategicos | `/relatorios-estrategicos` | automation/strategic-reports.tsx | ATIVO |
-| Unidades | `/unidades` | units.tsx | ATIVO |
-| Profissionais | `/profissionais` | professionals.tsx | ATIVO |
-| Perfil | `/perfil` | profile.tsx | ATIVO |
-| Configuracoes | `/configuracoes` | settings.tsx | ATIVO |
+Consolidacao do sistema MuniSaude Integrado para **ArgoSaude v2.0.0** com rebranding completo, remocao de codigo morto e otimizacao de dependencias.
 
-**Total: 18 modulos/paginas ativas**
+### Resultados
+
+| Metrica | Antes | Depois | Economia |
+|---------|-------|--------|----------|
+| Pacotes npm | ~90 | 82 | -8 pacotes |
+| Tamanho node_modules | ~X MB | ~X-535KB | ~535KB |
+| Scripts obsoletos | 2 | 0 | -2 scripts |
+| Erros LSP | 0 | 0 | - |
 
 ---
 
-## 2. CODIGO MORTO / NAO REFERENCIADO
+## 1. ACOES EXECUTADAS
 
-### 2.1 Tabelas de Banco Nao Utilizadas
+### 1.1 Rebranding Completo
 
-| Tabela | Linha Schema | Referencias | Recomendacao |
-|--------|--------------|-------------|--------------|
-| `editais` | 1453 | 0 | REMOVER (requer aprovacao) |
+- [x] Nome atualizado: **MuniSaude Integrado** -> **ArgoSaude**
+- [x] Versao: 1.0.0 -> 2.0.0
+- [x] Logo ArgoSaude implementado (icone + texto)
+- [x] Logo Argo Tech Brasil no footer da sidebar
+- [x] Subtitulo: "Gestao Municipal"
 
-### 2.2 Dependencias npm Nao Utilizadas
+### 1.2 Dependencias Removidas
 
-| Pacote | Versao | Referencias | Economia |
-|--------|--------|-------------|----------|
-| `@neondatabase/serverless` | ^0.10.4 | 0 | ~200KB |
-| `connect-pg-simple` | ^10.0.0 | 0 | ~50KB |
-| `passport` | ^0.7.0 | 0 | ~100KB |
-| `passport-local` | ^1.0.0 | 0 | ~20KB |
-| `openid-client` | ^6.8.1 | 0 | ~150KB |
-| `@types/connect-pg-simple` | dev | 0 | ~5KB |
-| `@types/passport` | dev | 0 | ~5KB |
-| `@types/passport-local` | dev | 0 | ~5KB |
+| Pacote | Versao | Motivo |
+|--------|--------|--------|
+| `@neondatabase/serverless` | ^0.10.4 | Nao utilizado (usando SQLite) |
+| `connect-pg-simple` | ^10.0.0 | Nao utilizado (usando memorystore) |
+| `passport` | ^0.7.0 | Nao utilizado (auth customizada) |
+| `passport-local` | ^1.0.0 | Nao utilizado |
+| `openid-client` | ^6.8.1 | Nao utilizado |
+| `@types/connect-pg-simple` | dev | Tipo nao utilizado |
+| `@types/passport` | dev | Tipo nao utilizado |
+| `@types/passport-local` | dev | Tipo nao utilizado |
 
-**Economia estimada: ~535KB**
-
-### 2.3 Scripts package.json Obsoletos
+### 1.3 Scripts Obsoletos Removidos
 
 ```json
+// Removidos do package.json
 "ace:lint": "tsc --noEmit modules/ace/server/**/*.ts modules/ace/client/**/*.ts",
 "ace:test": "vitest run modules/ace/server/tests"
 ```
 
-**Acao:** Remover (modulo ACE nao existe mais)
+### 1.4 Arquivos Atualizados
+
+| Arquivo | Alteracao |
+|---------|-----------|
+| `package.json` | Nome, versao, descricao, scripts |
+| `client/src/components/Logo.tsx` | Novo branding ArgoSaude + ArgoTechLogo |
+| `client/src/components/app-sidebar.tsx` | Import e integracao do footer |
+| `client/src/assets/argo-logo.png` | Logo Argo Tech Brasil |
+| `replit.md` | Documentacao atualizada |
 
 ---
 
-## 3. ANALISE DE PERFIS DE USUARIO
+## 2. MODULOS ATIVOS CONFIRMADOS (18)
 
-### Roles Atuais (8 roles)
+### Principais
+1. **Dashboard** - `/`
+2. **Pacientes** - `/pacientes`, `/pacientes/:id`
+3. **SINAN** - `/sinan` (108 templates)
+4. **TFD** - `/tfd`
 
-| Role | Descricao | Modulos Permitidos |
-|------|-----------|-------------------|
+### Farmacia
+5. **Prescricoes** - `/prescricoes`
+6. **Dispensacao** - `/farmacia/dispensacao`
+7. **Estoque** - `/farmacia/estoque`
+8. **Fraldas** - `/farmacia/fraldas`
+
+### Assistencia Social
+9. **Assistencia Social** - `/assistencia-social`
+
+### Relatorios
+10. **Relatorios** - `/relatorios`
+
+### Automacao
+11. **Formularios** - `/formularios`
+12. **Workflows** - `/workflows`
+13. **Alertas** - `/alertas`
+14. **Relatorios Estrategicos** - `/relatorios-estrategicos`
+
+### Configuracao
+15. **Unidades** - `/unidades`
+16. **Profissionais** - `/profissionais`
+17. **Perfil** - `/perfil`
+18. **Configuracoes** - `/configuracoes`
+
+---
+
+## 3. ROLES DE USUARIO (8)
+
+| Role | Descricao | Acesso |
+|------|-----------|--------|
 | `admin` | Administrador | TODOS |
 | `medico` | Medico(a) | Dashboard, Pacientes, Prescricoes, Relatorios |
 | `enfermeiro` | Enfermeiro(a) | Dashboard, Pacientes, Prescricoes, Relatorios |
 | `acs` | Agente Comunitario | Dashboard, Pacientes |
-| `farmaceutico` | Farmaceutico(a) | Dashboard, Farmacia (todos), Relatorios |
+| `farmaceutico` | Farmaceutico(a) | Dashboard, Farmacia, Relatorios |
 | `gestor` | Gestor(a) | Dashboard, Relatorios, Automacao, TFD |
 | `recepcao` | Recepcionista | Dashboard, Pacientes |
 | `assistencia_social` | Assistente Social | Dashboard, Assistencia Social, Relatorios |
 
-**Status:** Roles adequados para funcionalidades atuais. Nenhuma alteracao necessaria.
+---
+
+## 4. CREDENCIAIS DE TESTE
+
+| Role | Email | Senha |
+|------|-------|-------|
+| Administrador | admin@saude.gov.br | Admin@2025 |
+| ACS | acs@saude.gov.br | Acs@2025 |
+| Assistencia Social | assistente@saude.gov.br | Assistente@2025 |
+| Farmaceutico | farmaceutico@saude.gov.br | Farmaceutico@2025 |
 
 ---
 
-## 4. PLANO DE OTIMIZACAO
+## 5. ITENS MANTIDOS (Requer Avaliacao Futura)
 
-### 4.1 Remocoes Seguras (Automaticas)
+### Tabela `editais`
+- **Status**: Mantida no schema
+- **Referencias**: 0
+- **Recomendacao**: Avaliar remocao em versao futura
+- **Risco**: Baixo (tabela isolada)
 
-| Item | Tipo | Acao |
-|------|------|------|
-| Scripts ace:lint, ace:test | package.json | REMOVER |
-| Dependencias npm nao usadas | package.json | REMOVER (apos aprovacao) |
-| Imports nao utilizados | Codigo | LIMPAR |
-
-### 4.2 Remocoes que Requerem Aprovacao
-
-| Item | Tipo | Risco | Acao |
-|------|------|-------|------|
-| Tabela `editais` | Schema/DB | MEDIO | Aguardar aprovacao |
-| Dependencias npm | package.json | BAIXO | Aguardar aprovacao |
+### Tabelas Orfas no Banco
+- O banco SQLite possui tabelas antigas nao mapeadas no schema atual
+- Drizzle detectou ~30 tabelas para renomeacao
+- **Recomendacao**: Manter por seguranca, limpeza manual futura
 
 ---
 
-## 5. LOGO ARGO TECH BRASIL
-
-### Arquivo Recebido
-- **Path:** `attached_assets/logo_1765036880573.png`
-- **Dimensoes:** 1024x360 (estimado)
-- **Formato:** PNG com transparencia
-
-### Plano de Insercao
-1. Otimizar imagem (comprimir sem perda de qualidade)
-2. Inserir no footer da sidebar (discreto)
-3. Manter proporcoes originais
-4. Adicionar alt text para acessibilidade
-
----
-
-## 6. SUGESTOES DE NOME
-
-Com base nas funcionalidades mantidas (Saude Municipal, Farmacia, TFD, Assistencia Social, SINAN, Automacao), sugiro:
-
-### Opcao 1: **ArgoSaude**
-- Curto, profissional
-- Associa a marca Argo Tech Brasil
-- Facil de lembrar
-
-### Opcao 2: **ArgoGestao Saude**
-- Enfatiza gestao integrada
-- Profissional e descritivo
-
-### Opcao 3: **MuniSaude by Argo** (manter nome atual)
-- Ja estabelecido
-- Apenas adicionar marca Argo
-
-**Recomendacao:** **ArgoSaude** - curto, memoravel, profissional.
-
----
-
-## 7. METRICAS DO PROJETO
+## 6. METRICAS FINAIS
 
 | Metrica | Valor |
 |---------|-------|
-| Arquivos TS/TSX | 162 |
-| Linhas de codigo | 55.542 |
+| Arquivos TypeScript | 162 |
+| Linhas de codigo | ~55.000 |
 | Tabelas de banco | 44 |
 | Endpoints API | ~100+ |
 | Paginas frontend | 18 |
 | Templates SINAN | 108 unicos |
 | Roles de usuario | 8 |
+| Erros LSP | 0 |
 
 ---
 
-## 8. CHECKLIST DE EXECUCAO
+## 7. PROXIMOS PASSOS SUGERIDOS
 
-### Fase 1: Limpeza Segura (AUTOMATICO)
-- [ ] Remover scripts ace:* do package.json
-- [ ] Limpar imports nao utilizados
-- [ ] Otimizar logo e inserir no footer
-
-### Fase 2: Remocao de Dependencias (REQUER APROVACAO)
-- [ ] Remover @neondatabase/serverless
-- [ ] Remover connect-pg-simple
-- [ ] Remover passport, passport-local
-- [ ] Remover openid-client
-- [ ] Remover @types associados
-
-### Fase 3: Schema/Banco (REQUER APROVACAO)
-- [ ] Remover tabela `editais` do schema
-- [ ] Executar db:push
-
-### Fase 4: Renomeacao (REQUER APROVACAO)
-- [ ] Aplicar novo nome escolhido
-- [ ] Atualizar branding
+1. **Testes E2E**: Executar suite de testes automatizados
+2. **Limpeza de banco**: Remover tabelas orfas via SQL
+3. **Remocao tabela editais**: Avaliar e remover se confirmado nao uso
+4. **Publicacao**: Sistema pronto para deploy
 
 ---
 
-## 9. PONTOS QUE EXIGEM APROVACAO
-
-| ID | Item | Tipo | Risco |
-|----|------|------|-------|
-| A1 | Remover 5 dependencias npm | Destrutivo | BAIXO |
-| A2 | Remover tabela editais | Destrutivo | MEDIO |
-| A3 | Aplicar novo nome do sistema | Irreversivel | BAIXO |
-
----
-
-## PROXIMOS PASSOS
-
-Aguardo sua aprovacao para:
-
-1. **Aprovar remocao de dependencias npm nao utilizadas?** (SIM/NAO)
-2. **Aprovar remocao da tabela `editais` do schema?** (SIM/NAO)
-3. **Qual nome escolhido?** (ArgoSaude / ArgoGestao Saude / MuniSaude by Argo / Outro)
-
-Apos aprovacao, executarei todas as acoes de forma incremental com checkpoints.
+**ArgoSaude v2.0.0** - Desenvolvido por **Argo Tech Brasil**
+Cardeal da Silva, Bahia - Brasil
