@@ -201,10 +201,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(citizen);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
-        console.log("Zod validation errors:", JSON.stringify(error.errors, null, 2));
         return res.status(400).json({ error: "Dados inválidos", details: error.errors });
       }
-      console.log("Error creating citizen:", error.message);
       res.status(500).json({ error: error.message });
     }
   });
@@ -2583,10 +2581,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(notification);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
-        console.log("SINAN Zod errors:", JSON.stringify(error.errors, null, 2));
         return res.status(400).json({ error: "Dados inválidos", details: error.errors });
       }
-      console.log("SINAN creation error:", error.message);
       res.status(500).json({ error: error.message });
     }
   });

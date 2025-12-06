@@ -1,0 +1,159 @@
+Contexto (ler antes de executar):
+Projeto: MuniSaúde Integrado (monorepo client/server/shared).
+Resumo das ações solicitadas: limpeza segura de artefatos órfãos, remoção de duplicados conhecidos, remoção de console.log de debug, e preparação do projeto para etapas seguintes (dependências, assets, correções técnicas).
+Este prompt deve ser executado em modo BUILD/EXECUTION mas seguindo regras estritas de segurança abaixo.
+
+Regras obrigatórias (NÃO IGNORAR)
+
+Antes de qualquer alteração crie um checkpoint/gist e um branch git chamado cleanup/initial-YYYYMMDD-HHMM (use timestamp). Não avance sem a criação confirmada do checkpoint.
+
+Execute alterações incrementais e atômicas — 1 alteração = 1 checkpoint e 1 commit.
+
+Para qualquer remoção marcada como “DEPENDE DE APROVAÇÃO” gere um relatório de impacto e aguarde o OK do proprietário (marque com DEPENDE_APROVACAO no commit message). Não remova automaticamente.
+
+Inclua testes e validações após cada checkpoint: lint, typecheck, unit tests (Vitest), E2E (Playwright) selecionados, build do client. Se qualquer verificação falhar, reverta automaticamente ao último checkpoint e reporte o erro.
+
+Mantenha logs de mudanças (arquivo CLEANUP_LOG.md) contendo: arquivo alterado, motivo, diff curto, checkpoint id, teste status.
+
+Forneça instrução de rollback em cada checkpoint (ex.: replit rollback <checkpoint-id> ou git reset --hard <commit>), e registre no CLEANUP_LOG.md.
+
+Passo A — Preparação (passos a executar imediatamente)
+
+Criar branch:
+
+git checkout -b cleanup/initial-$(date +%Y%m%d-%H%M)
+
+
+Criar checkpoint Replit com mensagem: checkpoint: cleanup - initial snapshot
+
+Fazer backup do DB atual: copiar saude.db para backups/saude.db.YYYYMMDD-HHMM.db
+
+Atualizar CLEANUP_LOG.md com timestamp e lista inicial de arquivos a processar.
+
+Validações pré-execução (falhar se não OK):
+
+npm ci ou pnpm install executa sem erros
+
+pnpm -w -s build (ou npm run build) compila o client sem erros
+
+pnpm -w -s test:unit executa (se falhar, abortar e reportar)
+
+Passo B — Limpeza Segura (executar como 1º checkpoint de execução)
+
+Ações seguras e de baixo risco (EXECUTAR AUTOMATICAMENTE):
+
+Remover banco órfão
+
+Verificação: confirmar que server/db.ts aponta para saude.db e que sqlite.db não é referenciado.
+
+Comando: git rm -f sqlite.db && git commit -m "chore: remove orphan sqlite.db (cleanup) [checkpoint]"
+
+Checkpoint/Replit: criar checkpoint e anotar no CLEANUP_LOG.md.
+
+Remover diretório vazio modules/editais/
+
+Verificação: confirmar ausência de imports (rg "editais" --hidden --glob '!node_modules').
+
+Comando: git rm -r modules/editais && git commit -m "chore: remove empty modules/editais (cleanup) [checkpoint]"
+
+Remover ZIP duplicado (attached_assets/FICHAS_*.zip duplicados)
+
+Verificação: confirmar hash idêntico (sha256sum ou shasum -a 256) e manter a cópia com timestamp mais recente ou mover para backups/attached_assets/.
+
+Ação: mover/remoção com commit e checkpoint.
+
+Limpeza de console.log debug no server
+
+Estratégia: aplicar transformação automática somente nos console.log evidentes de debug (ex.: console.log('DEBUG' ou logs com /* debug */).
+
+Ferramenta recomendada: eslint com regra no-console ou um codemod (jscodeshift).
+
+Execução segura:
+
+Rodar: npx eslint 'server/**/*.ts' --fix --rule '{"no-console":["error", { "allow": ["warn","error"] }]}'
+
+Confirmar diffs: gerar patch (git add -A && git commit -m "chore: remove debug console.log (cleanup) [checkpoint]")
+
+Não remover console.error e console.warn usados para erros.
+
+Após completar cada item: rodar pnpm -w -s test:unit && pnpm -w -s build && pnpm -w -s test:e2e (apenas os E2E relevantes) — se alguma checagem falhar, reverter o commit e reportar.
+
+Passo C — Itens marcados como “DEPENDE DE APROVAÇÃO”
+
+Não remover automaticamente. Gere relatório detalhado e aguarde autorização. Para cada item, o Agent deve:
+
+Enumerar arquivos afetados e um diff conciso.
+
+Indicar possíveis perdas (ex.: PDFs que podem ser referência).
+
+Sugerir ação alternativa (mover para archived_assets/ ou backups/ em vez de apagar).
+
+Preparar commit que archive (em vez de deletar) para aprovação prévia.
+
+Itens:
+
+Remover arquivos em attached_assets/ (PNGs, PDFs, TXTs) — sugerir arquivamento seletivo.
+
+Remover dependências npm potencialmente não usadas (@neondatabase/serverless, passport, connect-pg-simple, openid-client) — executar análise de referência de imports antes de remover: rg -n "@neondatabase/serverless|passport|connect-pg-simple|openid-client" || true. Gerar relatório.
+
+Remover pacotes: somente após confirmação manual do proprietário. Em vez de remoção direta, crie PR/branch com package.json atualizado e teste completo.
+
+Passo D — Verificações pós-limpeza
+
+Para cada checkpoint de limpeza concluído, executar em sequência obrigatória:
+
+pnpm -w -s lint (eslint)
+
+pnpm -w -s typecheck (tsc --noEmit)
+
+pnpm -w -s test:unit (Vitest) — falha -> reverter
+
+pnpm -w -s build (Vite build) — falha -> reverter
+
+Executar subset das E2E (Playwright) focado nas rotas críticas (login, pacientes, prescrições) — falha -> reverter
+
+Log de resultados no CLEANUP_LOG.md com o status (pass/fail) e id do checkpoint.
+
+Passo E — Commit messages, Tags e Rollback
+
+Commits: seguir padrão chore(cleanup): <descrição> [checkpoint:<id>]
+
+Tags: após sucesso das validações do checkpoint, criar tag cleanup/<fase>-<timestamp>
+
+Rollback: instrução clara para cada checkpoint (adicionar no CLEANUP_LOG.md), por ex:
+
+Replit: replit rollback <checkpoint-id>
+
+Git: git reset --hard <commit-sha> e git push --force origin cleanup/initial-... (somente se aprovado)
+
+Passo F — Relatório final e próximos passos automáticos
+
+Ao final da Fase de Limpeza (todos os checkpoints concluídos):
+
+Gerar RELATORIO_CLEANUP.md com: lista de arquivos removidos, diffs resumidos, tempo gasto, testes executados, checkpoints criados e instruções de rollback.
+
+Criar issues automáticas (ou tarefas) para: remover dependências após aprovação, arquivar assets, implementar session store persistente, adicionar índices de FKs e testes faltantes.
+
+Sugerir PRs separados para package.json e node_modules (dependências) — PRs com CI verde só após testes.
+
+Perguntar explicitamente ao proprietário (via chat): “Deseja que eu proceda com a remoção dos assets marcados como DEPENDE DE APROVAÇÃO? (responda SIM/NAO ou forneça lista de exceções)”
+
+Saída esperada do Agent (o que quero ver no chat após execução)
+
+Confirmação de criação do branch e checkpoint inicial (ID).
+
+Lista de ações automáticas realizadas com timestamps + IDs dos checkpoints.
+
+Resultados das validações (lint, typecheck, unit tests, build, E2E subset).
+
+CLEANUP_LOG.md atualizado (inclua link/preview).
+
+RELATORIO_CLEANUP.md gerado.
+
+Lista de itens marcados DEPENDE_APROVACAO com diffs e recomendações (arquivamento vs remoção).
+
+Próximo passo recomendado e pergunta para o proprietário sobre aprovação dos itens dependentes.
+
+IMPORTANTE: se qualquer passo automático falhar (build/tests/lint/typecheck), pare imediatamente, reverta para o checkpoint anterior e detalhe a falha no chat com instruções de mitigação.
+
+Fim do prompt.
