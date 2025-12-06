@@ -642,7 +642,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         previousQuantity: 0,
         newQuantity: stock.currentQuantity,
         reason: 'Entrada inicial de estoque',
-        performedBy: req.session.user!.id,
+        userId: req.session.user!.id,
       });
       
       res.status(201).json(stock);
@@ -671,7 +671,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           previousQuantity: existing.currentQuantity,
           newQuantity: req.body.currentQuantity,
           reason: req.body.movementReason || 'Ajuste manual de estoque',
-          performedBy: req.session?.user?.id || 'system',
+          userId: req.session?.user?.id || 'system',
         });
       }
 
@@ -1084,14 +1084,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.createDiaperStockMovement({
             stockId: allocation.stockId,
             unitId: sessionUnitId,
-            movementType: 'dispensacao',
+            movementType: 'doacao_assistencia',
             quantity: allocation.quantity,
             previousQuantity: stock.currentQuantity,
             newQuantity: stock.currentQuantity - allocation.quantity,
             reason: `Entrega para autorização ${authorization.authorizationNumber}`,
-            performedBy: req.session.user!.id,
-            referenceId: authorization.id,
-            referenceType: 'diaper_authorization',
+            userId: req.session.user!.id,
+            diaperDeliveryId: authorization.id,
           });
         }
       }
@@ -1294,7 +1293,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalRecords: parseResult.totalRows,
         validRecords: parseResult.validRows.length,
         invalidRecords: parseResult.invalidRows.length,
-        validationErrors: parseResult.invalidRows,
         processingStatus: parseResult.invalidRows.length === 0 ? 'validado' : 'pendente',
         uploadedById: req.session.user!.id,
         uploadedAt: new Date(),
@@ -1501,7 +1499,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         stock: {
           totalUnits: totalStock,
           monthsRemaining: avgMonthlyUsage > 0 ? (totalStock / avgMonthlyUsage).toFixed(1) : 'N/A',
-          lowStockSizes: stock.filter(s => s.currentQuantity < s.minimumQuantity).length,
+          lowStockSizes: stock.filter(s => s.currentQuantity < (s.reorderPoint || s.minStock)).length,
         },
       });
     } catch (error: any) {
@@ -1830,8 +1828,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const citizen = await storage.getCitizenById(request.citizenId);
-      const professional = await storage.getProfessionalById(request.professionalId);
-      const unit = await storage.getHealthUnitById(request.unitId);
+      const professional = await storage.getProfessionalById(request.requestedById);
+      const unit = await storage.getHealthUnitById(request.originUnitId);
       
       if (!citizen || !professional || !unit) {
         return res.status(404).json({ error: "Dados incompletos para geração do PDF" });
@@ -1865,8 +1863,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const citizen = await storage.getCitizenById(request.citizenId);
-      const professional = await storage.getProfessionalById(request.professionalId);
-      const unit = await storage.getHealthUnitById(request.unitId);
+      const professional = await storage.getProfessionalById(request.requestedById);
+      const unit = await storage.getHealthUnitById(request.originUnitId);
       
       if (!citizen || !professional || !unit) {
         return res.status(404).json({ error: "Dados incompletos para geração do PDF" });
@@ -1915,7 +1913,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       for (const tp of tripPassengers) {
         const citizen = await storage.getCitizenById(tp.citizenId);
-        const request = tp.requestId ? await storage.getTfdRequestById(tp.requestId) : null;
+        const request = tp.tfdRequestId ? await storage.getTfdRequestById(tp.tfdRequestId) : null;
         if (citizen && request) {
           passengers.push({
             citizen,
@@ -1961,8 +1959,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const records = [];
       for (const request of filteredRequests) {
         const citizen = await storage.getCitizenById(request.citizenId);
-        const professional = await storage.getProfessionalById(request.professionalId);
-        const unit = await storage.getHealthUnitById(request.unitId);
+        const professional = await storage.getProfessionalById(request.requestedById);
+        const unit = await storage.getHealthUnitById(request.originUnitId);
         const trip = request.tripId ? await storage.getTfdTripById(request.tripId) : null;
         
         if (citizen && professional && unit) {
@@ -2022,8 +2020,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       for (const request of filteredRequests) {
         const citizen = await storage.getCitizenById(request.citizenId);
-        const professional = await storage.getProfessionalById(request.professionalId);
-        const unit = await storage.getHealthUnitById(request.unitId);
+        const professional = await storage.getProfessionalById(request.requestedById);
+        const unit = await storage.getHealthUnitById(request.originUnitId);
         const authorizer = request.approvedBy ? await storage.getProfessionalById(request.approvedBy) : undefined;
         
         if (citizen && professional && unit) {
@@ -2088,8 +2086,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const records = [];
       for (const request of filteredRequests) {
         const citizen = await storage.getCitizenById(request.citizenId);
-        const professional = await storage.getProfessionalById(request.professionalId);
-        const unit = await storage.getHealthUnitById(request.unitId);
+        const professional = await storage.getProfessionalById(request.requestedById);
+        const unit = await storage.getHealthUnitById(request.originUnitId);
         const trip = request.tripId ? await storage.getTfdTripById(request.tripId) : null;
         
         if (citizen && professional && unit) {
@@ -2136,8 +2134,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (const request of filteredRequests) {
         const citizen = await storage.getCitizenById(request.citizenId);
-        const professional = await storage.getProfessionalById(request.professionalId);
-        const unit = await storage.getHealthUnitById(request.unitId);
+        const professional = await storage.getProfessionalById(request.requestedById);
+        const unit = await storage.getHealthUnitById(request.originUnitId);
         const trip = request.tripId ? await storage.getTfdTripById(request.tripId) : null;
 
         if (citizen && professional && unit) {
@@ -2190,7 +2188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get unit info for the header
-      const unit = await storage.getHealthUnitById(effectiveUnitId || filteredRequests[0].unitId);
+      const unit = await storage.getHealthUnitById(effectiveUnitId || filteredRequests[0].originUnitId);
       if (!unit) {
         return res.status(404).json({ error: 'Unidade de saúde não encontrada' });
       }
@@ -2271,8 +2269,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate PDF for the first valid request (APAC forms are individual)
       for (const request of filteredRequests) {
         const citizen = await storage.getCitizenById(request.citizenId);
-        const professional = await storage.getProfessionalById(request.professionalId);
-        const unit = await storage.getHealthUnitById(request.unitId);
+        const professional = await storage.getProfessionalById(request.requestedById);
+        const unit = await storage.getHealthUnitById(request.originUnitId);
         const authorizer = request.approvedBy ? await storage.getProfessionalById(request.approvedBy) : undefined;
 
         if (citizen && professional && unit) {
@@ -2285,11 +2283,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             citizen,
             professional,
             unit,
-            apacNumber: request.apacAuthorizationNumber || `APAC-${Date.now()}`,
+            authorizationNumber: request.apacAuthorizationNumber || `APAC-${Date.now()}`,
             validityStart,
             validityEnd,
             authorizer: authorizer || professional,
-            distanceKm: request.distanceKm || 100,
           });
 
           res.setHeader('Content-Type', 'application/pdf');
