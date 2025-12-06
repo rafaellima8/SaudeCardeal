@@ -1,4 +1,37 @@
-# CLEANUP LOG - MuniSaúde Integrado
+# CLEANUP LOG - ArgoSaude v2.0.0
+
+## Ultima Atualizacao: 2025-12-06 16:17 UTC
+## Status: ATIVO
+
+---
+
+## SESSION 2025-12-06T16:17 - Limpeza Raiz
+
+### Arquivos Movidos para archived_root/
+
+| Arquivo Original | Destino | Tamanho | Referenciado |
+|------------------|---------|---------|--------------|
+| RELATORIO_PRODUCAO_MUNIS AUDE.md | archived_root/docs/ | 12KB | NAO |
+| RELATORIO_TECNICO_MUNISAUDE.md | archived_root/docs/ | 14KB | NAO |
+| RELATO_ASSETS.md | archived_root/docs/ | 4.7KB | NAO |
+| ASSETS_REPORT.md | archived_root/docs/ | 4.3KB | NAO |
+| 9x Captura_de_Tela_*.png | archived_root/screenshots/ | ~6MB | NAO |
+| 2x Pasted--*.txt | archived_root/docs/ | ~12KB | NAO |
+
+### Estrutura archived_root/
+
+```
+archived_root/
+├── docs/           # 6 arquivos MD + 2 TXT
+├── screenshots/    # 9 screenshots PNG
+└── assets/         # (reservado para futuros arquivamentos)
+```
+
+### Espaco Arquivado: 6.2MB
+
+---
+
+## SESSION 2025-12-06T04:02 - Primeira Consolidacao
 
 ## Iniciado: 2025-12-06 04:02 UTC
 ## Finalizado: 2025-12-06 04:08 UTC

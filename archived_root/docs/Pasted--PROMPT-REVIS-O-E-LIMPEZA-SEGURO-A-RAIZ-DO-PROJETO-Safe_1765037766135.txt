@@ -1,0 +1,95 @@
+/*
+PROMPT: REVISÃO E LIMPEZA SEGURO(A) - RAIZ DO PROJETO (Safe Root Cleanup & Consolidation)
+Contexto:
+- Este workspace já passou por uma consolidação (ArgoSaude v2.0.0).
+- Há arquivos duplicados e metadocs na raiz que descrevem o SaaS original e podem gerar confusão ou incluir informação antiga.
+- Objetivo: revisar a raiz do repositório, apagar/arquivar apenas itens **desnecessários ou duplicados**, preservar tudo que for referenciado no build/tests/runtime, e garantir o sistema 100% funcional com checkpoints, testes e rollback.
+
+Referências locais (usar conforme necessário):
+- Manual de operação: file:///mnt/data/manual_replit.pdf
+- Logo Argo Tech: /mnt/data/logo.png
+
+PRINCÍPIOS (LEIA ANTES DE EXECUTAR):
+1. Segurança primeiro: TODO passo destrutivo requer snapshot/checkpoint e backup (DB se for o caso) e minha aprovação explícita.
+2. Só executar automaticamente ações **safe** (não alteram DB, não removem arquivos referenciados por código/build).
+3. Para arquivos potencialmente perigosos (migrations/tables/CI/CD/manifest), gerar patch + proposta e aguardar aprovação.
+4. Todas as mudanças devem ser reversíveis (git commit + tags e instruções de rollback).
+5. Documentar tudo automaticamente (CLEANUP_LOG.md) com difs, rationale e lista de arquivos movidos/removidos.
+
+PASSO 0 — MODO:
+- Execute em **PLAN MODE** e gere relatório inicial. NÃO altere nada ainda.
+- Após minha aprovação, executar as ações SAFE automaticamente.
+
+PASSO 1 — VARREDURA (AUTOMÁTICO, SAFE)
+- Executar análise estática do repositório raiz:
+  - `rg --hidden --glob '!node_modules' --glob '!dist' -n "TODO|REMOVED|DEPRECATED|LEGACY|REMOVE|duplicate|duplicado|originais|original"`
+  - `git ls-files --others --exclude-standard` para arquivos não rastreados
+  - Listar arquivos na raiz (top-level): `ls -la .` e `du -sh * | sort -h`
+  - Detectar arquivos grandes (>1MB) na raiz: `find . -maxdepth 2 -type f -size +1M -printf "%s %p\n" | sort -nr`
+  - Identificar arquivos com nomes semelhantes (candidates to duplicate): checksum grouping:
+    `find . -maxdepth 2 -type f -exec md5sum {} + | sort`
+- Gerar `ROOT_SCAN_REPORT.md` com:
+  - Lista de arquivos top-level
+  - Arquivos não rastreados
+  - Arquivos grandes
+  - Possíveis duplicatas (mesmo hash ou mesmo nome + diferente pasta)
+  - Arquivos Markdown/README/RELATORIO/CONSOLIDATION que parecem descrever o sistema original
+
+PASSO 2 — DETECTAR RISCO DE REFERÊNCIA (AUTOMÁTICO, SAFE)
+- Para cada arquivo candidato a remover, verificar referências no código:
+  - `rg --hidden --glob '!node_modules' -n "nome_do_arquivo|basename|CONSOLIDATION_REPORT.md|ASSETS_REPORT.md|client/src/assets/argo-logo.png"`
+- Se arquivo for referenciado pelo client/server/build/tests, marcar como **referenciado** e NÃO removê-lo automaticamente.
+
+PASSO 3 — AÇÕES SAFE AUTOMÁTICAS (APÓS GERAR RELATÓRIO; NÃO DEMOLIR)
+- Criar pasta de arquivamento segura na raiz: `archived_root/` (se não existir).
+- Mover automaticamente para `archived_root/` (não deletar) os seguintes itens **apenas** se:
+  - não forem referenciados por código (PASSO 2)
+  - e/ou forem claramente duplicatas (mesmo hash) ou arquivos de documentação antiga em excesso
+- Padrões sugeridos para MOVIMENTO automático:
+  - `CONSOLIDATION_REPORT_OLD*.md`, `RELATORIO_PRODUCAO*`, `RELATÓRIO_TECNICO_*` duplicados -> `archived_root/docs/`
+  - Arquivos renomeados de README antigos (ex.: `README.old.md`, `replit.md` que não sejam usados) -> `archived_root/readmes/`
+  - PDFs pesados ou manuais já armazenados em `/mnt/data` ou `/docs` duplicados na raiz -> `archived_root/pdfs/`
+  - Arquivos ZIP e screenshots antigos sem referência -> `archived_root/assets/`
+- Para cada arquivo movido, criar entry em `CLEANUP_LOG.md` com:
+  - `timestamp, original_path, new_path, size, referenced:boolean, referenced_in:[file1,file2]`
+- Commit automático com mensagem padrão: `chore(cleanup): archive unreferenced root files - safe move` e tag `cleanup/root-safety-<sha>`.
+
+PASSO 4 — AÇÕES QUE DEVEM Aguardar APROVAÇÃO (NÃO EXECUTAR)
+- Deletar arquivos permanentemente da raiz.
+- Remover arquivos que aparecem como referenciados em código.
+- Alterar package.json `name` ou metadados (renomear app) — gerar proposta apenas.
+- Remover tabelas/migrations ou arquivos de configuração que impactam CI/CD ou deploy.
+- Substituir assets oficiais (logo) em locais usados sem confirmação.
+
+PASSO 5 — LIMPEZA ESPECÍFICA PEDIDA (RAIZ)
+- Procurar e reportar (Plan Mode):
+  - Arquivos de documentação que descrevem o SaaS original e que contenham marketing/manual antigo (ex.: `RELATORIO_PRODUCAO_MUNIS AUDE.md` ou arquivos com texto identificável do SaaS original). Listar e propor arquivamento.
+  - Arquivos `client/src/assets/argo-logo.png` que foram colocados corretamente: verificar duplicatas na raiz (`argo-logo.png`, `argo-logo.png.md`, `argo-logo.png.txt`) e propor manter somente a versão otimizada em `client/src/assets/` e mover possíveis cópias para `archived_root/assets/`.
+  - Arquivos `.db`, `saude.db*` na raiz (SQLite) — não remover automaticamente; reportar e sugerir mover para `/backups/` com backup e aviso.
+  - Arquivos `CONSOLIDATION_REPORT.md` e `CONSOLIDATION_REPORT_OLD.md` — manter o mais recente na raiz e mover versões antigas para `archived_root/docs/`.
+- Para qualquer arquivo Markdown que contenha descrições do produto original que conflitam com o posicionamento atual (detectar por palavras-chave: "MuniSaude", "Secretaria Municipal", "SUS APS v5.3", etc.), gerar diffs automatizados mostrando as seções que sugerimos arquivar ou atualizar. Não editar sem aprovação.
+
+PASSO 6 — TESTES E VALIDAÇÃO (APÓS MOVES SAFE)
+- Rodar:
+  - `npm ci && npm run lint` (ou `pnpm`/`yarn` conforme for)
+  - `npm test` (unit)
+  - `npm run build`
+  - `npm run start:staging` + smoke tests (health check endpoints)
+- Se qualquer teste falhar, reverter mudanças automáticas (git revert) e reportar detalhes em `CLEANUP_LOG.md`.
+
+PASSO 7 — RELATÓRIO E PROPOSTA (IMEDIATO)
+- Entregar `ROOT_SCAN_REPORT.md` e `CLEANUP_PLAN.md` contendo:
+  - Lista final de arquivos movidos (com difs)
+  - Lista de arquivos que requerem aprovação para remoção
+  - Proposta de organização final da raiz (ex.: `archived_root/`, `docs/`, `assets/`, `backups/`)
+  - Comandos de rollback exatos
+  - PR/branch recomendada: `cleanup/root-consolidation/<date>`
+
+COMANDOS EXATOS SUGERIDOS (para o Agent rodar automaticamente nas partes SAFE):
+- Criar pasta de arquivamento:
+  `mkdir -p archived_root/{docs,assets,readmes,pdfs}`
+- Mover arquivos não referenciados (exemplo):
+  `git mv RELATO_ASSETS.md archived_root/docs/ || mv RELATO_ASSETS.md archived_root/docs/`
+- Gerar log:
+  ```bash
+  echo "$(date -Iseconds) - MOVED: RELATO_ASSETS.md -> archived_root/docs/ - $(du -h RELATO_ASSETS.md)" >> CLEANUP_LOG.md
