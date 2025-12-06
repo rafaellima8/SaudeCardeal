@@ -40,7 +40,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { Logo } from "@/components/Logo";
+import { Logo, ArgoTechLogo } from "@/components/Logo";
 import { filterMenuByRole } from "@/lib/permissions";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -285,7 +285,7 @@ export function AppSidebar() {
         )}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border p-2">
+      <SidebarFooter className="border-t border-sidebar-border p-2 space-y-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex w-full items-center gap-3 rounded-md p-2 hover-elevate active-elevate-2" data-testid="button-user-menu">
@@ -322,6 +322,16 @@ export function AppSidebar() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <div className="pt-2 border-t border-sidebar-border/50">
+          <a 
+            href="https://argotechbrasil.com.br" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="block"
+          >
+            <ArgoTechLogo className="py-1" />
+          </a>
+        </div>
       </SidebarFooter>
     </Sidebar>
   );

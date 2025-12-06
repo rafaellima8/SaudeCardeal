@@ -1,12 +1,12 @@
-# MuniSaúde Integrado - Sistema de Gestão em Saúde Municipal
+# ArgoSaude - Sistema de Gestao em Saude Municipal
 
 ## Overview
 
-MuniSaúde Integrado is a municipal health management system for Cardeal da Silva, Bahia, Brazil. It aims to enhance efficiency, compliance, and data management for municipal health services by streamlining patient management, electronic prescriptions (with RENAME catalog integration), pharmacy management (medication and diaper stock control), inter-municipal patient transport (TFD) compliant with SUS regulations, Social Assistance for diaper requests, and SINAN for compulsory disease notification. The project's vision is to provide a comprehensive, integrated solution for municipal public health, improving healthcare delivery and data-driven decision-making.
+ArgoSaude (v2.0.0) is a municipal health management SaaS system developed by **Argo Tech Brasil** for Cardeal da Silva, Bahia, Brazil. It aims to enhance efficiency, compliance, and data management for municipal health services by streamlining patient management, electronic prescriptions (with RENAME catalog integration), pharmacy management (medication and diaper stock control), inter-municipal patient transport (TFD) compliant with SUS regulations, Social Assistance for diaper requests, and SINAN for compulsory disease notification.
 
 ## User Preferences
 
-I want iterative development. Ask before making major changes. I prefer detailed explanations. Do not make changes to the folder `Z`. Do not make changes to the file `Y`.
+I want iterative development. Ask before making major changes. I prefer detailed explanations.
 
 ## System Architecture
 
@@ -15,88 +15,115 @@ The system employs a client-server architecture with a clear separation of conce
 ### Frontend
 - **Technology**: React 18+ with TypeScript, Vite, Wouter (routing), TanStack Query v5.
 - **UI/UX**: shadcn/ui and Radix UI components, styled with Tailwind CSS, including dark mode.
+- **Branding**: ArgoSaude by Argo Tech Brasil (logo in sidebar footer)
 
 ### Backend
 - **Technology**: Express.js with TypeScript, SQLite (Better-SQLite3), Drizzle ORM.
 - **Authentication**: Session-based with bcrypt for password hashing.
 - **Security**: Role-Based Access Control (RBAC) with 8 roles. Multi-tenant isolation enforced via `enforceUnitScope()` middleware.
-- **Core Features**:
-    - **Patient Management**: Registration, demographics, health unit association.
-    - **Electronic Prescriptions**: Management, Portaria 344/98 compliance, PDF export.
-    - **Pharmacy Management**: RENAME catalog, medication stock (alerts, expiration), diaper stock (FIFO, lot tracking), dispensation.
-    - **TFD (Inter-municipal Transport)**: Vehicle/driver/trip/passenger management, SUS compliance (Portaria SAS/MS nº 55/1999), SIGTAP integration, BPA-I/APAC TXT export, 50km minimum distance, CID-10, IBGE municipality codes.
-    - **Social Assistance**: Beneficiary management, diaper request/authorization/delivery workflow, monthly list CSV upload, demand forecasting, audit logging.
-    - **SINAN (Sistema de Informação de Agravos de Notificação)**: Official notification forms for 68+ compulsory diseases, epidemiological week calculation, patient demographics, clinical evolution, investigation workflow, lab exam results, export batch management.
-- **Automation Modules (Isolated in `/modules/`)**:
-    - **Form Automation**: Dynamic form templates (SINAN, BPA-I, APAC) with JSON schema, validation.
-    - **Workflow Engine**: State machine for approval flows (e.g., Unit → Vigilância → CPD).
-    - **Alert Scheduler**: Event-driven notification rules for deadlines, stock, epidemic thresholds.
-    - **Strategic Reports**: ETL engine for Previne Brasil indicators, MAC production, KPIs.
 
-### System Design Choices
-- **Database**: SQLite with Drizzle ORM for type-safe data access.
-- **Modularity**: Organized into distinct modules (Patient, Prescriptions, Pharmacy, TFD, Social Assistance, SINAN) with dedicated routes and services. New automation modules are isolated.
-- **Validation**: Extensive use of Zod for data integrity on frontend and backend.
-- **PDF Generation**: Services for compliant PDF documents (prescriptions, TFD reports, Social Assistance documents).
-- **Date Input Standardization**: Manual date entry fields use DD/MM/YYYY input mask with Zod preprocessing for validation. Dates are stored as Unix timestamps (seconds since epoch) in SQLite.
-- **SINAN CID-10 Auto-population**: When an agravo is selected in the SINAN notification form, the corresponding CID-10 code is automatically populated using the AGRAVO_CID_MAP mapping (45+ disease codes).
-- **Multi-tenant Unit Injection**: Routes automatically inject the user's unitId from session before Zod validation to ensure proper multi-tenant isolation.
+### Active Modules (18 total)
+1. **Dashboard** - KPIs, charts, system overview
+2. **Pacientes** - Patient registration, demographics, health unit association
+3. **Farmacia - Prescricoes** - Electronic prescriptions, Portaria 344/98 compliance
+4. **Farmacia - Dispensacao** - Medication dispensing workflow
+5. **Farmacia - Estoque** - RENAME catalog, medication stock (alerts, expiration)
+6. **Farmacia - Fraldas** - Diaper stock (FIFO, lot tracking)
+7. **TFD** - Inter-municipal transport, SUS compliance, BPA-I/APAC export
+8. **Assistencia Social** - Beneficiary management, diaper requests, CSV upload
+9. **SINAN** - 108 unique templates for 81 agravos, dynamic forms, PDF export
+10. **Relatorios** - Standard reports and exports
+11. **Formularios** - Dynamic form templates (automation)
+12. **Workflows** - Approval state machines (automation)
+13. **Alertas** - Event-driven notifications (automation)
+14. **Relatorios Estrategicos** - ETL engine, Previne Brasil indicators (automation)
+15. **Unidades** - Health unit management
+16. **Profissionais** - Healthcare professional management
+17. **Perfil** - User profile management
+18. **Configuracoes** - System settings
+
+### User Roles (8 roles)
+| Role | Access |
+|------|--------|
+| admin | All modules |
+| medico | Dashboard, Patients, Prescriptions, Reports |
+| enfermeiro | Dashboard, Patients, Prescriptions, Reports |
+| acs | Dashboard, Patients |
+| farmaceutico | Dashboard, Pharmacy (all), Reports |
+| gestor | Dashboard, Reports, Automation, TFD |
+| recepcao | Dashboard, Patients |
+| assistencia_social | Dashboard, Social Assistance, Reports |
 
 ## External Dependencies
 
-- **RENAME Catalog**: Integrated for electronic prescription medication data.
-- **SUS (Sistema Único de Saúde) Regulations**: Compliance with Portaria 344/98 (prescriptions), Portaria SAS/MS nº 55/1999 (TFD), SIGTAP (TFD procedure codes).
-- **DATASUS BPA System**: For exporting BPA-I and APAC data in TXT format for submission.
-- **IBGE (Brazilian Institute of Geography and Statistics)**: Used for municipality codes in TFD.
-- **CID-10 (International Classification of Diseases, 10th Revision)**: Used for diagnosis coding.
+- **RENAME Catalog**: Integrated for electronic prescription medication data
+- **SUS Regulations**: Portaria 344/98 (prescriptions), Portaria SAS/MS nº 55/1999 (TFD), SIGTAP
+- **DATASUS BPA System**: BPA-I and APAC TXT export format
+- **IBGE**: Municipality codes for TFD
+- **CID-10**: Diagnosis coding (45+ disease codes mapped)
 
-## SINAN Template System Architecture
+## SINAN Template System
 
-### Template Type System (`shared/sinan/template-types.ts`)
-- **SinanFormGroupId**: Literal union type for form group identifiers
-- **SinanField**: Type-safe field definitions with validated group assignment
-- **SinanFormTemplate**: Complete template interface with versioning support
-- **SINAN_FORM_GROUPS**: Standardized form sections (dados_gerais, notificacao, residencia, etc.)
+### Template Coverage
+- **100% Coverage**: All 81 official SINAN agravos have dedicated templates
+- **108 unique agravoCode templates**, 142 total including variants
+- **Categories**: Arboviroses, Respiratorias, IST/HIV/AIDS, Hepatites, Meningites, Zoonoses, Endemicas, Cronicas, Imunopreveniveis, Intoxicacoes, Violencias, Saude do Trabalhador, Virais Emergentes, Alimentares, Vigilancia, Farmacovigilancia
 
-### Template Registry (`shared/sinan/templates/index.ts`)
-- **Composite Key Strategy**: Templates keyed by `${agravoCode}__${versaoFicha}` to prevent collisions
-- **CID-10 Array Lookup**: `getTemplatesByCid()` returns all matching templates when CID-10 is shared
-- **Disambiguation Support**: `requiresSelection` flag indicates when user must choose from multiple templates
+### Template Files
+- `shared/sinan/templates/` - 20 category-specific template files
+- `shared/sinan/template-types.ts` - Type definitions
+- `shared/sinan/registry.ts` - Coverage tracking
 
-### Template Validation (`shared/sinan/template-validator.ts`)
-- **Mandatory Group Validation**: Ensures all templates include required SINAN sections
-- **Field Consistency Check**: Validates requiredFields array matches field definitions
-- **sinanCode Mapping Verification**: Warns when fields lack official SINAN codification
+## Database Schema
 
-### Registry Coverage (`shared/sinan/registry.ts`)
-- **Coverage Tracking**: Links SINAN_AGRAVOS_COMPLETOS (82 agravos) with implemented templates
-- **Category Statistics**: Reports template coverage by disease category
-- **Build-time Assertions**: `assertFullCoverage()` logs missing template warnings
+- **44 tables** in SQLite with Drizzle ORM
+- **Date storage**: Unix timestamps (seconds since epoch)
+- **ID generation**: UUID v4 via generateId()
 
-### Current Template Coverage
-- **100% Coverage Achieved**: All 81 official SINAN agravos have dedicated templates (108 unique agravoCode templates, 142 total templates including variants)
-- **Categories Covered**: Arboviroses, Respiratórias, IST/HIV/AIDS, Hepatites, Meningites, Zoonoses, Endêmicas, Crônicas, Imunopreveníveis, Intoxicações, Violências, Saúde do Trabalhador, Virais Emergentes, Alimentares, Vigilância, Farmacovigilância
-- **Template Architecture**: Multi-template support with composite keys, CID-10 range lookups, version disambiguation
+## Recent Changes (2025-12-06)
 
-### SINAN Dynamic Form System (New)
+### Consolidation v2.0.0
+- Rebranded to **ArgoSaude** by Argo Tech Brasil
+- Removed 8 unused npm packages (passport, neon, openid-client, connect-pg-simple, etc.)
+- Removed obsolete ace:* scripts
+- Added Argo Tech Brasil logo to sidebar footer
+- Updated Logo.tsx component with new branding
+- Generated CONSOLIDATION_REPORT.md with full analysis
+- 0 LSP errors - clean codebase
 
-#### Backend Services
-- **sinan-template-service.ts**: Template lookup by agravo/CID-10/category, field validation engine, dependency resolution, metadata extraction
-- **sinan-pdf-generator.ts**: Official SINAN form layouts, field mapping, multi-page support, metadata headers, jsPDF-based generation
+### Cleanup Summary
+- **Removed packages**: @neondatabase/serverless, connect-pg-simple, passport, passport-local, openid-client, @types/connect-pg-simple, @types/passport, @types/passport-local
+- **Estimated savings**: ~535KB
 
-#### API Endpoints
-- `GET /api/sinan/templates` - Template catalog with search/filter
-- `GET /api/sinan/templates/stats` - Template statistics
-- `GET /api/sinan/templates/categorias` - Available categories
-- `GET /api/sinan/templates/agravos` - Unique agravo codes
-- `GET /api/sinan/templates/by-agravo/:code` - Templates by agravo
-- `GET /api/sinan/templates/by-cid/:cid10` - Templates by CID-10
-- `GET /api/sinan/templates/:templateId` - Single template with grouped fields
-- `POST /api/sinan/templates/:templateId/validate` - Server-side validation
-- `GET /api/sinan/notifications/:id/pdf` - PDF export for notification
-- `GET /api/sinan/templates/:templateId/blank-form` - Blank PDF form
+## Credentials (Development)
 
-#### Frontend Components
-- **SinanDynamicForm.tsx**: Dynamic field renderer with conditional logic, multi-step navigation, validation feedback
-- **SinanTemplateSelector.tsx**: Template catalog browser with search, category filtering, statistics display
-- **sinan.tsx**: Main page with tabs for "Notificações" (existing workflow) and "Fichas SinanNet" (new dynamic templates)
+| Role | Email | Password |
+|------|-------|----------|
+| Administrador | admin@saude.gov.br | Admin@2025 |
+| ACS | acs@saude.gov.br | Acs@2025 |
+| Assistencia Social | assistente@saude.gov.br | Assistente@2025 |
+| Farmaceutico | farmaceutico@saude.gov.br | Farmaceutico@2025 |
+
+## File Structure
+
+```
+/
+├── client/src/           # React frontend
+│   ├── assets/           # Logo and images
+│   ├── components/       # UI components
+│   ├── pages/            # Route pages
+│   ├── hooks/            # Custom hooks
+│   └── lib/              # Utilities
+├── server/               # Express backend
+│   ├── services/         # Business logic
+│   └── routes.ts         # API endpoints
+├── shared/               # Shared types
+│   ├── schema.ts         # Drizzle schema (44 tables)
+│   └── sinan/            # SINAN templates
+├── modules/              # Automation modules
+│   ├── alerts/           # Alert scheduler
+│   ├── forms/            # Form engine
+│   ├── reports/          # Strategic reports
+│   └── workflow/         # Workflow engine
+└── docs/                 # Technical documentation
+```

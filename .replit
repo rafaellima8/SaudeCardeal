@@ -10,6 +10,7 @@ packages = ["sqlite", "chromium", "glib"]
 deploymentTarget = "autoscale"
 build = ["npm", "run", "build"]
 run = ["npm", "run", "start"]
+publicDir = "dist/public"
 
 [[ports]]
 localPort = 5000
@@ -34,6 +35,10 @@ externalPort = 4200
 [[ports]]
 localPort = 42553
 externalPort = 3003
+
+[[ports]]
+localPort = 44825
+externalPort = 5000
 
 [env]
 PORT = "5000"

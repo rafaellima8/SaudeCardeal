@@ -1,0 +1,145 @@
+/* 
+PROMPT OFICIAL — LIMPEZA, CONSOLIDAÇÃO E OTIMIZAÇÃO DO SAAS DUPLICADO
+OBJETIVO: Ajustar completamente este SaaS duplicado para operar SOMENTE com as funcionalidades que permaneceram,
+limpar vestígios das que foram removidas e deixar o sistema 100% funcional, leve, organizado e robusto.
+
+O sistema original continha vários módulos. No SaaS duplicado, diversas funcionalidades foram removidas. 
+Agora precisamos:
+
+1) Consolidar e fazer o sistema funcionar apenas com as funcionalidades que permaneceram, garantindo total integração e eliminando erros.
+2) Remover qualquer vestígio, trecho de código, rota, asset, componente ou referência das funcionalidades removidas.
+3) Otimizar o sistema para que fique o mais leve e rápido possível.
+4) Ajustar perfis de usuários para refletir SOMENTE as funcionalidades que ficaram.
+5) Inserir discretamente a logo da Argo Tech Brasil (arquivo local: /mnt/data/logo.png).
+6) Sugerir e aplicar um novo nome apropriado para o sistema (somente após minha aprovação).
+7) Trabalhar com checkpoints, testes e segurança — NADA que possa quebrar o sistema deve ser executado sem minha aprovação.
+
+--------------------------------------------------------------------
+FUNCIONALIDADES QUE PERMANECERAM
+(ANALISAR BASEADO NO SISTEMA EM EXECUÇÃO DISPONÍVEL EM:)
+https://1d48038f-28de-40b2-ac90-03288231f0e8-00-u87lwyot5urr.picard.replit.dev/
+
+O sistema atual contém (como observado no frontend):
+- Dashboard
+- Pacientes
+- Farmácia
+   - Prescrições
+   - Dispensação
+   - Estoque
+   - Fraldas
+- TFD (Tratamento Fora de Domicílio)
+- Assistência Social
+- SINAN
+- Relatórios
+- Automação:
+   - Formulários
+   - Workflows
+   - Alertas
+   - Relatórios Estratégicos
+- Configurações básicas
+
+Todos os outros módulos que existiam originalmente, mas não aparecem no sistema atual, DEVEM SER REMOVIDOS COMPLETAMENTE.
+
+--------------------------------------------------------------------
+TAREFAS OBRIGATÓRIAS PARA EXECUÇÃO (PLAN MODE → AGUARDAR MINHA APROVAÇÃO)
+
+1) ANÁLISE COMPLETA DO PROJETO:
+- Mapear TUDO que pertence às funcionalidades removidas:
+  - Arquivos
+  - Rotas
+  - Controllers
+  - Services
+  - Hooks
+  - Components
+  - Assets (icones, imagens, CSS)
+  - Tabelas do banco
+  - Migrations
+  - Testes
+  - Dependências do package.json que não são mais usadas.
+- Mapear conflitos, erros potenciais e duplicações.
+- Mapear os fluxos atuais das funcionalidades mantidas.
+- Identificar pontos do sistema que ainda tentam consumir funções removidas.
+- Gerar relatório completo com:
+  - Riscos
+  - Prioridades
+  - Ordens de execução
+  - Itens destrutivos (somente listar, NÃO executar)
+  - Itens seguros (pode executar de forma incremental)
+
+2) REMOÇÃO COMPLETA E SEGURA DAS FUNCIONALIDADES ANTIGAS:
+- Remover código morto ou não referenciado.
+- Remover rotas e endpoints obsoletos.
+- Remover imports pendentes.
+- Remover migrations, tabelas e colunas associadas às funcionalidades excluídas (SOMENTE APÓS MINHA APROVAÇÃO).
+- Remover assets não usados.
+
+3) OTIMIZAÇÃO DO SISTEMA:
+- Reduzir dependências do projeto.
+- Minificar assets.
+- Remover JS/CSS não utilizado.
+- Aplicar lazy-loading onde possível.
+- Reduzir peso geral do build.
+- Melhorar performance do dashboard e das listagens.
+- Implementar melhorias de segurança caso necessário.
+
+4) AJUSTES DE USABILIDADE E ORGANIZAÇÃO:
+- Reorganizar o menu lateral de acordo com as funcionalidades existentes.
+- Garantir que nenhuma tela tente acessar módulos removidos.
+- Revisar navegação, breadcrumbs e redirecionamentos.
+
+5) AJUSTE DE PERFIS DE USUÁRIO:
+- Detectar permissões atuais.
+- Criar novo mapa de roles baseado somente nas funcionalidades mantidas.
+- Atualizar políticas de autorização.
+- Remover permissões antigas.
+
+6) INSERIR LOGO DA ARGO TECH BRASIL DISCRETAMENTE:
+- Arquivo: /mnt/data/logo.png
+- Inserção no footer ou header, de forma leve e sutil.
+- Garantir que o asset seja otimizado.
+
+7) SUGESTÃO DE NOVO NOME PARA O SISTEMA:
+Gerar 3 opções coerentes com as funcionalidades mantidas e com características:
+- Nome curto
+- Fácil de lembrar
+- Apresentação profissional
+Ex.: ArgoHealth, ArgoSaúde Core, ArgoClin Lite (APENAS EXEMPLOS)
+
+A execução da renomeação só deve ocorrer após minha aprovação explícita.
+
+8) TESTES AUTOMATIZADOS + VALIDAÇÃO:
+- Criar testes unitários para fluxos principais.
+- Criar testes e2e mínimos.
+- Garantir funcionamento total das funcionalidades mantidas.
+
+9) CHECKPOINTS E SEGURANÇA:
+- Antes de QUALQUER ação destrutiva, criar snapshot do Replit.
+- Antes de migrations, gerar backup do banco.
+- Todas as alterações devem ser incrementais e reversíveis.
+- Nunca executar remoções profundas sem aprovação.
+
+--------------------------------------------------------------------
+INSTRUÇÕES DE EXECUÇÃO
+
+1) Primeiro rodar este prompt em PLAN MODE.
+2) Gerar relatório completo de análise.
+3) Aguardar minha autorização antes de executar qualquer item classificado como:
+   - disruptive
+   - irreversible
+   - destructive
+
+--------------------------------------------------------------------
+SAÍDAS ESPERADAS IMEDIATAS (NO PLAN MODE)
+- Relatório de análise completo.
+- Lista de funcionalidades remanescentes confirmadas.
+- Lista das funcionalidades removidas e seus vestígios.
+- Lista de tudo que será removido de forma segura.
+- Lista de pontos que exigem aprovação.
+- Sugestão dos três novos nomes do sistema.
+- Plano de otimização.
+- Plano de ajuste de perfis de usuários.
+- Plano de reorganização e limpeza.
+- Plano de inserção da logo Argo Tech Brasil.
+
+Após isso, aguardarei para aprovar execução.
+*/
