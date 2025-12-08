@@ -122,12 +122,13 @@ describe("Automation API Integration Tests", () => {
 
     it("GET /api/workflow/available-actions should return actions", async () => {
       const response = await fetchWithAuth(
-        `${BASE_URL}/api/workflow/available-actions?workflowSlug=sinan&status=pending&role=admin`
+        `${BASE_URL}/api/workflow/available-actions?status=pending&role=admin`
       );
       expect(response.ok).toBe(true);
       
       const data = await response.json();
-      expect(Array.isArray(data)).toBe(true);
+      expect(data).toHaveProperty("availableActions");
+      expect(Array.isArray(data.availableActions)).toBe(true);
     });
   });
 
