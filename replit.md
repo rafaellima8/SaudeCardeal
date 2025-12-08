@@ -76,22 +76,21 @@ The system employs a client-server architecture with a clear separation of conce
 
 ## Database Schema
 
-- **44 tables** in SQLite with Drizzle ORM
+- **77 tables** in SQLite with Drizzle ORM
 - **Date storage**: Unix timestamps (seconds since epoch)
 - **ID generation**: UUID v4 via generateId()
 
-## Recent Changes (2025-12-06)
+## Recent Changes (2025-12-08)
 
-### Consolidation v2.0.0
-- Rebranded to **ArgoSaude** by Argo Tech Brasil
-- Removed 8 unused npm packages (passport, neon, openid-client, connect-pg-simple, etc.)
-- Removed obsolete ace:* scripts
-- Added Argo Tech Brasil logo to sidebar footer
-- Updated Logo.tsx component with new branding
-- Generated CONSOLIDATION_REPORT.md with full analysis
+### Database Synchronization
+- Synchronized schema.ts with SQLite database
+- Added missing columns: `action_url`, `due_at`, `error_message`
+- Removed 5 orphan tables with 0 records: `editais`, `ace_audit_logs`, `ace_dwellings`, `ace_foci`, `ace_visits`
+- Deploy configuration: autoscale mode with `node dist/index.js`
+- 89/89 E2E tests passing (100% approval)
 - 0 LSP errors - clean codebase
 
-### Cleanup Summary
+### Cleanup Summary (2025-12-06)
 - **Removed packages**: @neondatabase/serverless, connect-pg-simple, passport, passport-local, openid-client, @types/connect-pg-simple, @types/passport, @types/passport-local
 - **Estimated savings**: ~535KB
 
@@ -118,7 +117,7 @@ The system employs a client-server architecture with a clear separation of conce
 │   ├── services/         # Business logic
 │   └── routes.ts         # API endpoints
 ├── shared/               # Shared types
-│   ├── schema.ts         # Drizzle schema (44 tables)
+│   ├── schema.ts         # Drizzle schema (77 tables)
 │   └── sinan/            # SINAN templates
 ├── modules/              # Automation modules
 │   ├── alerts/           # Alert scheduler
