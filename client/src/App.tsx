@@ -19,6 +19,7 @@ import Pharmacy from "@/pages/pharmacy";
 import PharmacyDispensation from "@/pages/pharmacy-dispensation";
 import PharmacyStock from "@/pages/pharmacy-stock";
 import PharmacyDiaperStock from "@/pages/pharmacy-diaper-stock";
+import PharmacyPendingAuthorizations from "@/pages/pharmacy-pending-authorizations";
 import TFD from "@/pages/tfd";
 import SocialAssistance from "@/pages/social-assistance";
 import Sinan from "@/pages/sinan";
@@ -46,6 +47,7 @@ function ProtectedRoutes() {
       <Route path="/farmacia/dispensacao" component={PharmacyDispensation} />
       <Route path="/farmacia/estoque" component={PharmacyStock} />
       <Route path="/farmacia/fraldas" component={PharmacyDiaperStock} />
+      <Route path="/farmacia/autorizacoes" component={PharmacyPendingAuthorizations} />
       <Route path="/tfd" component={TFD} />
       <Route path="/assistencia-social" component={SocialAssistance} />
       <Route path="/sinan" component={Sinan} />

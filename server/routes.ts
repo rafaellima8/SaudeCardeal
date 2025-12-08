@@ -712,6 +712,158 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Pharmacy - Pending Diaper Authorizations (Integration with Social Assistance)
+  app.get("/api/pharmacy/diapers/pending-authorizations", enforceUnitScope(), async (req, res) => {
+    try {
+      const effectiveUnitId = getEffectiveUnitId(req);
+      
+      const authorizations = await storage.getDiaperAuthorizations({
+        unitId: effectiveUnitId || undefined,
+        status: 'ativa',
+      });
+
+      const activeAuthorizations = authorizations.filter(
+        a => a.status === 'ativa' || a.status === 'parcialmente_utilizada'
+      );
+
+      const result = await Promise.all(activeAuthorizations.map(async (auth) => {
+        const beneficiary = await storage.getSaBeneficiaryById(auth.beneficiaryId);
+        const stockAvailable = await storage.getDiaperStockByFIFO(
+          effectiveUnitId || auth.unitId,
+          auth.diaperSize,
+          1
+        );
+        const totalAvailable = stockAvailable.reduce((sum, s) => sum + s.availableQuantity, 0);
+        
+        return {
+          ...auth,
+          beneficiary,
+          stockAvailable: totalAvailable,
+          canDeliver: totalAvailable >= (auth.quantityRemaining || 0),
+        };
+      }));
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Pharmacy - Process Diaper Delivery
+  app.post("/api/pharmacy/diapers/process-delivery", enforceUnitScope(), async (req, res) => {
+    try {
+      const sessionUnitId = req.session?.user?.unitId;
+      if (!sessionUnitId) {
+        return res.status(401).json({ error: "Unidade não identificada" });
+      }
+
+      const { authorizationId, quantity, receiverName, receiverDocument, observations } = req.body;
+
+      if (!authorizationId) {
+        return res.status(400).json({ error: "ID da autorização é obrigatório" });
+      }
+
+      const deliveryQuantity = quantity || 0;
+      if (deliveryQuantity <= 0) {
+        return res.status(400).json({ error: "Quantidade inválida" });
+      }
+
+      const authorization = await storage.getDiaperAuthorizationById(authorizationId);
+      if (!authorization) {
+        return res.status(404).json({ error: "Autorização não encontrada" });
+      }
+
+      if (!['ativa', 'parcialmente_utilizada'].includes(authorization.status || '')) {
+        return res.status(400).json({ error: "Autorização não está ativa" });
+      }
+
+      const remaining = authorization.quantityRemaining || (authorization.quantityAuthorized - (authorization.quantityDelivered || 0));
+      if (remaining < deliveryQuantity) {
+        return res.status(400).json({ error: `Quantidade solicitada (${deliveryQuantity}) excede o saldo disponível (${remaining})` });
+      }
+
+      const availableStock = await storage.getDiaperStockByFIFO(
+        sessionUnitId,
+        authorization.diaperSize,
+        deliveryQuantity
+      );
+
+      let remainingQty = deliveryQuantity;
+      const stockAllocations: { stockId: string; quantity: number }[] = [];
+
+      for (const stock of availableStock) {
+        if (remainingQty <= 0) break;
+        const allocateQty = Math.min(remainingQty, stock.availableQuantity);
+        stockAllocations.push({ stockId: stock.id, quantity: allocateQty });
+        remainingQty -= allocateQty;
+      }
+
+      if (remainingQty > 0) {
+        return res.status(400).json({ 
+          error: `Estoque insuficiente. Faltam ${remainingQty} unidades do tamanho ${authorization.diaperSize}` 
+        });
+      }
+
+      for (const allocation of stockAllocations) {
+        const stock = await storage.getDiaperStockById(allocation.stockId);
+        if (stock) {
+          await storage.createDiaperStockMovement({
+            stockId: allocation.stockId,
+            unitId: sessionUnitId,
+            movementType: 'doacao_assistencia',
+            quantity: allocation.quantity,
+            previousQuantity: stock.currentQuantity,
+            newQuantity: stock.currentQuantity - allocation.quantity,
+            reason: `Entrega pela Farmácia - Autorização ${authorization.authorizationNumber}`,
+            userId: req.session.user!.id,
+            diaperDeliveryId: authorization.id,
+          });
+        }
+      }
+
+      const deliveryNumber = await storage.generateDiaperDeliveryNumber();
+      
+      const data = { 
+        authorizationId,
+        unitId: sessionUnitId,
+        deliveryNumber,
+        beneficiaryId: authorization.beneficiaryId,
+        diaperSize: authorization.diaperSize,
+        quantityDelivered: deliveryQuantity,
+        receivedByName: receiverName,
+        receivedByCpf: receiverDocument,
+        observations: observations || 'Entrega processada pela Farmácia',
+        deliveredAt: new Date(),
+        deliveredById: req.session.user!.id,
+        stockAllocations: JSON.stringify(stockAllocations),
+      };
+      
+      const delivery = await storage.createDiaperDelivery(data);
+
+      const newDeliveredTotal = (authorization.quantityDelivered || 0) + deliveryQuantity;
+      const newRemaining = authorization.quantityAuthorized - newDeliveredTotal;
+      const newStatus = newRemaining <= 0 ? 'utilizada' : 'parcialmente_utilizada';
+
+      await storage.updateDiaperAuthorization(authorization.id, {
+        quantityDelivered: newDeliveredTotal,
+        status: newStatus,
+      });
+
+      res.status(201).json({
+        success: true,
+        delivery,
+        authorization: {
+          ...authorization,
+          quantityDelivered: newDeliveredTotal,
+          quantityRemaining: newRemaining,
+          status: newStatus,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ============================================================================
   // SOCIAL ASSISTANCE API
   // ============================================================================
@@ -958,6 +1110,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const periodEnd = req.body.periodEnd ? new Date(req.body.periodEnd) : new Date(now.getFullYear(), now.getMonth() + 1, 0);
       const validUntil = new Date(periodEnd);
       validUntil.setMonth(validUntil.getMonth() + 1);
+
+      // Validate period overlap
+      const beneficiaryIdToCheck = req.body.beneficiaryId || request?.beneficiaryId;
+      const diaperSizeToCheck = req.body.diaperSize || request?.diaperSize;
+      
+      if (beneficiaryIdToCheck && diaperSizeToCheck) {
+        const existingAuthorizations = await storage.getDiaperAuthorizations({
+          beneficiaryId: beneficiaryIdToCheck,
+        });
+        
+        const overlappingAuth = existingAuthorizations.find(auth => {
+          if (!['ativa', 'parcialmente_utilizada'].includes(auth.status || '')) return false;
+          if (auth.diaperSize !== diaperSizeToCheck) return false;
+          
+          const authStart = new Date(auth.periodStart);
+          const authEnd = new Date(auth.periodEnd);
+          
+          const hasOverlap = periodStart <= authEnd && periodEnd >= authStart;
+          return hasOverlap;
+        });
+        
+        if (overlappingAuth) {
+          const overlapStart = new Date(overlappingAuth.periodStart).toLocaleDateString('pt-BR');
+          const overlapEnd = new Date(overlappingAuth.periodEnd).toLocaleDateString('pt-BR');
+          return res.status(400).json({ 
+            error: `Já existe autorização ativa (${overlappingAuth.authorizationNumber}) para este beneficiário e tamanho no período ${overlapStart} a ${overlapEnd}`,
+            overlappingAuthorization: overlappingAuth.authorizationNumber,
+          });
+        }
+      }
 
       const authorizationNumber = await storage.generateDiaperAuthorizationNumber();
       const data = { 

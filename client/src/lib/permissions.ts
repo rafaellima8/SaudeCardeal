@@ -33,6 +33,7 @@ export const menuPermissions = {
   dispensacao: ["admin", "farmaceutico", "gestor"] as UserRole[],
   estoque: ["admin", "farmaceutico", "gestor"] as UserRole[],
   fraldas: ["admin", "farmaceutico", "gestor", "assistencia_social"] as UserRole[],
+  autorizacoes: ["admin", "farmaceutico", "gestor", "assistencia_social"] as UserRole[],
   tfd: ["admin", "gestor", "recepcao"] as UserRole[],
   "assistencia social": ["admin", "gestor", "assistencia_social"] as UserRole[],
   beneficiarios: ["admin", "gestor", "assistencia_social"] as UserRole[],

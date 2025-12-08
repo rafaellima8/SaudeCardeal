@@ -25,7 +25,10 @@ import {
   CheckCircle,
   Info,
   Loader2,
+  User,
+  Search,
 } from "lucide-react";
+import PatientSelector, { PatientData } from "@/components/PatientSelector";
 
 interface SinanField {
   key: string;
@@ -116,6 +119,52 @@ export default function SinanDynamicForm({
   const [currentStep, setCurrentStep] = useState(0);
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [formValues, setFormValues] = useState<Record<string, any>>(initialData);
+  const [selectedPatientId, setSelectedPatientId] = useState<string | undefined>();
+
+  const handlePatientSelect = (patient: PatientData) => {
+    const fieldMappings: Record<string, keyof PatientData> = {
+      paciente_nome: "name",
+      paciente_cpf: "cpf",
+      paciente_cns: "cns",
+      paciente_sexo: "gender",
+      paciente_mae: "motherName",
+      paciente_telefone: "phone",
+      res_logradouro: "address",
+      res_bairro: "neighborhood",
+      res_municipio: "city",
+      res_uf: "state",
+    };
+
+    Object.entries(fieldMappings).forEach(([formField, patientField]) => {
+      const value = patient[patientField];
+      if (value !== undefined && value !== null && value !== "") {
+        form.setValue(formField, value);
+        setFormValues(prev => ({ ...prev, [formField]: value }));
+      }
+    });
+
+    if (patient.birthDate) {
+      const birthDateStr = format(patient.birthDate, "yyyy-MM-dd");
+      form.setValue("paciente_dt_nasc", birthDateStr);
+      setFormValues(prev => ({ ...prev, paciente_dt_nasc: birthDateStr }));
+
+      const age = Math.floor((Date.now() - patient.birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+      form.setValue("paciente_idade", age);
+      form.setValue("paciente_idade_tipo", "A");
+      setFormValues(prev => ({ ...prev, paciente_idade: age, paciente_idade_tipo: "A" }));
+    }
+
+    if (patient.id) {
+      setSelectedPatientId(patient.id);
+      form.setValue("citizen_id", patient.id);
+      setFormValues(prev => ({ ...prev, citizen_id: patient.id }));
+    }
+
+    toast({
+      title: "Paciente selecionado",
+      description: `Dados de ${patient.name} preenchidos automaticamente.`,
+    });
+  };
 
   const { data: template, isLoading: templateLoading } = useQuery<SinanTemplate>({
     queryKey: ["/api/sinan/templates", templateId],
@@ -551,6 +600,27 @@ export default function SinanDynamicForm({
               : `${validationResult.errors.length} erro(s) encontrado(s). Verifique os campos destacados.`}
           </AlertDescription>
         </Alert>
+      )}
+
+      {currentStep === 0 && mode !== "view" && (
+        <Card className="border-dashed border-primary/50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Search className="h-4 w-4" />
+              Buscar Paciente Cadastrado
+            </CardTitle>
+            <CardDescription>
+              Selecione um paciente para preencher automaticamente os dados
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PatientSelector
+              onSelect={handlePatientSelect}
+              selectedPatientId={selectedPatientId}
+              compact={false}
+            />
+          </CardContent>
+        </Card>
       )}
 
       <Card>

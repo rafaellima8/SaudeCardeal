@@ -20,6 +20,7 @@ import {
   BarChart3,
   Package,
   Boxes,
+  ClipboardCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -57,6 +58,7 @@ const farmaciaSubItems = [
   { title: "Dispensação", icon: Package, url: "/farmacia/dispensacao" },
   { title: "Estoque", icon: Boxes, url: "/farmacia/estoque" },
   { title: "Fraldas", icon: Baby, url: "/farmacia/fraldas" },
+  { title: "Autorizações", icon: ClipboardCheck, url: "/farmacia/autorizacoes" },
 ];
 
 const operationalMenuItems = [

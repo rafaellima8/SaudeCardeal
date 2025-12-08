@@ -1,0 +1,234 @@
+/*
+PROMPT FINAL — ARGO SAÚDE v3.0
+“Sistema 100% pronto para publicação”
+
+NÍVEL: Especialista Sênior (Arquitetura, Backend, Frontend, Banco, SINAN, Farmácia, Assistência Social, Automação)
+REQUISITO: Executar PRIMEIRO em PLAN MODE → gerar relatórios e plano de execução.  
+Após minha aprovação: executar automaticamente todas as ações SAFE.
+
+====================================================================
+OBJETIVO GERAL
+====================================================================
+Concluir totalmente o sistema ArgoSaude, eliminando duplicações, corrigindo inconsistências,
+sincronizando módulos, reestruturando pastas, validando SINAN completo, finalizando integração
+Assistência Social ↔ Farmácia, otimizando o projeto e deixando pronto para publicação.
+
+“Nenhuma funcionalidade pode ficar com comportamento parcial, incompleto ou inconsistente.”
+
+====================================================================
+ESCOPO TÉCNICO (100% OBRIGATÓRIO)
+====================================================================
+
+1) SINAN — Conclusão total
+-----------------------------------
+- Validar *todos os* 108 templates de agravos.
+- Gerar/Uso de Dynamic Loader baseado em registry único: shared/sinan/registry.ts
+- Fichas completas: 1 a 9 etapas, com todos os blocos.
+- Autopreenchimento automático com dados do paciente (nome, mãe, sexo, CPF, CNS, endereço, data nasc.).
+- Preenchimento automático de CID-10 e rótulos específicos por agravo.
+- Validações oficiais: required, máscaras, ranges, condicionais.
+- Salvamento incremental (rascunho), versionamento do template, logs.
+- Exportação DBF/TXT compatível com SINANNet: validar estrutura campo a campo.
+- Testes completos: unit + e2e Playwright.
+
+2) ASSISTÊNCIA SOCIAL — Conclusão total
+-----------------------------------
+Fluxo final 100% funcional:
+Beneficiário → Solicitação → Autorização → Farmácia → Entrega → Histórico
+
+- Criar/validar tabela `social_diapers_authorizations`
+- Validar beneficiaries: CPF, CNS, duplicidade.
+- Criar módulo completo: beneficiários, solicitações, autorizações, entregas.
+- Dashboard:
+  • Pendentes  
+  • Autorizadas  
+  • Entregues  
+  • Estoque Baixo  
+- Logs completos (quem autorizou, quem entregou).
+- Cancelamentos e revalidações.
+- Testes unitários e e2e.
+
+3) FARMÁCIA — Integração final com Assistência Social
+-----------------------------------
+- Farmácia recebe autorizações pendentes em:
+  `/api/pharmacy/diapers/pending`
+- Farmácia processa retirada:
+  `/api/pharmacy/diapers/process`
+- Atualiza o estoque com baixa automática (FIFO).
+- Dashboard:
+  • Pendentes  
+  • Processadas  
+  • Alertas de baixo estoque  
+- Rastreabilidade total.
+- Testes unitários e e2e.
+
+4) LIMPEZA DE DUPLICAÇÕES E REORGANIZAÇÃO FINAL
+-----------------------------------
+Executar auditoria raiz → relatórios:
+- ROOT_DUPLICATION_REPORT.md
+- SYSTEM_INTEGRITY_REPORT.md
+
+Identificar e corrigir:
+- Arquivos MD duplicados
+- Templates repetidos
+- Componentes replicados
+- Pastas redundantes
+- Rotas órfãs
+- Código morto
+- Schemas duplicados
+- Tipos duplicados em shared/
+
+Criar nova estrutura consolidada:
+
+shared/
+  sinan/
+    templates/
+    registry.ts
+    validators/
+  types/
+  utils/
+
+modules/
+  social/
+    beneficiaries/
+    requests/
+    authorizations/
+    deliveries/
+  pharmacy/
+    stock/
+    diapers/
+    integrations/
+
+client/src/
+  sinan/
+    components/
+    loaders/
+    pages/
+    steps/
+  social/
+    beneficiarios/
+    solicitacoes/
+    autorizacoes/
+    entregas/
+  pharmacy/
+    autorizacoes/
+    processamento/
+  components/
+  hooks/
+  lib/
+
+server/
+  routes/
+  services/
+  modules/
+  middlewares/
+  utils/
+
+5) BANCO DE DADOS — SINTONIA FINA
+-----------------------------------
+- Validar 44 tabelas → corrigir inconsistências.
+- Criar migrations SAFE (rollback completo).
+- Indexes:
+  • sinan_records(agravoCode)  
+  • social_authorizations(status)  
+  • pharmacy_stock(item_id)  
+- Otimização: normalização dos campos repetidos.
+- Testes de integridade.
+
+6) PERFORMANCE E DEPLOY-READY
+-----------------------------------
+- Minimizar bundle (Vite).
+- Remover dependências obsoletas.
+- CSS purge (Tailwind).
+- Lazy-loading de templates SINAN.
+- Caching leve de dicionários (CID-10, agravos).
+- Logging estruturado (JSON logs).
+- Melhorar DX: comandos scripts scripts padronizados.
+
+7) TESTES AUTOMÁTICOS (OBRIGATÓRIO)
+-----------------------------------
+UNIT:
+- Validadores SINAN
+- Integradores Assistência ↔ Farmácia
+- Calculo de estoque FIFO
+- Normalizadores
+
+E2E:
+- Criar ficha Dengue completa e enviar
+- Criar beneficiário → autorizar → farmácia processar
+- Sincronização dashboards
+
+Gerar: TEST_COVERAGE_REPORT.md
+
+8) DOCUMENTAÇÃO FINAL DE PUBLICAÇÃO
+-----------------------------------
+Gerar automaticamente:
+- DEPLOY_GUIDE.md
+- CHANGELOG_v3.0.md
+- SYSTEM_READY_CHECKLIST.md
+- API_REFERENCE.md
+
+====================================================================
+MODO DE EXECUÇÃO
+====================================================================
+
+1) PLAN MODE — Geração automática de relatórios:
+-----------------------------------
+Gerar:
+- SYSTEM_AUDIT_REPORT.md
+- SINAN_SYNC_REPORT.md
+- SOCIAL_INTEGRATION_REPORT.md
+- PHARMACY_SYNC_REPORT.md
+- ROOT_DUPLICATION_REPORT.md
+- ARCHITECTURE_FINAL_PLAN.md
+- MIGRATIONS_PLAN.md
+- TEST_PLAN.md
+
+Sem alterar nada ainda.
+
+2) Após minha aprovação:
+-----------------------------------
+Executar automaticamente:
+✔ Tudo que for SAFE  
+✔ Refactors incrementais  
+✔ Correções de templates  
+✔ Novos módulos  
+✔ Integração Social ↔ Farmácia  
+✔ Dynamic loader SINAN  
+✔ Testes  
+✔ Build final  
+✔ PR completo v3.0  
+✔ Snapshot  
+
+3) Antes de ações destrutivas:
+-----------------------------------
+- Solicitar aprovação explícita  
+- Criar snapshot  
+- Criar branch final: `release/argos-3.0`  
+
+====================================================================
+REGRAS CRÍTICAS
+====================================================================
+
+- Nunca remover tabela/coluna sem aprovação explícita.  
+- Nunca sobrescrever template SINAN oficial sem validar consistência.  
+- Não duplicar arquivos, nunca.  
+- Relatórios obrigatórios antes de qualquer execução significativa.  
+- Commits atômicos com mensagem estruturada.  
+- Rollback garantido.
+
+====================================================================
+ENTREGA FINAL ESPERADA
+====================================================================
+
+- ArgoSaude v3.0 **100% funcional**  
+- Zero duplicações  
+- SINAN completo real  
+- Assistência Social integrada à Farmácia  
+- Estoque consistente  
+- Testes 100% passando  
+- Documentação final  
+- Sistema pronto para publicação sem pendências  
+
+FIM DO PROMPT FINAL — executar agora em PLAN MODE.
+*/
