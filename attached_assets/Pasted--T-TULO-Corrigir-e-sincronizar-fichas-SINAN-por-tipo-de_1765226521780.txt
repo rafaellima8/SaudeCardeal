@@ -1,0 +1,355 @@
+/*
+TÍTULO: Corrigir e sincronizar fichas SINAN por tipo de agravo — ArgoSaude v2.0.1
+OBJETIVO: Garantir que, ao selecionar "Agravo/Doença" no formulário SINAN, a interface carregue automaticamente a ficha correta
+(estrutura de campos, rótulos, validações, máscaras, valores padrões, CID-10 principal/associados, grupos condicionais), e que backend e export (DBF/TXT/PDF) sejam compatíveis com os formatos oficiais.
+
+CONTEXT:
+- Projeto: ArgoSaude (client/server/shared)
+- Templates SINAN existentes em: shared/sinan/templates/
+- Registry: shared/sinan/registry.ts (cobertura/metadata)
+- Frontend form modal em: client/src/pages/sinan/ (ou client/src/components/sinan/SinanForm.tsx)
+- Backend endpoints sinan em: server/services/sinan/ ou server/routes.ts
+- DB: SQLite com Drizzle (schema em shared/schema.ts)
+
+REGRAS:
+1) Execute em PLAN MODE e gere um relatório detalhado (ScanReport). NÃO altere o DB em produção sem aprovação.
+2) Tudo que for potencialmente destrutivo (migrations, drop tables, renomear colunas) deve esperar minha autorização.
+3) Faça mudanças incrementais e testáveis.
+4) Crie checkpoint/snapshot antes de qualquer execução.
+5) Documente cada alteração em CONSOLIDATION_LOG.md e gere PR/branch separada.
+
+TASKS — Etapas:
+
+A) ANÁLISE (Plan Mode — gerar relatório)
+- Mapear templates sinan: listar todos os arquivos em shared/sinan/templates/* e a estrutura de cada template (campos, tipos, required, máscaras, grupos condicionais).
+- Mapear registry.ts: confirmar o mapeamento agravoCode -> template filename, cid10 mapping.
+- Mapear frontend: localizar componente que renderiza a "Nova Ficha" modal e a função que reage à seleção de "Agravo/Doença".
+- Mapear backend: identificar endpoint que serve templates (se existir) ou confirmar que templates são importados estáticos no client via shared.
+- Detectar discrepâncias: campos faltando, diferenças entre template oficial (no shared) e o form UI, validações ausentes, export mapping faltando (DBF/APAC/BPA).
+- Gerar `SINAN_SYNC_REPORT.md` contendo: lista de agravos, template usado, faltas/erros, prioridades (alto/médio/baixo).
+
+B) PROPOSTA (Plan Mode — gerar plano)
+- Propor arquitetura de sincronização:
+  1. Fonte única de verdade: `shared/sinan/templates/*.json|tsx|yaml` (preferir JSON Schema / TS object).
+  2. Backend endpoint opcional `GET /api/sinan/templates/:agravoCode` que retorna template + meta (para fallback/AJAX).
+  3. Frontend: carregar template dinamicamente ao selecionar agravo; renderizar por um `DynamicForm` baseado em JSON Schema / form renderer (ex.: react-jsonschema-form or custom).
+  4. Validations: front + back mirrored (zod / yup / JSON schema) para garantir integridade.
+  5. Export: garantir mapeamento de campos para DBF/TXT de export SINAN.
+- Fornecer lista de arquivos a alterar e ordem de execução.
+
+C) IMPLEMENTAÇÃO SAFE (após aprovação) — Frontend changes (detalhado)
+- Criar/atualizar arquivo `shared/sinan/template-registry.ts` exportando:
+  ```ts
+  export type SinanField = {
+    name: string;
+    label: string;
+    type: 'string'|'date'|'number'|'select'|'checkbox'|'textarea';
+    required?: boolean;
+    mask?: string; // ex: CPF
+    options?: {value:string,label:string}[];
+    conditional?: { when: string, is: any }[]; // simple conditional rules
+    sinanExportMap?: string; // nome do campo no layout de export
+  }
+
+  export type SinanTemplate = {
+    agravoCode: string; // 'A92.8' ou agravoKey
+    title: string;
+    cid10?: string;
+    fields: SinanField[];
+  }
+  export const templates: Record<string, SinanTemplate> = {
+    'ZIKA': { agravoCode: 'A92.8', title: 'Doença pelo vírus Zika', fields: [ /* ... */ ] },
+    // ...
+  }
+Atualizar client/src/components/sinan/SinanForm.tsx (exemplo):
+
+tsx
+Copiar código
+import { useState, useEffect } from 'react'
+import { templates } from 'shared/sinan/template-registry'
+import DynamicForm from 'client/src/components/forms/DynamicForm'
+
+export default function SinanFormModal({ onClose }) {
+  const [agravo, setAgravo] = useState<string|null>(null)
+  const [template, setTemplate] = useState<SinanTemplate|null>(null)
+
+  useEffect(() => {
+    if (!agravo) { setTemplate(null); return }
+    // Prefer dynamic fetch if template big:
+    // fetch(`/api/sinan/templates/${agravo}`).then(...)
+    const t = templates[agravo] || null
+    setTemplate(t)
+  }, [agravo])
+
+  return (
+    <Modal>
+      <Select onChange={(v)=>setAgravo(v)} options={...} />
+      {template ? (
+        <DynamicForm
+          schema={template}
+          onSubmit={(values) => submitSinan(values)}
+        />
+      ) : (
+        <EmptyState>Selecione um agravo para carregar ficha</EmptyState>
+      )}
+    </Modal>
+  )
+}
+DynamicForm é um componente que:
+
+Recebe SinanTemplate
+
+Renderiza campos conforme tipos, aplica máscaras (ex.: CPF), required flags
+
+Suporta campos condicionais
+
+Em submit executa client-side validation e chama backend
+
+D) IMPLEMENTAÇÃO SAFE — Backend changes (detalhado)
+
+Criar endpoint (server/routes/sinan.ts):
+
+ts
+Copiar código
+import express from 'express'
+import { templates } from 'shared/sinan/template-registry'
+const router = express.Router()
+
+router.get('/templates/:key', (req, res) => {
+  const key = req.params.key
+  const t = templates[key]
+  if (!t) return res.status(404).json({error:'Template not found'})
+  res.json(t)
+})
+
+// Endpoint para validar payload (mirror validation)
+router.post('/validate', (req,res) => {
+  const { agravo, payload } = req.body
+  const template = templates[agravo]
+  if (!template) return res.status(404).json(...)
+  // Use zod or AJV to validate
+  const errors = validateAgainstTemplate(template, payload)
+  if (errors.length) return res.status(400).json({errors})
+  res.json({ok:true})
+})
+export default router
+validateAgainstTemplate usa JSON Schema/AJV or Zod generated from template fields.
+
+E) EXPORT / MAPPING SINAN (essencial)
+
+Garantir que cada SinanField tem sinanExportMap com nome do campo esperado pela exportação DBF/TXT.
+
+Atualizar gerador de export server/services/sinan/export.ts para mapear payload -> layout SINAN (coluna order).
+
+Testar export de um registro real (falso) para verificar formatação BF/APAC.
+
+F) DB / Persistência
+
+Se já existe tabela sinan_records com coluna payload JSON — OK.
+
+Se a export/form exige colunas específicas para index/search, sugerir migration (após aprovação) para:
+
+criar tabela sinan_records (id, agravoCode, cid10, payload JSON, created_by, unit_id, status)
+
+Sugerir índices em agravoCode, created_at.
+
+G) TESTS (automático)
+
+Unit tests:
+
+Testar template-registry consistency (cada agravoCode tem cid10 e fields).
+
+Testar validateAgainstTemplate aceita payload correto e rejeita payload com missing required.
+
+E2E Playwright (smoke):
+
+Abrir /sinan
+
+Clicar em "Nova Ficha"
+
+Selecionar agravo "Doença pelo vírus Zika"
+
+Verificar que os campos esperados aparecem (ex.: data inicio sintoma, CID-10 preenchido, campos específicos aparecem)
+
+Preencher e enviar, verificar success toast e que backend validou e salvou.
+
+Add small unit test for export mapping: generate export for Zika and assert field order and formats.
+
+H) UI/UX
+
+Mostrar mensagem amigável se não houver template.
+
+Focar performance: lazy load templates if > 200kb.
+
+Accessibility: labels, arias, focus.
+
+I) CHECKPOINTS / ROLLBACK
+
+Antes das alterações:
+
+Criar branch feature/sinan-template-sync/<date>
+
+Criar Replit snapshot (checkpoint)
+
+Backup DB (pg_dump or copy sqlite file)
+
+Em caso de falha: git revert + restore sqlite
+
+Commit messages padrão:
+
+feat(sinan): dynamic template loader and registry
+
+fix(sinan): validate templates on backend
+
+test(sinan): add e2e test for zika template
+
+Tag: sinan-sync-v2.0.1
+
+J) OUTPUTS (Plan Mode)
+
+Gerar:
+
+SINAN_SYNC_REPORT.md (scan)
+
+SINAN_SYNC_PLAN.md (passos e arquivos a alterar)
+
+Lista de arquivos/trechos a modificar com risco (ALTO/MEDIO/BAIXO)
+
+Branch/PR sugerido e checklist de deploy
+
+K) EXECUÇÃO (após sua aprovação explícita)
+
+Aplicar mudanças SAFE (frontend dynamic loader, registry, endpoint GET template, tests)
+
+Rodar npm ci && npm run build && npm test && npm run e2e
+
+Abrir PR com mudanças e artefatos (relatórios e testes)
+
+EXECUTION PREFERENCES:
+
+Plan Mode: execute análise e gere SINAN_SYNC_REPORT.md e SINAN_SYNC_PLAN.md.
+
+Pare e me notifique; depois autorizarei execução SAFE.
+
+PATHS IMPORTANTES (verifique e ajustar se diferente no repo):
+
+shared/sinan/templates/
+
+shared/sinan/registry.ts
+
+client/src/components/sinan/SinanForm.tsx
+
+client/src/components/forms/DynamicForm.tsx (criar se não existir)
+
+server/routes/sinan.ts
+
+server/services/sinan/export.ts
+
+shared/schema.ts
+
+Obrigado — gerar agora SINAN_SYNC_REPORT.md e SINAN_SYNC_PLAN.md em Plan Mode.
+*/
+
+yaml
+Copiar código
+
+---
+
+# **Trechos de código rápidos (copiar/colar)**
+Incluí aqui os snippets que o Agent deve usar quando autorizado a implementar:
+
+### registry.ts (shared/sinan/template-registry.ts)
+```ts
+export type SinanField = {
+  name: string;
+  label: string;
+  type: 'string'|'date'|'number'|'select'|'checkbox'|'textarea';
+  required?: boolean;
+  mask?: string;
+  options?: { value: string; label: string }[];
+  conditional?: { when: string; is: any }[];
+  sinanExportMap?: string;
+}
+
+export type SinanTemplate = {
+  key: string; // 'ZIKA'
+  agravoCode: string; // 'A92.8'
+  title: string;
+  cid10?: string;
+  fields: SinanField[];
+}
+
+export const templates: Record<string, SinanTemplate> = {
+  'ZIKA': {
+    key: 'ZIKA',
+    agravoCode: 'A92.8',
+    title: 'Doença pelo vírus Zika',
+    cid10: 'A92.8',
+    fields: [
+      { name: 'data_inicio', label: 'Data início dos sintomas', type: 'date', required: true, sinanExportMap: 'DTINISINT' },
+      { name: 'nome', label: 'Nome completo', type: 'string', required: true, sinanExportMap: 'NOMERESP' },
+      { name: 'cpf', label: 'CPF', type: 'string', mask: '999.999.999-99', required: false, sinanExportMap: 'CPF' },
+      // ... demais campos
+    ]
+  },
+  // outras templates...
+}
+DynamicForm (exemplo simplificado)
+tsx
+Copiar código
+import React from 'react'
+import Input from '@/components/ui/Input'
+import Select from '@/components/ui/Select'
+import DateInput from '@/components/ui/DateInput'
+import { SinanTemplate } from 'shared/sinan/template-registry'
+
+export default function DynamicForm({ schema, onSubmit }) {
+  const [values, setValues] = React.useState({})
+
+  function renderField(f) {
+    const common = { key: f.name, label: f.label, required: f.required }
+    switch(f.type) {
+      case 'string': return <Input {...common} value={values[f.name]||''} onChange={(v)=>setValues(s=>({...s,[f.name]:v}))} />
+      case 'date': return <DateInput {...common} value={values[f.name]||''} onChange={(v)=>setValues(s=>({...s,[f.name]:v}))} />
+      case 'select': return <Select {...common} options={f.options} value={values[f.name]||''} onChange={(v)=>setValues(s=>({...s,[f.name]:v}))} />
+      // ...
+    }
+  }
+
+  return (
+    <form onSubmit={(e)=>{e.preventDefault(); onSubmit(values)}}>
+      {schema.fields.map(renderField)}
+      <button type="submit">Enviar</button>
+    </form>
+  )
+}
+Backend route (server/routes/sinan.ts)
+ts
+Copiar código
+import express from 'express'
+import { templates } from 'shared/sinan/template-registry'
+const router = express.Router()
+
+router.get('/templates/:key', (req,res) => {
+  const key = req.params.key.toUpperCase()
+  const t = templates[key]
+  if(!t) return res.status(404).json({error:'not found'})
+  res.json(t)
+})
+
+export default router
+Playwright E2E (tests/sinan.e2e.ts)
+ts
+Copiar código
+import { test, expect } from '@playwright/test'
+
+test('Sinan Zika form loads fields and submit', async ({ page }) => {
+  await page.goto('/sinan')
+  await page.click('text=Nova Ficha')
+  await page.selectOption('select[name="agravo"]', 'ZIKA')
+  await expect(page.locator('label', { hasText: 'Data início dos sintomas' })).toBeVisible()
+  await page.fill('input[name="data_inicio"]', '2025-12-01')
+  await page.fill('input[name="nome"]', 'Rafael Argolo')
+  await page.click('button[type="submit"]')
+  await expect(page.locator('.toast-success')).toHaveText(/salvo/i)
+})

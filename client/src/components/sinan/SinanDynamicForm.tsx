@@ -143,9 +143,9 @@ export default function SinanDynamicForm({
   }, [initialData, form]);
 
   const validateMutation = useMutation({
-    mutationFn: async (data: Record<string, any>) => {
+    mutationFn: async (data: Record<string, any>): Promise<ValidationResult> => {
       const response = await apiRequest("POST", `/api/sinan/templates/${templateId}/validate`, data);
-      return response.json();
+      return (response as Response).json();
     },
     onSuccess: (result: ValidationResult) => {
       setValidationResult(result);
@@ -170,7 +170,7 @@ export default function SinanDynamicForm({
         });
       }
     },
-    onSuccess: (response: unknown) => {
+    onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sinan/notifications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sinan/stats"] });
       toast({
