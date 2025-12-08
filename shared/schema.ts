@@ -1447,44 +1447,6 @@ export const alertDeliveries = sqliteTable("alert_deliveries", {
 });
 
 // ============================================================================
-// EDITAIS MONITORING MODULE (Isolated - Non-invasive)
-// ============================================================================
-
-export const editais = sqliteTable("editais", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  
-  source: text("source", {
-    enum: ["ms", "fnde", "conass", "conasems", "mds", "ses", "outros"]
-  }).notNull(),
-  
-  title: text("title").notNull(),
-  description: text("description"),
-  url: text("url").notNull(),
-  
-  category: text("category", {
-    enum: ["infraestrutura", "equipamentos", "capacitacao", "programas", "custeio", "outros"]
-  }),
-  
-  openDate: integer("open_date", { mode: "timestamp" }),
-  closeDate: integer("close_date", { mode: "timestamp" }),
-  
-  estimatedValue: real("estimated_value"),
-  requirements: text("requirements", { mode: "json" }).$type<string[]>(),
-  documents: text("documents", { mode: "json" }).$type<string[]>(),
-  
-  status: text("status", {
-    enum: ["aberto", "em_analise", "inscrito", "aprovado", "rejeitado", "expirado"]
-  }).default("aberto").notNull(),
-  
-  impactAnalysis: text("impact_analysis"),
-  notes: text("notes"),
-  
-  scrapedAt: integer("scraped_at", { mode: "timestamp" }),
-  createdAt: integer("created_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(unixepoch())`).notNull(),
-});
-
-// ============================================================================
 // STRATEGIC REPORTS MODULE (Isolated - Non-invasive)
 // ============================================================================
 
@@ -1546,7 +1508,7 @@ export const systemAuditLog = sqliteTable("system_audit_log", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   
   module: text("module", {
-    enum: ["forms", "workflow", "alerts", "reports", "editais", "sinan", "tfd", "pharmacy", "social_assistance", "system"]
+    enum: ["forms", "workflow", "alerts", "reports", "sinan", "tfd", "pharmacy", "social_assistance", "system"]
   }).notNull(),
   
   action: text("action").notNull(),
@@ -2148,9 +2110,6 @@ export type WorkflowAction = typeof workflowActions.$inferSelect;
 export type AlertRule = typeof alertRules.$inferSelect;
 export type AlertInstance = typeof alertInstances.$inferSelect;
 export type AlertDelivery = typeof alertDeliveries.$inferSelect;
-
-// Editais Types
-export type Edital = typeof editais.$inferSelect;
 
 // Report Types
 export type ReportDefinition = typeof reportDefinitions.$inferSelect;
