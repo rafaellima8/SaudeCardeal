@@ -9,7 +9,7 @@ packages = ["sqlite", "chromium", "glib"]
 [deployment]
 deploymentTarget = "autoscale"
 build = ["npm", "run", "build"]
-run = ["npm", "run", "start"]
+run = ["node", "dist/index.js"]
 publicDir = "dist/public"
 
 [[ports]]
