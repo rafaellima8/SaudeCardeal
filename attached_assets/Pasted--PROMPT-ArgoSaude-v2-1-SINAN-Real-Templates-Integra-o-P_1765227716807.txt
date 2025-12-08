@@ -1,0 +1,237 @@
+/*
+PROMPT: ArgoSaude v2.1 — SINAN Real Templates, Integração Pacientes, Assistência Social + Farmácia, Correções Estruturais e Limpeza
+
+NÍVEL: Especialista Sênior (arquitetura, backend, frontend, sincronização de dados, automação)
+
+MODO: Executar em PLAN MODE primeiro.
+APÓS RELATÓRIO: aguardar minha aprovação para mudanças destrutivas (DB, migrations, deleções).
+Mudanças SAFE podem ser aplicadas automaticamente.
+
+=====================================================================
+OBJETIVOS GERAIS
+=====================================================================
+
+1) **SINAN – IMPLEMENTAR FICHAS REAIS**
+   - Carregar **templates completos reais** de cada agravo (Botulismo, Dengue, Chikungunya, Zika, Malária, Hanseníase, Tuberculose, Leishmanioses etc.).
+   - Reproduzir exatamente:
+     • Campos oficiais  
+     • Múltiplos blocos (Dados Gerais, Notificação Individual, Residência, Antecedentes Epidemiológicos, Clínicos, Laboratoriais, Tratamento etc.)  
+     • Validações, obrigatoriedade, máscaras, regras condicionais  
+     • Códigos CID-10 automáticos  
+     • Faixas etárias  
+     • Campos específicos por agravo
+
+   - Fichas devem carregar automaticamente ao selecionar “Agravos/Doença”.
+
+   - O sistema deve suportar:
+     • `Step-based form` (1 a 9 etapas)  
+     • Navegação Próximo/Anterior  
+     • Salvamento de rascunho  
+     • Envio final  
+     • Exportação DBF/TXT compatível com SINANNet  
+
+   - Criar **registro único da ficha** com payload validado + snapshot da versão do template.
+
+2) **AUTOPREENCHIMENTO COM DADOS DO PACIENTE**
+   - Ao selecionar paciente cadastrado:
+     • Nome
+     • CPF
+     • CNS
+     • Data de nascimento
+     • Nome da mãe
+     • Sexo  
+     • Endereço  
+     • Unidade de Saúde (se cadastrada)
+   - Todos esses campos populam automaticamente a ficha SINAN.
+
+   - Se paciente não existir → botão "Criar Paciente" (mini-modal).
+
+3) **ASSISTÊNCIA SOCIAL – FLUXO COMPLETO**
+   Implementar pipeline rígido de fraldas:
+
+   A) Beneficiário → Solicitação  
+   B) Assistência avalia → Autorização  
+   C) Autorização gera documento com ID único  
+   D) Farmácia visualiza autorizações pendentes  
+   E) Farmácia processa retirada → baixa no estoque  
+   F) Assistência vê status atualizado em tempo real
+
+   - Logs: beneficiário, quem autorizou, quem entregou.
+   - Evitar duplicidades: só uma autorização válida por período.
+   - Campos obrigatórios por norma municipal.
+
+   Melhorias a implementar:
+   - Dashboard Assistência com:
+     • Pendentes  
+     • Autorizadas  
+     • Entregues  
+     • Estoque baixo  
+   - Dashboard Farmácia com:
+     • Autorizações pendentes  
+     • Processadas  
+     • Estoque mínimo/alertas  
+
+4) **INTEGRAÇÃO ASSISTÊNCIA SOCIAL ↔ FARMÁCIA**
+   - Criar tabela/mapeamento:
+     • `social_diapers_authorizations`
+       - id (uuid)
+       - beneficiary_id
+       - social_worker_id
+       - pharmacy_user_id (quando entregue)
+       - status: `pendente`, `autorizado`, `entregue`
+       - itens autorizados
+       - timestamps
+
+   - Criar endpoint:
+     • `/api/social/diapers/authorize`
+     • `/api/pharmacy/diapers/pending`
+     • `/api/pharmacy/diapers/process`
+
+   - Farmácia deve reduzir estoque automaticamente ao processar autorização.
+
+   - Farmácia deve ver:
+     • Beneficiário  
+     • Itens  
+     • Data da autorização  
+     • Social Worker responsável  
+
+5) **LIMPEZA / ORGANIZAÇÃO / DUPLICAÇÕES**
+   - Remover MDs antigos que descrevem a versão antiga (guardar em `/archived/docs/`).
+   - Verificar duplicações em:
+     • client/src/pages/sinan  
+     • shared/sinan  
+     • modules/social  
+     • modules/pharmacy  
+     • shared/schema.ts  
+   - Corrigir referências quebradas.
+   - Validar arquitetura final:
+     • Pastas consistentes  
+     • Tipagens centrais unificadas  
+     • Zero duplicação de templates  
+     • Zero rotas mortas
+
+6) **GERAR ARQUITETURA COMPLETA**
+   - Criar arquitetura final proposta:
+     shared/
+       sinan/
+         registry.ts
+         templates/
+         validators/
+       types/
+       utils/
+
+     modules/
+       social/
+         authorizations/
+         beneficiaries/
+         deliveries/
+       pharmacy/
+         stock/
+         diapers/
+         deliveries/
+
+     client/
+       sinan/
+         TemplateLoader.tsx
+         pages/
+         components/
+         validators/
+       social/
+         Beneficiarios.tsx
+         Solicitacoes.tsx
+         Autorizacoes.tsx
+         Entregas.tsx
+       pharmacy/
+         AutorizacoesPendentes.tsx
+         ProcessamentoEntrega.tsx
+
+7) **CRIAR TESTES AUTOMATIZADOS**
+   - E2E Playwright:
+     • Selecionar agravo → ficha completa deve abrir com campos reais  
+     • Autopreenchimento via paciente  
+     • Criar beneficiário → gerar autorização → farmácia processa → assistência recebe status  
+   - Unit tests (Vitest):
+     • Validação de templates  
+     • Validação de exportações  
+     • Validação de payloads  
+
+8) **PROPOR MELHORIAS ADICIONAIS**
+   - Cache local para templates SINAN (lazy-loading)
+   - Normalização de tipos (shared/types)
+   - Remoção de bibliotecas obsoletas
+   - Logs estruturados (JSON logs)
+   - Persistência mais consistente para autorizações (event sourcing light)
+
+=====================================================================
+ENTRADAS IMPORTANTES PARA O AGENTE
+=====================================================================
+
+Referências de templates SINAN oficiais (já incluídos no projeto):
+shared/sinan/templates/
+shared/sinan/registry.ts
+
+Front atual:
+client/src/pages/sinan/
+client/src/components/
+
+Assistência Social:
+client/src/pages/assistencia-social
+server/modules/social/...
+
+Farmácia:
+client/src/pages/farmacia
+server/modules/pharmacy/...
+
+=====================================================================
+TAREFAS TÉCNICAS DETALHADAS (PLAN MODE)
+=====================================================================
+
+1) Fazer scan completo:
+   - shared/sinan/templates/*
+   - shared/sinan/registry.ts
+   - client/src/pages/sinan/*
+   - server/services/sinan/*
+   - server/routes.ts
+   - modules/social/*
+   - modules/pharmacy/*
+   - shared/schema.ts
+
+2) Detectar:
+   - Duplicações
+   - Campos ausentes por agravo
+   - Templates inconsistentes
+   - Falta de validação
+   - Falha de autopreenchimento
+   - Falta de integração social ↔ farmácia
+
+3) Gerar relatório:
+   - SINAN_REPORT.md  
+   - SOCIAL_REPORT.md  
+   - PHARMACY_REPORT.md  
+   - INTEGRATION_REPORT.md  
+   - ROOT_CLEANUP_REPORT.md  
+
+4) Gerar plano final de execução (arquivos, diffs, migrations, riscos).
+
+=====================================================================
+APÓS RELATÓRIO (SÓ SAFE):
+=====================================================================
+
+• Adicionar Dynamic Template Loader  
+• Adicionar serviço de autopreenchimento  
+• Criar fluxo completo Assistência Social ↔ Farmácia  
+• Criar validators  
+• Criar testes automáticos  
+• Criar endpoints REST novos  
+
+(Destrutivo → Aguarda aprovação)
+
+=====================================================================
+EXECUTION SETTINGS
+=====================================================================
+
+- Sempre snapshot antes de mexer em DB  
+- Commits atômicos  
+- Branch: feature/v2.1-sinan-social-integration  
+
+*/
