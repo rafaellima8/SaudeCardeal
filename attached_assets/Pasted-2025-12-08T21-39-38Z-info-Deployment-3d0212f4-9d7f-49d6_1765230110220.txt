@@ -1,0 +1,94 @@
+2025-12-08T21:39:38Z info: Deployment: 3d0212f4-9d7f-49d6-85c2-aa4cb3f1cb6d
+2025-12-08T21:39:38Z info: Connecting to builder
+2025-12-08T21:39:39Z info: Builder connected
+2025-12-08T21:39:39Z info: Installing packages
+--> npm install
+
+npm warn ERESOLVE overriding peer dependency
+
+npm warn While resolving: vite@7.2.2
+npm warn Found: @types/node@20.16.11
+npm warn node_modules/@types/node
+npm warn   dev @types/node@"20.16.11" from the root project
+npm warn   11 more (@types/bcrypt, @types/better-sqlite3, ...)
+npm warn
+npm warn Could not resolve dependency:
+npm warn peerOptional @types/node@"^20.19.0 || >=22.12.0" from vite@7.2.2
+npm warn node_modules/vitest/node_modules/vite
+npm warn   vite@"^6.0.0 || ^7.0.0" from vitest@4.0.9
+npm warn   node_modules/vitest
+npm warn   1 more (@vitest/mocker)
+npm warn
+npm warn Conflicting peer dependency: @types/node@24.10.1
+npm warn node_modules/@types/node
+npm warn   peerOptional @types/node@"^20.19.0 || >=22.12.0" from vite@7.2.2
+npm warn   node_modules/vitest/node_modules/vite
+npm warn     vite@"^6.0.0 || ^7.0.0" from vitest@4.0.9
+npm warn     node_modules/vitest
+npm warn     1 more (@vitest/mocker)
+
+
+up to date, audited 584 packages in 5s
+
+86 packages are looking for funding
+  run `npm fund` for details
+
+
+9 vulnerabilities (3 low, 5 moderate, 1 high)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+npm notice
+npm notice New major version of npm available! 10.8.2 -> 11.6.4
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.6.4
+npm notice To update run: npm install -g npm@11.6.4
+npm notice
+
+2025-12-08T21:39:45Z info: Starting Build
+
+> argosaude@2.0.0 build
+> vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+
+
+vite v5.4.20 building for production...
+
+transforming...
+
+
+A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+
+✓ 3803 modules transformed.
+
+rendering chunks...
+
+computing gzip size...
+
+../dist/public/index.html                              1.03 kB │ gzip:   0.56 kB
+
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+✓ built in 13.21s
+
+
+  dist/index.js  947.5kb
+
+⚡ Done in 369ms
+
+2025-12-08T21:40:04Z info: Pushing pid1 binary layer...
+2025-12-08T21:40:05Z info: Created pid1 binary layer
+2025-12-08T21:40:06Z info: Pushing hosting layer...
+2025-12-08T21:40:06Z info: Retrieved cached nix layer
+2025-12-08T21:40:07Z info: Created hosting layer
+2025-12-08T21:40:12Z fatal: failed to push layers: failed to push repl layer: failed to initiate blob upload: POST https://deployer.replit.com/registry/cloudrun/v2/replit-user-deployments/deployments-oxrhhd-3d0212f4-9d7f-49d6-85c2-aa4cb3f1cb6d/blobs/uploads/: HTTP 429
+map[Content-Length:[286] Content-Type:[application/json; charset=utf-8] Date:[Mon, 08 Dec 2025 21:40:12 GMT] Docker-Distribution-Api-Version:[registry/2.0] Strict-Transport-Security:[max-age=31536000; includeSubDomains] X-Content-Type-Options:[nosniff] X-Frame-Options:[SAMEORIGIN] X-Xss-Protection:[0]]
+{"errors":[{"code":"TOOMANYREQUESTS","message":"Quota exceeded for quota metric 'Requests per project in the US multi-region' and limit 'Requests per project in the US multi-region per minute' of service 'artifactregistry.googleapis.com' for consumer 'project_number:464307466402'."}]}
