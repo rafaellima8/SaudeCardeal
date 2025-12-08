@@ -2,7 +2,7 @@
 
 ## Overview
 
-ArgoSaude (v2.0.0) is a municipal health management SaaS system developed by **Argo Tech Brasil** for Cardeal da Silva, Bahia, Brazil. It aims to enhance efficiency, compliance, and data management for municipal health services by streamlining patient management, electronic prescriptions (with RENAME catalog integration), pharmacy management (medication and diaper stock control), inter-municipal patient transport (TFD) compliant with SUS regulations, Social Assistance for diaper requests, and SINAN for compulsory disease notification.
+ArgoSaude (v2.0.1) is a municipal health management SaaS system developed by **Argo Tech Brasil** for Cardeal da Silva, Bahia, Brazil. It aims to enhance efficiency, compliance, and data management for municipal health services by streamlining patient management, electronic prescriptions (with RENAME catalog integration), pharmacy management (medication and diaper stock control), inter-municipal patient transport (TFD) compliant with SUS regulations, Social Assistance for diaper requests, and SINAN for compulsory disease notification.
 
 ## User Preferences
 
@@ -66,13 +66,17 @@ The system employs a client-server architecture with a clear separation of conce
 
 ### Template Coverage
 - **100% Coverage**: All 81 official SINAN agravos have dedicated templates
-- **108 unique agravoCode templates**, 142 total including variants
-- **Categories**: Arboviroses, Respiratorias, IST/HIV/AIDS, Hepatites, Meningites, Zoonoses, Endemicas, Cronicas, Imunopreveniveis, Intoxicacoes, Violencias, Saude do Trabalhador, Virais Emergentes, Alimentares, Vigilancia, Farmacovigilancia
+- **109 unique templates** covering 108 unique agravoCodes
+- **25 Categories**: alimentares, arboviroses, bacterianas, congenitas, cronicas, endemicas, farmacovigilancia, hepatites, imunoprevenivel, infantil, infecciosas, intoxicacoes, ist, materna, meningites, nutricional, parasitarias, respiratorias, rickettsias, trabalho, vigilancia, violencia, violencias, virais, zoonoses
+- **50 templates** with immediate notification deadline
+- **59 templates** with weekly notification deadline
+- **105 templates** with investigation form
 
 ### Template Files
 - `shared/sinan/templates/` - 20 category-specific template files
-- `shared/sinan/template-types.ts` - Type definitions
+- `shared/sinan/template-types.ts` - Type definitions + Zod validation
 - `shared/sinan/registry.ts` - Coverage tracking
+- `shared/sinan/agravos.ts` - 95 official agravo definitions
 
 ## Database Schema
 
