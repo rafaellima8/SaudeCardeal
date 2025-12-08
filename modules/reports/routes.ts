@@ -65,7 +65,7 @@ router.post("/execute/:slug", enforceUnitScope({ requireUnitId: true }), async (
   try {
     const { slug } = req.params;
     const unitId = getEffectiveUnitId(req);
-    const user = req.user as any;
+    const user = req.session.user;
     const { parameters } = req.body;
     
     const builtInReport = strategicReportEngine.getReport(slug);

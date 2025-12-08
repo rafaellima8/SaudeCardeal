@@ -151,7 +151,7 @@ router.get("/instances", enforceUnitScope({ requireUnitId: true }), async (req: 
 router.post("/instances", enforceUnitScope({ requireUnitId: true }), async (req: Request, res: Response) => {
   try {
     const unitId = getEffectiveUnitId(req);
-    const user = req.user as any;
+    const user = req.session.user;
     const validation = createInstanceSchema.safeParse(req.body);
     
     if (!validation.success) {
@@ -188,7 +188,7 @@ router.post("/instances/:id/action", enforceUnitScope({ requireUnitId: true }), 
   try {
     const { id } = req.params;
     const unitId = getEffectiveUnitId(req);
-    const user = req.user as any;
+    const user = req.session.user;
     
     const validation = workflowActionSchema.safeParse(req.body);
     if (!validation.success) {
@@ -206,7 +206,7 @@ router.post("/instances/:id/action", enforceUnitScope({ requireUnitId: true }), 
       return res.status(403).json({ error: "Acesso negado a esta instância" });
     }
     
-    const canTransition = workflowEngine.canTransition(instance.status, action, user?.role);
+    const canTransition = workflowEngine.canTransition(instance.status, action, user?.role || "admin");
     if (!canTransition) {
       return res.status(400).json({ error: "Transição não permitida para seu perfil" });
     }

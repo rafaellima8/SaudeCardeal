@@ -92,7 +92,7 @@ router.post("/:id/acknowledge", enforceUnitScope({ requireUnitId: true }), async
   try {
     const { id } = req.params;
     const unitId = getEffectiveUnitId(req);
-    const user = req.user as any;
+    const user = req.session.user;
     
     const alert = await storage.getAlertInstanceById(id);
     if (!alert) {
@@ -119,7 +119,7 @@ router.post("/:id/resolve", enforceUnitScope({ requireUnitId: true }), async (re
   try {
     const { id } = req.params;
     const unitId = getEffectiveUnitId(req);
-    const user = req.user as any;
+    const user = req.session.user;
     
     const alert = await storage.getAlertInstanceById(id);
     if (!alert) {
