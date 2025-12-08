@@ -2,7 +2,7 @@
 
 ## Overview
 
-ArgoSaude (v2.0.1) is a municipal health management SaaS system developed by **Argo Tech Brasil** for Cardeal da Silva, Bahia, Brazil. It aims to enhance efficiency, compliance, and data management for municipal health services by streamlining patient management, electronic prescriptions (with RENAME catalog integration), pharmacy management (medication and diaper stock control), inter-municipal patient transport (TFD) compliant with SUS regulations, Social Assistance for diaper requests, and SINAN for compulsory disease notification.
+ArgoSaude (v2.1.0) is a municipal health management SaaS system developed by **Argo Tech Brasil** for Cardeal da Silva, Bahia, Brazil. It aims to enhance efficiency, compliance, and data management for municipal health services by streamlining patient management, electronic prescriptions (with RENAME catalog integration), pharmacy management (medication and diaper stock control), inter-municipal patient transport (TFD) compliant with SUS regulations, Social Assistance for diaper requests, and SINAN for compulsory disease notification.
 
 ## User Preferences
 
@@ -86,7 +86,24 @@ The system employs a client-server architecture with a clear separation of conce
 
 ## Recent Changes (2025-12-08)
 
-### Database Synchronization
+### Phase 1 SAFE - v2.1.0 Features
+1. **SINAN PatientSelector Integration**
+   - New PatientSelector component with autocomplete search
+   - Integrated in SinanDynamicForm for autofilling 12+ fields (nome, CPF, CNS, data nascimento, genero, raca, nome mae, telefone, endereco, bairro, municipio, UF)
+   - AGRAVO_CID_MAP refactored to derive from SINAN_AGRAVOS_COMPLETOS (eliminating duplication)
+
+2. **Pharmacy ↔ Social Assistance Integration**
+   - GET /api/pharmacy/diapers/pending-authorizations endpoint
+   - POST /api/pharmacy/diapers/process-delivery endpoint with FIFO validation
+   - New page pharmacy-pending-authorizations.tsx (379 lines)
+   - Sidebar link "Autorizacoes" under Farmacia module
+   - Permission "autorizacoes" added for admin, farmaceutico, gestor, assistencia_social
+
+3. **Authorization Period Validation**
+   - POST /api/social-assistance/authorizations validates period overlap
+   - Returns 400 if beneficiary already has authorization covering the requested period
+
+### Database Synchronization (earlier 2025-12-08)
 - Synchronized schema.ts with SQLite database
 - Added missing columns: `action_url`, `due_at`, `error_message`
 - Removed 5 orphan tables with 0 records: `editais`, `ace_audit_logs`, `ace_dwellings`, `ace_foci`, `ace_visits`
