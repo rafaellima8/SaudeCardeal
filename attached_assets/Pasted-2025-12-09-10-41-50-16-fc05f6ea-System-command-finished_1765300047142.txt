@@ -1,0 +1,145 @@
+2025-12-09 10:41:50.16
+fc05f6ea
+System
+command finished with error [node dist/index.js]: signal: terminated
+2025-12-09 10:50:42.10
+fc05f6ea
+User
+1:50:42 PM [vite] Pre-transform error: Failed to load url /src/main.tsx?v=v6-dXlJz2oXKFdooepGNL (resolved id: /src/main.tsx?v=v6-dXlJz2oXKFdooepGNL). Does the file exist?
+2025-12-09 10:50:42.13
+fc05f6ea
+System
+command finished with error [node dist/index.js]: exit status 1
+2025-12-09 11:21:11.36
+fc05f6ea
+User
+2:21:11 PM [vite] Pre-transform error: Failed to load url /src/main.tsx?v=_gXcJli_mup6IClmwe2fA (resolved id: /src/main.tsx?v=_gXcJli_mup6IClmwe2fA). Does the file exist?
+2025-12-09 11:21:11.37
+fc05f6ea
+System
+command finished with error [node dist/index.js]: exit status 1
+2025-12-09 12:30:38.10
+fc05f6ea
+System
+command finished with error [node dist/index.js]: signal: terminated
+2025-12-09 12:42:34.60
+fc05f6ea
+User
+3:42:34 PM [vite] Pre-transform error: Failed to load url /src/main.tsx?v=EsPMAUaKKfBn1lEBwq6Cv (resolved id: /src/main.tsx?v=EsPMAUaKKfBn1lEBwq6Cv). Does the file exist?
+2025-12-09 12:42:34.64
+fc05f6ea
+System
+command finished with error [node dist/index.js]: exit status 1
+2025-12-09 13:04:16.28
+fc05f6ea
+User
+4:04:16 PM [vite] Pre-transform error: Failed to load url /src/main.tsx?v=eZhQvd8-wjXCq72JqCxHF (resolved id: /src/main.tsx?v=eZhQvd8-wjXCq72JqCxHF). Does the file exist?
+2025-12-09 13:04:16.30
+fc05f6ea
+System
+command finished with error [node dist/index.js]: exit status 1
+2025-12-09 13:04:45.04
+fc05f6ea
+User
+4:04:45 PM [vite] Pre-transform error: Failed to load url /src/main.tsx?v=LMXCDAUym6KXtWXycNUV7 (resolved id: /src/main.tsx?v=LMXCDAUym6KXtWXycNUV7). Does the file exist?
+2025-12-09 13:04:45.09
+fc05f6ea
+System
+command finished with error [node dist/index.js]: exit status 1
+2025-12-09 13:05:11.22
+fc05f6ea
+User
+4:05:11 PM [vite] Pre-transform error: Failed to load url /src/main.tsx?v=0xf5OHKzKOsotXPMLTkvN (resolved id: /src/main.tsx?v=0xf5OHKzKOsotXPMLTkvN). Does the file exist?
+2025-12-09 13:05:12.01
+fc05f6ea
+System
+command finished with error [node dist/index.js]: exit status 1
+2025-12-09 13:06:18.10
+fc05f6ea
+User
+4:06:18 PM [vite] Pre-transform error: Failed to load url /src/main.tsx?v=e0lGq0YqfAAZpsOKEX8BO (resolved id: /src/main.tsx?v=e0lGq0YqfAAZpsOKEX8BO). Does the file exist?
+2025-12-09 13:06:18.24
+fc05f6ea
+System
+command finished with error [node dist/index.js]: exit status 1
+2025-12-09 13:16:34.82
+32bb8687
+User
+4:16:34 PM [vite] Pre-transform error: Failed to load url /src/main.tsx?v=cB_iM_Uu8pqaApoETP_Dv (resolved id: /src/main.tsx?v=cB_iM_Uu8pqaApoETP_Dv). Does the file exist?
+2025-12-09 13:16:34.85
+32bb8687
+System
+command finished with error [node dist/index.js]: exit status 1
+2025-12-09 13:18:08.95
+32bb8687
+User
+4:18:08 PM [vite] Pre-transform error: Failed to load url /src/main.tsx?v=PioQbzMEQmv37ELdX1dcV (resolved id: /src/main.tsx?v=PioQbzMEQmv37ELdX1dcV). Does the file exist?
+2025-12-09 13:18:09.89
+32bb8687
+System
+command finished with error [node dist/index.js]: exit status 1
+2025-12-09 13:18:10.06
+fc05f6ea
+System
+command finished with error [node dist/index.js]: signal: terminated
+2025-12-09 13:19:10.45
+32bb8687
+User
+4:19:10 PM [vite] Pre-transform error: Failed to load url /src/main.tsx?v=XTG8tfPjltHE7BCv5jVuy (resolved id: /src/main.tsx?v=XTG8tfPjltHE7BCv5jVuy). Does the file exist?
+2025-12-09 13:19:11.27
+32bb8687
+System
+command finished with error [node dist/index.js]: exit status 1
+
+2025-12-09 13:20:43.84
+32bb8687
+User
+4:20:43 PM [vite] Pre-transform error: Failed to load url /src/main.tsx?v=T-1ousTdjt4GvlfS4OCvC (resolved id: /src/main.tsx?v=T-1ousTdjt4GvlfS4OCvC). Does the file exist?
+2025-12-09 13:20:43.87
+32bb8687
+System
+command finished with error [node dist/index.js]: exit status 1
+2025-12-09 13:42:41.33
+32bb8687
+System
+command finished with error [node dist/index.js]: signal: terminated
+2025-12-09 13:43:33.69
+32bb8687
+User
+4:43:33 PM [vite] Pre-transform error: Failed to load url /src/main.tsx?v=bOEdPuyerZaNMcDDj3MjE (resolved id: /src/main.tsx?v=bOEdPuyerZaNMcDDj3MjE). Does the file exist?
+2025-12-09 13:43:33.72
+32bb8687
+System
+command finished with error [node dist/index.js]: exit status 1
+2025-12-09 13:47:55.85
+32bb8687
+User
+4:47:55 PM [vite] Pre-transform error: Failed to load url /src/main.tsx?v=ujKH7dc5AS7Sp8Iejgfgn (resolved id: /src/main.tsx?v=ujKH7dc5AS7Sp8Iejgfgn). Does the file exist?
+2025-12-09 13:47:55.89
+32bb8687
+System
+command finished with error [node dist/index.js]: exit status 1
+2025-12-09 13:51:44.03
+32bb8687
+User
+4:51:44 PM [vite] Pre-transform error: Failed to load url /src/main.tsx?v=R0UoQERC8s735BcFu5hIN (resolved id: /src/main.tsx?v=R0UoQERC8s735BcFu5hIN). Does the file exist?
+2025-12-09 13:51:44.05
+32bb8687
+System
+command finished with error [node dist/index.js]: exit status 1
+2025-12-09 13:55:31.78
+32bb8687
+User
+4:55:31 PM [vite] Pre-transform error: Failed to load url /src/main.tsx?v=g9G2lgf52vVt9jH3MElGw (resolved id: /src/main.tsx?v=g9G2lgf52vVt9jH3MElGw). Does the file exist?
+2025-12-09 13:55:31.82
+32bb8687
+System
+command finished with error [node dist/index.js]: exit status 1
+2025-12-09 13:57:22.88
+32bb8687
+User
+4:57:22 PM [vite] Pre-transform error: Failed to load url /src/main.tsx?v=d0Gs7szxYGi2bYBif5cDB (resolved id: /src/main.tsx?v=d0Gs7szxYGi2bYBif5cDB). Does the file exist?
+2025-12-09 13:57:22.90
+32bb8687
+System
+command finished with error [node dist/index.js]: exit status 1

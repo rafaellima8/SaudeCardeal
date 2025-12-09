@@ -82,7 +82,13 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  if (app.get("env") === "development") {
+  // Em produção (autoscale), NODE_ENV pode não estar definido
+  // Usar process.env.NODE_ENV diretamente com fallback para "production"
+  const isProduction = process.env.NODE_ENV === "production" || 
+    !process.env.NODE_ENV || // Se não definido, assumir produção (seguro)
+    process.env.NODE_ENV === "";
+  
+  if (!isProduction) {
     await setupVite(app, server);
   } else {
     serveStatic(app);
