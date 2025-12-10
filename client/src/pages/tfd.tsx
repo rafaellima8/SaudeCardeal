@@ -48,6 +48,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { HybridDateInput } from "@/components/ui/hybrid-date-input";
+import { format } from "date-fns";
 
 interface TFDRequest {
   id: string;
@@ -448,19 +450,17 @@ function SusExportsTab() {
             </div>
             <div className="space-y-2">
               <Label>Data Início</Label>
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+              <HybridDateInput
+                value={startDate ? new Date(startDate) : undefined}
+                onChange={(d) => setStartDate(d ? format(d, "yyyy-MM-dd") : "")}
                 data-testid="input-start-date"
               />
             </div>
             <div className="space-y-2">
               <Label>Data Fim</Label>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+              <HybridDateInput
+                value={endDate ? new Date(endDate) : undefined}
+                onChange={(d) => setEndDate(d ? format(d, "yyyy-MM-dd") : "")}
                 data-testid="input-end-date"
               />
             </div>
@@ -557,19 +557,19 @@ export default function TFD() {
   const qc = useQueryClient();
 
   const { data: requests = [], isLoading: requestsLoading } = useQuery<TFDRequest[]>({
-    queryKey: ['/api/tfd', statusFilter],
+    queryKey: ['/api/tfd/requests', statusFilter],
   });
 
   const { data: vehicles = [], isLoading: vehiclesLoading } = useQuery<TFDVehicle[]>({
-    queryKey: ['/api/tfd-vehicles'],
+    queryKey: ['/api/tfd/vehicles'],
   });
 
   const { data: drivers = [], isLoading: driversLoading } = useQuery<TFDDriver[]>({
-    queryKey: ['/api/tfd-drivers'],
+    queryKey: ['/api/tfd/drivers'],
   });
 
   const { data: trips = [], isLoading: tripsLoading } = useQuery<TFDTrip[]>({
-    queryKey: ['/api/tfd-trips'],
+    queryKey: ['/api/tfd/trips'],
   });
 
   const { data: citizens = [] } = useQuery<Citizen[]>({
@@ -581,9 +581,9 @@ export default function TFD() {
   });
 
   const createRequest = useMutation({
-    mutationFn: async (data: any) => apiRequest('POST', '/api/tfd', data),
+    mutationFn: async (data: any) => apiRequest('POST', '/api/tfd/requests', data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['/api/tfd'] });
+      qc.invalidateQueries({ queryKey: ['/api/tfd/requests'] });
       setIsNewRequestOpen(false);
       toast({ title: "Solicitação criada", description: "A solicitação TFD foi criada com sucesso." });
     },
@@ -594,9 +594,9 @@ export default function TFD() {
 
   const approveRequest = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => 
-      apiRequest('POST', `/api/tfd/${id}/approve`, data),
+      apiRequest('PATCH', `/api/tfd/requests/${id}`, { ...data, status: 'approved' }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['/api/tfd'] });
+      qc.invalidateQueries({ queryKey: ['/api/tfd/requests'] });
       setApprovalDialogOpen(false);
       setSelectedRequest(null);
       toast({ title: "Solicitação aprovada", description: "A solicitação foi aprovada com sucesso." });
@@ -605,9 +605,9 @@ export default function TFD() {
 
   const rejectRequest = useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => 
-      apiRequest('POST', `/api/tfd/${id}/reject`, { reason }),
+      apiRequest('PATCH', `/api/tfd/requests/${id}`, { status: 'rejected', rejectionReason: reason }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['/api/tfd'] });
+      qc.invalidateQueries({ queryKey: ['/api/tfd/requests'] });
       setRejectDialogOpen(false);
       setSelectedRequest(null);
       toast({ title: "Solicitação rejeitada" });
@@ -616,9 +616,9 @@ export default function TFD() {
 
   const scheduleRequest = useMutation({
     mutationFn: async ({ id, tripId }: { id: string; tripId: string }) => 
-      apiRequest('POST', `/api/tfd/${id}/schedule`, { tripId }),
+      apiRequest('PATCH', `/api/tfd/requests/${id}`, { status: 'scheduled', tripId }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['/api/tfd'] });
+      qc.invalidateQueries({ queryKey: ['/api/tfd/requests'] });
       setScheduleDialogOpen(false);
       setSelectedRequest(null);
       toast({ title: "Solicitação agendada" });
@@ -626,27 +626,27 @@ export default function TFD() {
   });
 
   const createVehicle = useMutation({
-    mutationFn: async (data: any) => apiRequest('POST', '/api/tfd-vehicles', data),
+    mutationFn: async (data: any) => apiRequest('POST', '/api/tfd/vehicles', data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['/api/tfd-vehicles'] });
+      qc.invalidateQueries({ queryKey: ['/api/tfd/vehicles'] });
       setIsNewVehicleOpen(false);
       toast({ title: "Veículo cadastrado" });
     },
   });
 
   const createDriver = useMutation({
-    mutationFn: async (data: any) => apiRequest('POST', '/api/tfd-drivers', data),
+    mutationFn: async (data: any) => apiRequest('POST', '/api/tfd/drivers', data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['/api/tfd-drivers'] });
+      qc.invalidateQueries({ queryKey: ['/api/tfd/drivers'] });
       setIsNewDriverOpen(false);
       toast({ title: "Motorista cadastrado" });
     },
   });
 
   const createTrip = useMutation({
-    mutationFn: async (data: any) => apiRequest('POST', '/api/tfd-trips', data),
+    mutationFn: async (data: any) => apiRequest('POST', '/api/tfd/trips', data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['/api/tfd-trips'] });
+      qc.invalidateQueries({ queryKey: ['/api/tfd/trips'] });
       setIsNewTripOpen(false);
       toast({ title: "Viagem criada" });
     },
@@ -654,23 +654,23 @@ export default function TFD() {
 
   const startTrip = useMutation({
     mutationFn: async ({ id, initialKm }: { id: string; initialKm: number }) => 
-      apiRequest('POST', `/api/tfd-trips/${id}/start`, { initialKm }),
+      apiRequest('PATCH', `/api/tfd/trips/${id}`, { status: 'em_andamento', initialKm }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['/api/tfd-trips'] });
-      qc.invalidateQueries({ queryKey: ['/api/tfd-vehicles'] });
-      qc.invalidateQueries({ queryKey: ['/api/tfd-drivers'] });
+      qc.invalidateQueries({ queryKey: ['/api/tfd/trips'] });
+      qc.invalidateQueries({ queryKey: ['/api/tfd/vehicles'] });
+      qc.invalidateQueries({ queryKey: ['/api/tfd/drivers'] });
       toast({ title: "Viagem iniciada" });
     },
   });
 
   const completeTrip = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => 
-      apiRequest('POST', `/api/tfd-trips/${id}/complete`, data),
+      apiRequest('PATCH', `/api/tfd/trips/${id}`, { ...data, status: 'concluida' }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['/api/tfd-trips'] });
-      qc.invalidateQueries({ queryKey: ['/api/tfd-vehicles'] });
-      qc.invalidateQueries({ queryKey: ['/api/tfd-drivers'] });
-      qc.invalidateQueries({ queryKey: ['/api/tfd'] });
+      qc.invalidateQueries({ queryKey: ['/api/tfd/trips'] });
+      qc.invalidateQueries({ queryKey: ['/api/tfd/vehicles'] });
+      qc.invalidateQueries({ queryKey: ['/api/tfd/drivers'] });
+      qc.invalidateQueries({ queryKey: ['/api/tfd/requests'] });
       setCompleteTripDialogOpen(false);
       setSelectedTrip(null);
       toast({ title: "Viagem concluída" });
@@ -1315,7 +1315,12 @@ export default function TFD() {
               </div>
               <div className="space-y-2">
                 <Label>Data Desejada</Label>
-                <Input name="desiredDate" type="date" />
+                <HybridDateInput
+                  value={undefined}
+                  onChange={() => {}}
+                  data-testid="input-desired-date"
+                />
+                <input type="hidden" name="desiredDate" id="desiredDateHidden" />
               </div>
               <div className="space-y-2">
                 <Label>Tipo de Transporte</Label>
@@ -1515,7 +1520,12 @@ export default function TFD() {
               </div>
               <div className="space-y-2 col-span-2">
                 <Label>Validade CNH *</Label>
-                <Input name="cnhExpiry" type="date" required />
+                <HybridDateInput
+                  value={undefined}
+                  onChange={() => {}}
+                  data-testid="input-cnh-expiry"
+                />
+                <input type="hidden" name="cnhExpiry" id="cnhExpiryHidden" />
               </div>
             </div>
             <DialogFooter>

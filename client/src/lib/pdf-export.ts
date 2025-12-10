@@ -30,6 +30,10 @@ const periodLabels: Record<string, string> = {
 };
 
 export function exportReportToPDF(data: ReportData, options: ExportOptions) {
+  if (!data || !data.summary) {
+    throw new Error('Dados do relatório não disponíveis ou incompletos');
+  }
+  
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   let yPosition = 15;

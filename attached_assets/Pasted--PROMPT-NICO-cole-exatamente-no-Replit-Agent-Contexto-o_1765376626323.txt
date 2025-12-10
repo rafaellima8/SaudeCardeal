@@ -1,0 +1,300 @@
+🔴 PROMPT ÚNICO (cole exatamente no Replit Agent)
+
+Contexto / objetivo curto:
+Corrigir e estabilizar o fluxo TFD; adaptar formulários para exportação e compatibilidade com BPA; todos os campos de data devem aceitar seleção via datepicker e digitação; corrigir erro Unexpected token '<' (retorno HTML onde o frontend espera JSON); resolver falha de geração de PDF; no perfil do Administrador, ao criar novo profissional gerar automaticamente login e senha; entregar tudo com testes automatizados, checkpoints e rollback seguro.
+
+Requisitos de operação (obrigatórios):
+
+Antes de qualquer alteração: crie checkpoint "pre-tfd-bpa-fix".
+
+Todas as mudanças devem ser incrementais, reversíveis, e com testes automatizados.
+
+Antes do merge/deploy para main peça minha aprovação (não faça deploy sem aprovação).
+
+Usar banco de dados atual do projeto; se migrar, criar migrations reversíveis e comando de rollback.
+
+Registrar logs estruturados (JSON) para todos os erros de backend.
+
+1 — Arquitetura, pastas e dependências (criar/atualizar)
+
+Crie/atualize estrutura (Node/TS + React) — ajustar se outro stack for detectado:
+
+/server
+  /src
+    app.ts
+    routes/
+      tfd.ts
+      relatorios.ts
+      professionals.ts
+    controllers/
+      tfdController.ts
+      reportsController.ts
+      professionalController.ts
+    services/
+      pdfService.ts
+      bpaService.ts
+      authService.ts
+    middlewares/
+      errorHandler.ts
+      jsonOnly.ts
+      validateRequest.ts
+    tests/
+      tfd.test.ts
+      reports.test.ts
+      professional.test.ts
+    migrations/
+  package.json
+  tsconfig.json
+
+/client
+  /src
+    components/
+      DateInput/DateInput.tsx
+      TfdForm/TfdForm.tsx
+    pages/
+      tfd.tsx
+    services/
+      api.ts
+    tests/
+      tfd.e2e.ts
+  package.json
+
+
+Dependências sugeridas (adicionar ao package.json do server e client):
+
+server: express, cors, body-parser, ajv (validação JSON), bcrypt, jsonwebtoken, pg/mysql2/better-sqlite3 conforme DB, knex ou prisma (migrations), puppeteer ou pdfkit (PDF), jest, supertest, ts-node, typescript.
+
+client: react, date-fns, react-datepicker (ou biblioteca acessível), axios, jest, playwright (E2E).
+
+2 — Backend: regras e correções cruciais (código a aplicar)
+2.1 Forçar respostas JSON (corrige Unexpected token '<')
+
+Criar jsonOnly middleware que detecta Accept header e força respostas JSON em endpoints API; converter handlers para sempre usar res.json(...).
+
+Criar errorHandler global (exemplo em TS):
+
+// middlewares/errorHandler.ts
+import { Request, Response, NextFunction } from "express";
+
+export function errorHandler(err: any, req: Request, res: Response, next: NextFunction) {
+  console.error(err);
+  const status = err.status || 500;
+  res.status(status).json({
+    error: err.message || "Erro interno",
+    code: err.code || "INTERNAL_ERROR",
+    details: process.env.NODE_ENV === "production" ? undefined : err.stack
+  });
+}
+
+
+Em app.ts, sempre app.use(express.json()) e app.use(errorHandler) no final.
+
+2.2 Endpoint PDF (/relatorios/pdf)
+
+Revisar o controller, trocar geração síncrona bloqueante por async com puppeteer ou pdfkit.
+
+Garantir headers: res.setHeader('Content-Type', 'application/pdf') e res.setHeader('Content-Disposition', 'attachment; filename=relatorio.pdf').
+
+Adicionar timeout handling e fallback (log + mensagem clara no JSON).
+
+2.3 TFD endpoints: salvar/editar/validar
+
+tfdController.create: validar payload com AJV esquema JSON (ex.: dateDesired, procedure, professionalId, destiny).
+
+Garantir que qualquer erro retorne res.status(x).json({ error: ... }) — nunca HTML.
+
+2.4 BPA rules (usar BPA_LEIAME.txt)
+
+Implementar bpaService.validateForBPA(attendance) com regras:
+
+CNS/CPF: aplicar regras históricas e atuais: não permitir CNS+CPF simultâneos quando proibido; se procedimento exigeCNS então CNS obrigatório; se não, aceitar CPF ou CNS. (Regras detalhadas no arquivo carregado).
+
+Raça/Cor: remover/ocultar opção 99 - Sem informação. Se estiver presente na base, mapear para null e logar.
+
+Etnia: somente obrigatório quando raça/cor = INDÍGENA.
+
+Adicionar validações para quantidade máxima por procedimento conforme SIGTAP (onde aplicável).
+
+Exportação: criar função que gera o layout fixo do BPA (TXT/DBF) a partir dos dados do TFD/atendimento.
+
+3 — Frontend: data input, UX e tratamento de erros
+3.1 Componente DateInput (aceita digitar E selecionar)
+
+Criar DateInput/DateInput.tsx com:
+
+<input type="text" inputMode="numeric" placeholder="DD/MM/YYYY"> com parser e máscara leve, e um botão que abre react-datepicker.
+
+Funções de parse: aceitar DD/MM/YYYY, YYYY-MM-DD, DDMMYYYY.
+
+No onBlur, validar e normalizar para YYYY-MM-DD ao enviar para backend.
+
+Teste: entrada por teclado e pelo datepicker; garantir compatibilidade mobile e acessibilidade (aria attributes).
+
+3.2 TFD form UX fixes
+
+Substituir campos de data atuais pelo DateInput.
+
+Dropdowns: carregar opções via API (profissionais, unidades, procedimentos); incluir allowCustom onde for exigido (por exemplo, aceitar digitar nome do procedimento se não existir? — somente se requisito permitir).
+
+Mostrar mensagem clara (toast) quando API retornar erro JSON (use error.message).
+
+3.3 Tratamento do erro mostrado na UI
+
+Quando a UI tentar response.json() e o servidor retornar HTML, exibir uma mensagem de erro amigável e console.log do response.text() para debug; mas esse caso será cortado ao corrigir backend.
+
+4 — Perfil do Administrador: criar profissional + gerar login e senha
+4.1 Backend: POST /professionals
+
+Payload: { name, cpf, councilType, councilNumber, councilUF, email, ... }
+
+Lógica:
+
+Gerar username normalizado: preferir email antes do @; se não houver email, nome.sobrenome ASCII, minúsculo, remover acentos.
+
+Gerar temporaryPassword criptograficamente: 12 caracteres (ex: using crypto.randomBytes(9).toString('base64') then normalize to url-safe).
+
+Hash da senha com bcrypt (salt 12).
+
+Salvar profissional com is_temporary_password = true.
+
+Retornar username e temporaryPassword APENAS no momento da criação (exibir na UI e baixar como TXT); registrar log em audit trail.
+
+Opcional: enviar email com senha se SMTP configurado (opção controlada por flag).
+
+Segurança: instruir front para forçar alteração da senha no primeiro login.
+
+4.2 Frontend: tela de criação
+
+Ao criar, mostrar modal com username e senha gerada e botão Copiar e Baixar .txt. Aviso: "Senha mostrada apenas uma vez".
+
+Testes: garantir hashing (unit tests server), garantir texto exibido (E2E).
+
+5 — Testes automatizados
+5.1 Unit & Integration (server)
+
+Usar jest + supertest.
+
+Cobrir:
+
+tfdController.create success & validation errors.
+
+reportsController.pdf returns 200 & Content-Type application/pdf (mock puppeteer).
+
+professionalController.create returns username & temporary password, password hashed in DB.
+
+5.2 E2E (client)
+
+Usar playwright:
+
+Fluxo completo TFD: abrir formulário, preencher datas por digitação e datepicker, salvar, checar DB via API.
+
+Fluxo criação profissional: criar e verificar exibição de credenciais.
+
+5.3 Lint & Typecheck
+
+npm run lint, tsc --noEmit, falha bloqueante antes do merge.
+
+6 — Migrations & DB
+
+Criar migration add_professional_credentials com colunas username, password_hash, is_temporary_password, created_by.
+
+Se adicionar novos campos ao paciente (endereço, telefone, email), criar migrations reversíveis com down().
+
+7 — Scripts de deploy / rollback e CI
+7.1 Checkpoints & branches
+
+Criar branch fix/tfd-bpa-full.
+
+Criar checkpoint pre-tfd-bpa-fix.
+
+Depois de testes verdes, criar checkpoint post-tfd-bpa-fix.
+
+7.2 Rollback
+
+Instruções legíveis: git checkout main && git revert <commit-id> ou rollback migration knex migrate:down --to <migration>.
+
+Criar script scripts/rollback-to-checkpoint.sh que restaura git + DB snapshot (onde possível).
+
+7.3 CI
+
+Pipeline steps:
+
+install
+
+lint + typecheck
+
+unit tests
+
+e2e tests (playwright)
+
+build
+
+create build artifact
+
+8 — Checklist final e critérios de aceite (Agent deve validar antes de pedir aprovação)
+
+✅ Todos os endpoints API retornam JSON em situações de erro e sucesso.
+
+✅ relatorios/pdf retorna Content-Type: application/pdf e gera arquivo válido.
+
+✅ Todos os campos de data aceitam digitação e seleção e enviam YYYY-MM-DD.
+
+✅ Regras do BPA (CNS/CPF, raça/cor, etnia, endereço) implementadas conforme documento oficial.
+
+✅ Criação de profissional gera username e senha, password stored hashed; senha exibida somente uma vez.
+
+✅ Testes unitários e E2E passados (100% success).
+
+✅ Checkpoint criado e rollback documentado.
+
+✅ Não executar deploy em main sem minha aprovação (exigir confirmação textual).
+
+9 — Entregáveis do Agent (respostas que devo receber no chat do Agent)
+
+Resumo das mudanças (arquivos modificados, linhas chaves).
+
+Diff (link/preview).
+
+Comandos executados e checkpoints criados (nomes/IDs).
+
+Resultados de testes (logs).
+
+Artefato de build (se aplicável).
+
+Comando de rollback pronto, com instruções passo-a-passo.
+
+Solicitação de aprovação clara: PR ready to merge -> awaiting user approval: type "APPROVAR TFD/BPA" to proceed to deploy.
+
+10 — Permissões e segurança
+
+Não exponha credenciais (SMTP, DB) nos logs públicos.
+
+Salvar credenciais sensíveis apenas em secrets (Replit secrets).
+
+Ao enviar password temporária, registrar apenas hash no DB.
+
+11 — Executar (instruções que o Agent deve seguir no workspace)
+
+Detectar stack (Node/TS + React ou equivalente).
+
+Criar branch fix/tfd-bpa-full e checkpoint pre-tfd-bpa-fix.
+
+Aplicar mudanças de código conforme seções 2 e 3 (criar arquivos, migrations e testes).
+
+npm install (server & client).
+
+Rodar npm run lint && npm run test && npm run e2e.
+
+Se testes PASSAREM: criar checkpoint post-tfd-bpa-fix e abrir PR/preview.
+
+Enviar no chat do Agent: diff + resultados de testes + comando para aprovar deploy.
+
+NÃO FAZER MERGE NEM DEPLOY até receber texto APPROVAR TFD/BPA por mim.
+
+Última observação do prompt (obrigatória)
+
+Se algum passo requer alteração que impacte funcionalidades já estáveis (ex.: alteração de schema que quebra relatórios existentes), pause e solicite aprovação explícita com um resumo do impacto e plano de rollback.
+
+FIM DO PROMPT ÚNICO.
+
+Cole exatamente o texto acima no Replit Agent. Depois de colado, me diga aqui quando o PR/checkpoint estiver pronto — eu reviso e dou o comando APPROVAR TFD/BPA somente após checagem.
