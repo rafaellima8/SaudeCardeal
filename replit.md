@@ -84,6 +84,29 @@ The system employs a client-server architecture with a clear separation of conce
 - **Date storage**: Unix timestamps (seconds since epoch)
 - **ID generation**: UUID v4 via generateId()
 
+## Recent Changes (2025-12-10)
+
+### v2.1.1 Stability & UX Improvements
+1. **API Error Handling**
+   - Guard de content-type no apiRequest para detectar respostas HTML vs JSON
+   - Mensagens de erro descritivas quando rotas retornam HTML inesperado
+   - Previne erros de parse JSON em rotas inexistentes
+
+2. **SINAN Export/Print Handlers**
+   - `handlePrintNotification()` - Download PDF via `/api/sinan/notifications/:id/pdf`
+   - `handleExportCSV()` - Exportação CSV de notificações filtradas
+   - Botões conectados com feedback toast
+
+3. **Profissionais Form Expansion**
+   - Campos adicionais: CPF, councilType, councilNumber, councilState
+   - Select para tipo de conselho (CRM, COREN, CRF, CRO, CREFITO, CRP, CRESS, CRN)
+   - Select para UF do conselho
+   - Campo CNS opcional (anteriormente obrigatório)
+
+4. **Route Fixes**
+   - Corrigido mismatch `/api/units` → `/api/health-units` em 6 páginas
+   - Páginas afetadas: units, patients, reports, professionals, settings, profile
+
 ## Recent Changes (2025-12-08)
 
 ### Phase 1 SAFE - v2.1.0 Features
