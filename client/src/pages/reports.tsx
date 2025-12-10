@@ -45,7 +45,7 @@ export default function Reports() {
   const { toast } = useToast();
 
   const { data: units = [] } = useQuery<Array<{ id: string; name: string }>>({
-    queryKey: ['/api/units'],
+    queryKey: ['/api/health-units'],
   });
 
   const { data: reportData, isLoading } = useQuery<ReportData>({

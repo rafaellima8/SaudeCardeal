@@ -71,9 +71,9 @@ export default function Patients() {
   };
 
   const { data: units } = useQuery({
-    queryKey: ['/api/units'],
+    queryKey: ['/api/health-units'],
     queryFn: async () => {
-      const response = await fetch('/api/units');
+      const response = await fetch('/api/health-units');
       if (!response.ok) throw new Error('Erro ao buscar unidades');
       return response.json();
     },

@@ -18,11 +18,18 @@ import type { Professional, HealthUnit } from "@shared/schema";
 
 const professionalSchema = z.object({
   name: z.string().min(3, "Nome deve ter no mínimo 3 caracteres"),
-  specialty: z.string().optional(),
-  cns: z.string().length(15, "CNS deve ter 15 caracteres"),
-  crm: z.string().optional(),
+  cpf: z.string().min(11, "CPF obrigatório"),
+  specialty: z.string().min(1, "Especialidade obrigatória"),
+  cns: z.string().optional().or(z.literal("")),
+  councilType: z.string().min(1, "Tipo de conselho obrigatório"),
+  councilNumber: z.string().min(1, "Número do conselho obrigatório"),
+  councilState: z.string().min(2, "UF do conselho obrigatória"),
+  cboCode: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().email().optional().or(z.literal("")),
   unitId: z.string().uuid("Selecione uma unidade válida"),
-  isActive: z.boolean().default(true),
+  teamINE: z.string().optional(),
+  active: z.boolean().default(true),
 });
 
 type ProfessionalForm = z.infer<typeof professionalSchema>;
@@ -38,16 +45,23 @@ export default function Professionals() {
     resolver: zodResolver(professionalSchema),
     defaultValues: {
       name: "",
+      cpf: "",
       specialty: "",
       cns: "",
-      crm: "",
+      councilType: "CRM",
+      councilNumber: "",
+      councilState: "BA",
+      cboCode: "",
+      phone: "",
+      email: "",
       unitId: "",
-      isActive: true,
+      teamINE: "",
+      active: true,
     },
   });
 
   const { data: units = [] } = useQuery<HealthUnit[]>({
-    queryKey: ["/api/units"],
+    queryKey: ["/api/health-units"],
   });
 
   const { data: professionals = [], isLoading } = useQuery<Professional[]>({
@@ -163,11 +177,18 @@ export default function Professionals() {
     setEditingProfessional(professional);
     form.reset({
       name: professional.name,
+      cpf: professional.cpf || "",
       specialty: professional.specialty || "",
-      cns: professional.cns,
-      crm: professional.crm || "",
+      cns: professional.cns || "",
+      councilType: professional.councilType || "CRM",
+      councilNumber: professional.councilNumber || "",
+      councilState: professional.councilState || "BA",
+      cboCode: professional.cboCode || "",
+      phone: professional.phone || "",
+      email: professional.email || "",
       unitId: professional.unitId || "",
-      isActive: professional.isActive,
+      teamINE: professional.teamINE || "",
+      active: professional.active,
     });
     setIsDialogOpen(true);
   };
@@ -262,12 +283,75 @@ export default function Professionals() {
                 />
                 <FormField
                   control={form.control}
-                  name="crm"
+                  name="councilType"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>CRM (opcional)</FormLabel>
+                      <FormLabel>Tipo de Conselho</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o conselho" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="CRM">CRM - Conselho Regional de Medicina</SelectItem>
+                          <SelectItem value="COREN">COREN - Conselho Regional de Enfermagem</SelectItem>
+                          <SelectItem value="CRF">CRF - Conselho Regional de Farmácia</SelectItem>
+                          <SelectItem value="CRO">CRO - Conselho Regional de Odontologia</SelectItem>
+                          <SelectItem value="CREFITO">CREFITO - Conselho de Fisioterapia</SelectItem>
+                          <SelectItem value="CRP">CRP - Conselho Regional de Psicologia</SelectItem>
+                          <SelectItem value="CRESS">CRESS - Conselho de Serviço Social</SelectItem>
+                          <SelectItem value="CRN">CRN - Conselho de Nutricionistas</SelectItem>
+                          <SelectItem value="OUTRO">Outro</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="councilNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Número do Conselho</FormLabel>
                       <FormControl>
-                        <Input placeholder="12345-BA" {...field} />
+                        <Input placeholder="12345" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="councilState"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>UF do Conselho</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="UF" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"].map(uf => (
+                            <SelectItem key={uf} value={uf}>{uf}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="cpf"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>CPF</FormLabel>
+                      <FormControl>
+                        <Input placeholder="000.000.000-00" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -353,7 +437,7 @@ export default function Professionals() {
                   <TableHead>Nome</TableHead>
                   <TableHead>Especialidade</TableHead>
                   <TableHead>CNS</TableHead>
-                  <TableHead>CRM</TableHead>
+                  <TableHead>Conselho</TableHead>
                   <TableHead>Unidade</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
@@ -364,12 +448,12 @@ export default function Professionals() {
                   <TableRow key={professional.id}>
                     <TableCell className="font-medium">{professional.name}</TableCell>
                     <TableCell>{professional.specialty || "-"}</TableCell>
-                    <TableCell className="font-mono text-sm">{professional.cns}</TableCell>
-                    <TableCell>{professional.crm || "-"}</TableCell>
+                    <TableCell className="font-mono text-sm">{professional.cns || "-"}</TableCell>
+                    <TableCell>{professional.councilType}/{professional.councilNumber || "-"}</TableCell>
                     <TableCell>{getUnitName(professional.unitId)}</TableCell>
                     <TableCell>
-                      <Badge variant={professional.isActive ? "default" : "secondary"}>
-                        {professional.isActive ? "Ativo" : "Inativo"}
+                      <Badge variant={professional.active ? "default" : "secondary"}>
+                        {professional.active ? "Ativo" : "Inativo"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">

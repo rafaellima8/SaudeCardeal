@@ -35,7 +35,7 @@ export default function Settings() {
   });
 
   const { data: units = [] } = useQuery<any[]>({
-    queryKey: ["/api/units"],
+    queryKey: ["/api/health-units"],
   });
 
   const isAdmin = user?.role === 'admin' || user?.role === 'gestor';

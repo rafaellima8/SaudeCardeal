@@ -42,12 +42,12 @@ export default function Units() {
   });
 
   const { data: units = [], isLoading } = useQuery<HealthUnit[]>({
-    queryKey: ["/api/units"],
+    queryKey: ["/api/health-units"],
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: HealthUnitForm) => {
-      const response = await fetch("/api/units", {
+      const response = await fetch("/api/health-units", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -78,7 +78,7 @@ export default function Units() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<HealthUnitForm> }) => {
-      const response = await fetch(`/api/units/${id}`, {
+      const response = await fetch(`/api/health-units/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -110,7 +110,7 @@ export default function Units() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`/api/units/${id}`, {
+      const response = await fetch(`/api/health-units/${id}`, {
         method: "DELETE",
       });
       if (!response.ok) {

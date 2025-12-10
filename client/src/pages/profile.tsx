@@ -54,10 +54,10 @@ export default function Profile() {
   });
 
   const { data: unit } = useQuery<any>({
-    queryKey: ["/api/units", user?.unitId],
+    queryKey: ["/api/health-units", user?.unitId],
     enabled: !!user?.unitId,
     queryFn: async () => {
-      const response = await fetch(`/api/units/${user.unitId}`);
+      const response = await fetch(`/api/health-units/${user.unitId}`);
       if (!response.ok) return null;
       return response.json();
     },

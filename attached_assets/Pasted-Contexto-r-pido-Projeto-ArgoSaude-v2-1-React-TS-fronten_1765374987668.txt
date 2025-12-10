@@ -1,0 +1,116 @@
+Contexto rápido:
+- Projeto: ArgoSaude v2.1 (React+TS frontend, Express+TS backend, SQLite+Drizzle).
+- Problemas reportados: 
+  1) Erro ao criar solicitação TFD (toast: "Unexpected token '<', '<!DOCTYPE '... is not valid JSON")  
+  2) Erro ao criar nova unidade (mesmo toast)  
+  3) Imprimir ficha SINAN não funciona  
+  4) Exportar DBF (SINAN) não funciona  
+  5) Novo profissional: campo CNS deve ser OPICIONAL/REMOVIDO da validação obrigatória  
+  6) Revisar todo fluxo e permissões de acordo com perfis (RBAC) — evitar duplicações e alterações destrutivas sem aprovação
+
+Objetivo do Agent:
+1. Diagnosticar e corrigir a origem do erro "Unexpected token '<'… is not valid JSON" em todas as rotas/ações afetadas (TFD criar, Unidades criar, Imprimir SINAN, Exportar DBF).
+2. Corrigir a validação do cadastro de profissional (remover obrigatoriedade de CNS) e sincronizar backend/frontend.
+3. Corrigir e garantir a exportação DBF do SINAN e a geração/impressão de ficha.
+4. Revisar fluxos e RBAC, ajustar permissões por perfil, gerar testes e uma estratégia de deploy segura.
+5. Entregar um plano incremental com checkpoints, testes automatizados (unit + integration + E2E), scripts migration & rollback e PRs/changesets.
+
+Restrições obrigatórias (SÉRIAS):
+- NÃO aplique migrations destrutivas (ex: drop column, alterar big foreign keys, consolidar tabelas) sem minha **APROVAÇÃO**. Para ações de alto risco, gerar o diff SQL + plano de rollback e pausar.
+- Todas as mudanças devem incluir **testes** que comprovem a correção antes do merge.
+- Priorizar alterações **incrementais, reversíveis e com transações** no backend.
+
+Ações técnicas detalhadas — ordem e expectativas (execute em ordem e pare se encontrar risco >MÉDIO sem pedir aprovação):
+
+PHASE A — INVESTIGAÇÃO E CORREÇÃO RÁPIDA (SAFE)
+1. Diagnóstico do erro JSON (alto impacto)
+   - Inspecione logs do servidor (dev/prod) e console do browser ao reproduzir: capture a request que retorna HTML em vez de JSON. (Suspeita: rota retornando HTML 500/404 ou middleware de autenticação redirecionando para login HTML.)
+   - Arquivos para checar (prioridade): `client/src/services/api.ts` (fetch wrapper/axios), `server/routes.ts`, `server/middlewares/*` (auth, enforceUnitScope), handlers TFD (`server/services/tfd`), unidades (`server/services/units`), sinan export (`server/services/sinan`).
+   - Verifique `fetch`/`axios` chamadas que esperam `application/json` e routes que usam `res.sendFile()` ou `res.render` indevidamente.
+   - Fix requerido: garantir que todas as API endpoints chamadas por frontend retornem `res.json(...)` e status corretos, e que erros sejam JSON `{ error, message }`. Remova redirecionamentos HTML em APIs — se auth redireciona, em APIs deve retornar 401 JSON.
+
+2. Patch rápido (non-destructive)
+   - Add wrapper middleware `ensureJsonResponse` (aplicar temporariamente em `/api/*`) que converta respostas de erro HTML em JSON (com stack trace curto em dev). Exemplo:
+     ```ts
+     function ensureJsonResponse(req,res,next){
+       res._send = res.send;
+       res.send = function(body){ 
+         if (typeof body === 'string' && body.trim().startsWith('<')) {
+           res.type('application/json');
+           return res._send.call(this, JSON.stringify({ error: 'server_html_response', body: body.slice(0,400) }));
+         }
+         return res._send.call(this, body);
+       }
+       next();
+     }
+     ```
+   - Deploy essa correção como canary para que front não quebre e para coletar stack traces completos.
+
+PHASE B — CORREÇÕES POR BUG
+3. **TFD - Criar Solicitação**
+   - Reproduza via E2E test: preencher modal, submeter e validar resposta 201 + location. Capture payload e rota (`/api/tfd/create` ou similar).
+   - Corrija handlers: validar `Content-Type` no servidor; quando receber JSON parse error, log e retornar 400 JSON.
+   - Confirmar que front envia `fetch(url,{headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)})`.
+   - Adicionar testes unitários para validar schema do request (zod) e testar falhas de parsing.
+
+4. **Unidades - Nova Unidade**
+   - Mesmo padrão: identificar handler, checar validações schema (zod/yup). Se o servidor redireciona ao login (HTML), alterar para 401 JSON.
+   - Atualizar response para retornar a unidade criada em JSON e atualizar cache do frontend (TanStack Query `invalidateQueries('units')`).
+
+5. **SINAN - Imprimir Ficha & Exportar DBF**
+   - Imprimir ficha: checar se frontend chama `/api/sinan/print/:id` que devolve PDF ou HTML. Se PDF: `res.setHeader('Content-Type','application/pdf'); res.send(Buffer)`. O toast indica JSON parse error -> talvez frontend faça `response.json()` ao invés de `response.blob()` ou `response.arrayBuffer()`.  
+     *Fix*: no frontend, quando endpoint retorna PDF, use `fetch(...).then(r => r.blob()).then(blob => createObjectURL(blob))`. Ajustar função `printSinan` e adicionar um util `downloadOrOpenBlob`.
+   - Export DBF: verificar rota `/api/sinan/export/dbf` — certificar que responde com `application/octet-stream` e `Content-Disposition: attachment; filename="sinan.dbf"`. No frontend, usar `response.blob()` e forçar download. Se endpoint atual retorna HTML de erro, aplicar `ensureJsonResponse` e corrigir server logic.
+   - Adicionar unit/integration tests: mock responses e assegurar frontend usa blob API.
+
+PHASE C — MODEL & VALIDATION CHANGES (LOW RISK)
+6. **Profissionais - CNS opcional**
+   - Backend: localizar schema de validação (`shared/schema/professionals.ts` ou `server/validators/professionalValidator.ts`). Remover `required` em `cns` e aceitar null/empty string. Se houver `unique` index on `cns`, manter índice mas permitir nulls.
+   - Frontend: no form `client/src/pages/profissionais/*` remover `required` do campo e do HTML, ajustar mensagens.
+   - Tests: unit test validação aceitando sem CNS; E2E cria profissional sem CNS e checa sucesso 201.
+
+PHASE D — RBAC E FLUXOS (REVIEW)
+7. Auditoria de Permissões
+   - Gerar relatório automático: varrer `client/src` para componentes que mostram/hide features (e.g., `hasPermission('farmacia.dispensacao')`) e mapear com backend `roles` table + `permissions` seeds. Produzir CSV com: componente/endpoint/roles allowed/current state.
+   - Ajustes recomendados (aplicar SAFE changes): adicionar granular permission `autorizacoes:view`, `autorizacoes:process` e mapear para roles `farmaceutico`, `gestor`, `assistencia_social`. Não remova permissões existentes sem aprovação.
+   - Atualizar middleware `enforceRole('permission')` para suportar permission hierarchies e cache com TTL 60s.
+
+PHASE E — TESTES & CI
+8. Escrever testes:
+   - Unit tests (Jest/Ts): validar validators (TFD, Units, Professional); simulate server handlers returning HTML; assert conversion to JSON by `ensureJsonResponse`.
+   - Integration tests (supertest): POST /api/tfd/create with valid/invalid payload, expect proper status and JSON error messages.
+   - E2E tests (Playwright or Agent App Testing): flows: criar unidade, criar profissional sem CNS, criar TFD, imprimir SINAN, export DBF.
+   - Coverage mínima exigida para changes: +90% nas rotas alteradas.
+
+PHASE F — DEPLOY, CHECKPOINTS E ROLLBACK
+9. Deploy seguro:
+   - Criar branch `fix/integration-<ts>` e abrir PR.
+   - Antes merge: rodar CI (tests, lint, build).
+   - Use Replit checkpoints antes de cada fase aplicativa (A->B->C...). Cada checkpoint deve ter um resumo e instrução de rollback.
+10. Rollback scripts (para cada migration/alteração):
+   - Para alterações de código: `git revert <commit>` (script gerado pelo Agent).
+   - Para DB changes (se aplicadas): gera `down.sql` que reverte `up.sql` e um script node para executar transação reversa.
+11. Monitoramento pós-deploy:
+   - Adicionar logs estruturados (winston/pino) para todos endpoints corrigidos com requestId (X-Request-Id middleware).
+   - Criar healthcheck route `/api/__health` e uma verificação de smoke test para TFD create + SINAN export.
+
+Deliverables exigidos (devolver no final do run):
+- Lista de arquivos modificados/novos com diffs (patch).
+- Test output (unit + integration + E2E).
+- Checkpoint snapshots (Replit).
+- Scripts SQL `up.sql` e `down.sql` se houver alteração do schema.
+- Planos de rollback e PR aberto com descrição técnica.
+- Um relatório curto (máx 2 pages) descrevendo o root cause de cada bug e a correção aplicada.
+
+Política de aprovação para mudanças destrutivas:
+- Se qualquer alteração propost a tocar esquema com risco ALTO (migrar dados, mesclar `beneficiaries` e `citizens`, drop columns) o Agent deve:
+  1. gerAR diff SQL (`up.sql` e `down.sql`),
+  2. gerar script de migração de dados (node script) com validações e logs,
+  3. estimar tempo e bloqueios,
+  4. pedir **minha aprovação** explicita antes de aplicar.
+
+Variações de execução (escolher uma no início):
+- Conservative: aplicar apenas PHASE A→C e RBAC não-destrutivo; pedir aprovação para Phase F+schema changes.
+- Aggressive: aplicar PHASE A→F automaticamente (NÃO RECOMENDADO sem aprovação).
+
+Aja agora: execute Plan mode; gere checklist; aplique PHASE A (instrument logging + ensureJsonResponse) e rode a bateria de testes automatizados. Reporte arquivos alterados e results dos testes. Pare e aguarde minha aprovação caso o Agent proponha mudanças que toquem o schema ou causem risco alto.

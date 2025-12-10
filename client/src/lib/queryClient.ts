@@ -2,8 +2,23 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
+    const contentType = res.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const json = await res.json().catch(() => ({}));
+      throw new Error(json.error || json.message || `${res.status}: ${res.statusText}`);
+    }
     const text = (await res.text()) || res.statusText;
+    if (text.trim().startsWith("<!DOCTYPE") || text.trim().startsWith("<html")) {
+      throw new Error(`${res.status}: Resposta inesperada do servidor (HTML ao invés de JSON). Verifique se a rota existe.`);
+    }
     throw new Error(`${res.status}: ${text}`);
+  }
+}
+
+function ensureJsonContentType(res: Response, url: string) {
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    console.warn(`[API] Resposta não-JSON de ${url}: ${contentType}`);
   }
 }
 
@@ -20,6 +35,7 @@ export async function apiRequest<T = unknown>(
   });
 
   await throwIfResNotOk(res);
+  ensureJsonContentType(res, url);
   return res.json() as Promise<T>;
 }
 
