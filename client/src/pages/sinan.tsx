@@ -244,6 +244,70 @@ export default function Sinan() {
     setActiveTab("templates");
   };
 
+  const handlePrintNotification = async (notificationId: string) => {
+    try {
+      const response = await fetch(`/api/sinan/notifications/${notificationId}/pdf`, {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Erro ao gerar PDF");
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ficha_sinan_${notificationId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast({
+        title: "PDF gerado",
+        description: "A ficha foi baixada com sucesso.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro ao gerar PDF",
+        description: "Tente novamente mais tarde.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleExportDBF = () => {
+    const csvData = filteredNotifications.map((n) => ({
+      numero: n.notificationNumber || "",
+      data: n.notificationDate ? format(new Date(n.notificationDate), "dd/MM/yyyy") : "",
+      agravo: AGRAVO_CID_MAP[n.agravoCode]?.name || n.agravoCode,
+      cid: n.cidCode || "",
+      paciente: n.patientName || "",
+      cpf: n.patientCpf || "",
+      cns: n.patientCns || "",
+      status: STATUS_LABELS[n.status || "rascunho"]?.label || n.status,
+      classificacao: CLASSIFICATION_LABELS[n.classificacaoFinal || "em_investigacao"]?.label || "",
+    }));
+    
+    const headers = ["Número", "Data", "Agravo", "CID", "Paciente", "CPF", "CNS", "Status", "Classificação"];
+    const csvContent = [
+      headers.join(";"),
+      ...csvData.map(row => Object.values(row).map(v => `"${v}"`).join(";"))
+    ].join("\n");
+    
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `sinan_export_${format(new Date(), "yyyyMMdd_HHmmss")}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    toast({
+      title: "Exportação concluída",
+      description: `${csvData.length} notificação(ões) exportada(s).`,
+    });
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -834,9 +898,9 @@ export default function Sinan() {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" data-testid="button-export-sinan">
+            <Button variant="outline" onClick={handleExportDBF} data-testid="button-export-sinan">
               <Download className="h-4 w-4 mr-2" />
-              Exportar DBF
+              Exportar CSV
             </Button>
           </div>
         </CardContent>
@@ -1024,7 +1088,7 @@ export default function Sinan() {
             <Button variant="outline" onClick={() => setSelectedNotification(null)}>
               Fechar
             </Button>
-            <Button data-testid="button-print-notification">
+            <Button onClick={() => selectedNotification && handlePrintNotification(selectedNotification.id)} data-testid="button-print-notification">
               <FileCheck className="h-4 w-4 mr-2" />
               Imprimir Ficha
             </Button>
