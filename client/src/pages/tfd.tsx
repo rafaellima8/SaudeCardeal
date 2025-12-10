@@ -553,6 +553,8 @@ export default function TFD() {
   const [selectedTrip, setSelectedTrip] = useState<TFDTrip | null>(null);
   const [formCompanion, setFormCompanion] = useState(false);
   const [formPernoite, setFormPernoite] = useState(false);
+  const [formDesiredDate, setFormDesiredDate] = useState<Date | undefined>();
+  const [formCnhExpiry, setFormCnhExpiry] = useState<Date | undefined>();
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -729,9 +731,10 @@ export default function TFD() {
       pernoite: formPernoite,
       pernoiteQuantity: formPernoite ? parseInt(formData.get('pernoiteQuantity') as string) || 1 : null,
       pernoiteNotes: formPernoite ? formData.get('pernoiteNotes') : null,
-      desiredDate: formData.get('desiredDate') ? new Date(formData.get('desiredDate') as string) : null,
-      requestDate: new Date(),
+      desiredDate: formDesiredDate ? formDesiredDate.toISOString() : null,
+      requestDate: new Date().toISOString(),
     });
+    setFormDesiredDate(undefined);
   };
 
   const handleVehicleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -751,15 +754,20 @@ export default function TFD() {
 
   const handleDriverSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!formCnhExpiry) {
+      toast({ title: "Erro", description: "Validade CNH é obrigatória", variant: "destructive" });
+      return;
+    }
     const formData = new FormData(e.currentTarget);
     createDriver.mutate({
       name: formData.get('name'),
       cpf: formData.get('cpf'),
       cnh: formData.get('cnh'),
       cnhCategory: formData.get('cnhCategory'),
-      cnhExpiry: new Date(formData.get('cnhExpiry') as string),
+      cnhExpiry: formCnhExpiry.toISOString(),
       phone: formData.get('phone'),
     });
+    setFormCnhExpiry(undefined);
   };
 
   const handleTripSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -1240,7 +1248,7 @@ export default function TFD() {
       </Tabs>
 
       {/* New Request Dialog */}
-      <Dialog open={isNewRequestOpen} onOpenChange={setIsNewRequestOpen}>
+      <Dialog open={isNewRequestOpen} onOpenChange={(open) => { setIsNewRequestOpen(open); if (!open) { setFormDesiredDate(undefined); setFormCompanion(false); setFormPernoite(false); } }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Nova Solicitação TFD</DialogTitle>
@@ -1316,11 +1324,10 @@ export default function TFD() {
               <div className="space-y-2">
                 <Label>Data Desejada</Label>
                 <HybridDateInput
-                  value={undefined}
-                  onChange={() => {}}
+                  value={formDesiredDate}
+                  onChange={setFormDesiredDate}
                   data-testid="input-desired-date"
                 />
-                <input type="hidden" name="desiredDate" id="desiredDateHidden" />
               </div>
               <div className="space-y-2">
                 <Label>Tipo de Transporte</Label>
@@ -1400,7 +1407,7 @@ export default function TFD() {
               )}
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsNewRequestOpen(false)}>Cancelar</Button>
+              <Button type="button" variant="outline" onClick={() => { setIsNewRequestOpen(false); setFormDesiredDate(undefined); setFormCompanion(false); setFormPernoite(false); }}>Cancelar</Button>
               <Button type="submit" disabled={createRequest.isPending}>
                 {createRequest.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Criar Solicitação
@@ -1480,7 +1487,7 @@ export default function TFD() {
       </Dialog>
 
       {/* New Driver Dialog */}
-      <Dialog open={isNewDriverOpen} onOpenChange={setIsNewDriverOpen}>
+      <Dialog open={isNewDriverOpen} onOpenChange={(open) => { setIsNewDriverOpen(open); if (!open) { setFormCnhExpiry(undefined); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Novo Motorista</DialogTitle>
@@ -1521,15 +1528,14 @@ export default function TFD() {
               <div className="space-y-2 col-span-2">
                 <Label>Validade CNH *</Label>
                 <HybridDateInput
-                  value={undefined}
-                  onChange={() => {}}
+                  value={formCnhExpiry}
+                  onChange={setFormCnhExpiry}
                   data-testid="input-cnh-expiry"
                 />
-                <input type="hidden" name="cnhExpiry" id="cnhExpiryHidden" />
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsNewDriverOpen(false)}>Cancelar</Button>
+              <Button type="button" variant="outline" onClick={() => { setIsNewDriverOpen(false); setFormCnhExpiry(undefined); }}>Cancelar</Button>
               <Button type="submit" disabled={createDriver.isPending}>
                 {createDriver.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Cadastrar
