@@ -86,7 +86,27 @@ The system employs a client-server architecture with a clear separation of conce
 
 ## Recent Changes (2025-12-10)
 
-### v2.1.1 Stability & UX Improvements
+### v2.1.2 TFD Stability & HybridDateInput
+1. **TFD Routes Fixed**
+   - Corrigido mismatch de rotas frontend: `/api/tfd` → `/api/tfd/requests`
+   - URLs de vehicles, drivers, trips atualizadas para `/api/tfd/vehicles`, `/api/tfd/drivers`, `/api/tfd/trips`
+   - Mutations approve/reject/schedule agora usam PATCH em vez de endpoints inexistentes
+
+2. **HybridDateInput Component**
+   - Novo componente reutilizável: `client/src/components/ui/hybrid-date-input.tsx`
+   - Permite digitação manual com máscara DD/MM/YYYY + seleção via datepicker
+   - Parsing multi-formato (dd/MM/yyyy, yyyy-MM-dd, ddMMyyyy)
+   - Integrado em 4 campos TFD: Data Início, Data Fim, Data Desejada, Validade CNH
+
+3. **Form State Management**
+   - States `formDesiredDate` e `formCnhExpiry` gerenciados corretamente
+   - Cleanup automático ao cancelar ou fechar diálogos (ESC, overlay, botão)
+   - Handlers de submit convertidos para ISO strings
+
+4. **PDF Export Guard**
+   - Validação defensiva em `exportReportToPDF` verifica `data.summary` antes de renderizar
+
+### v2.1.1 Stability & UX Improvements (earlier 2025-12-10)
 1. **API Error Handling**
    - Guard de content-type no apiRequest para detectar respostas HTML vs JSON
    - Mensagens de erro descritivas quando rotas retornam HTML inesperado
